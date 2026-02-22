@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal B2B - Importadora Uziel</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #e8ecef; color: #111; }
+        .header { background: linear-gradient(to right, #003366, #001f3f); padding: 20px 50px; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
+        .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+        
+        .tabla-caja { background-color: #ffffff; padding: 25px; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #b0b0b0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f4f4f4; color: #003366; font-weight: bold; text-transform: uppercase; font-size: 14px; }
+        tr:hover { background-color: #f5f9ff; }
+        .precio { color: #27AE60; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>📦 Portal de Consulta - Importadora Uziel</h1>
+    </div>
+
+    <div class="container">
+        <div class="tabla-caja">
+            <h2>Catálogo de Productos en Tiempo Real</h2>
+            <p>Este portal refleja el inventario actualizado directamente desde el departamento de Marketing.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código SKU</th>
+                        <th>Nombre de la Pieza</th>
+                        <th>Marca</th>
+                        <th>Precio Corporativo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr>
+                        <td><strong>{{ producto[0] }}</strong></td>
+                        <td>{{ producto[1] }}</td>
+                        <td>{{ producto[2] }}</td>
+                        <td class="precio">${{ producto[3] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: gray;">No hay productos registrados en la base de datos aún.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>
