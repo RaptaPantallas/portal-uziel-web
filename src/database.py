@@ -109,8 +109,47 @@ class ConexionBD:
                 conexion.close()
         return producto
 
+    # --- FUNCIONES NUEVAS PARA EDITAR Y BORRAR ---
+    def eliminar_producto(self, sku):
+        conexion = self.conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("DELETE FROM productos WHERE sku = %s", (sku,))
+                conexion.commit()
+                return True
+            except Error as e:
+                print(f"🔴 Error al eliminar producto: {e}")
+                conexion.rollback()
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
+    def actualizar_producto(self, sku, nombre, descripcion, marca, compatibilidad, precio):
+        conexion = self.conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                consulta_sql = """
+                    UPDATE productos 
+                    SET nombre=%s, descripcion=%s, marca=%s, compatibilidad=%s, precio=%s 
+                    WHERE sku=%s
+                """
+                valores = (nombre, descripcion, marca, compatibilidad, precio, sku)
+                cursor.execute(consulta_sql, valores)
+                conexion.commit()
+                return True
+            except Error as e:
+                print(f"🔴 Error al actualizar el producto: {e}")
+                conexion.rollback()
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
     # ==========================================
-    # MÓDULO DAM (ACTIVOS DIGITALES) - ¡NUEVO!
+    # MÓDULO DAM (ACTIVOS DIGITALES)
     # ==========================================
     def registrar_activo(self, sku, ruta_archivo, tipo_archivo, angulo):
         conexion = self.conectar()
@@ -157,6 +196,5 @@ class ConexionBD:
                 cursor.close()
                 conexion.close()
         return datos_completos
-
 
 
