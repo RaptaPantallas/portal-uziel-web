@@ -16,6 +16,13 @@
         th { background-color: #f4f4f4; color: #003366; font-weight: bold; text-transform: uppercase; font-size: 14px; }
         tr:hover { background-color: #f5f9ff; }
         .precio { color: #27AE60; font-weight: bold; }
+        
+        /* Estilos agregados para los botones de acción */
+        .btn { text-decoration: none; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; margin-right: 5px; display: inline-block; transition: background 0.3s;}
+        .btn-editar { background-color: #F39C12; color: white; }
+        .btn-editar:hover { background-color: #D68910; }
+        .btn-eliminar { background-color: #C0392B; color: white; }
+        .btn-eliminar:hover { background-color: #922B21; }
     </style>
 </head>
 <body>
@@ -29,6 +36,17 @@
             <h2>Catálogo de Productos en Tiempo Real</h2>
             <p>Este portal refleja el inventario actualizado directamente desde el departamento de Marketing.</p>
             
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div style="padding: 15px; margin-bottom: 20px; border-radius: 4px; color: white; font-weight: bold;
+                       background-color: {{ '#27AE60' if category == 'exito' else '#E74C3C' }};">
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
             <table>
                 <thead>
                     <tr>
@@ -36,7 +54,7 @@
                         <th>Nombre de la Pieza</th>
                         <th>Marca</th>
                         <th>Precio Corporativo</th>
-                    </tr>
+                        <th>Acciones</th> </tr>
                 </thead>
                 <tbody>
                     {% for producto in productos %}
@@ -45,10 +63,14 @@
                         <td>{{ producto[1] }}</td>
                         <td>{{ producto[2] }}</td>
                         <td class="precio">${{ producto[3] }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-editar">✏️ Editar</a>
+                            <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" onclick="return confirm('¿Seguro que deseas eliminar el SKU {{ producto[0] }} de la base de datos?');" class="btn btn-eliminar">❌ Borrar</a>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="text-align: center; color: gray;">No hay productos registrados en la base de datos aún.</td>
+                        <td colspan="5" style="text-align: center; color: gray;">No hay productos registrados en la base de datos aún.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

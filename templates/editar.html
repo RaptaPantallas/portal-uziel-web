@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Producto - Importadora Uziel</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #e8ecef; color: #111; }
+        .header { background: linear-gradient(to right, #003366, #001f3f); padding: 20px 50px; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        .container { max-width: 600px; margin: 40px auto; padding: 0 20px; }
+        
+        .formulario-caja { background-color: #ffffff; padding: 30px; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #b0b0b0; }
+        .formulario-caja h2 { margin-top: 0; color: #003366; text-align: center; border-bottom: 2px solid #f4f4f4; padding-bottom: 10px; }
+        
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 14px; text-transform: uppercase; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 15px; background-color: #f9f9f9;}
+        input:focus { border-color: #0056b3; outline: none; background-color: #fff; }
+        
+        .sku-display { background-color: #e9ecef !important; color: #555; cursor: not-allowed; font-weight: bold; }
+        
+        .btn-guardar { width: 100%; background-color: #27AE60; color: white; padding: 15px; border: none; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; text-transform: uppercase; transition: background 0.3s; margin-bottom: 15px; }
+        .btn-guardar:hover { background-color: #219150; }
+        
+        .btn-cancelar { display: block; width: 100%; text-align: center; background-color: #7f8c8d; color: white; padding: 12px; text-decoration: none; border-radius: 4px; font-weight: bold; box-sizing: border-box; transition: background 0.3s;}
+        .btn-cancelar:hover { background-color: #606b6d; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>✏️ Panel de Administración</h1>
+    </div>
+
+    <div class="container">
+        <div class="formulario-caja">
+            <h2>Actualizar Datos del Repuesto</h2>
+            
+            <form method="POST">
+                <label>Código SKU (Identificador):</label>
+                <input type="text" value="{{ producto[0] }}" class="sku-display" readonly>
+
+                <label>Nombre de la Pieza:</label>
+                <input type="text" name="nombre" value="{{ producto[1] }}" required>
+
+                <label>Descripción:</label>
+                <input type="text" name="descripcion" value="{{ producto[2] }}" required>
+
+                <label>Marca:</label>
+                <input type="text" name="marca" value="{{ producto[3] }}" required>
+
+                <label>Compatibilidad (Vehículos):</label>
+                <input type="text" name="compatibilidad" value="{{ producto[4] }}" required>
+
+                <label>Precio Corporativo ($):</label>
+                <input type="number" step="0.01" name="precio" value="{{ producto[5] }}" required>
+
+                <button type="submit" class="btn-guardar">💾 Guardar Cambios</button>
+                <a href="/" class="btn-cancelar">❌ Cancelar y Volver al Catálogo</a>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

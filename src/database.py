@@ -94,6 +94,21 @@ class ConexionBD:
                 conexion.close()
         return lista_productos
 
+    def obtener_producto(self, sku):
+        conexion = self.conectar()
+        producto = None
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("SELECT sku, nombre, descripcion, marca, compatibilidad, precio FROM productos WHERE sku = %s", (sku,))
+                producto = cursor.fetchone()
+            except Error as e:
+                print(f"🔴 Error al obtener el producto: {e}")
+            finally:
+                cursor.close()
+                conexion.close()
+        return producto
+
     # ==========================================
     # MÓDULO DAM (ACTIVOS DIGITALES) - ¡NUEVO!
     # ==========================================
@@ -142,3 +157,4 @@ class ConexionBD:
                 cursor.close()
                 conexion.close()
         return datos_completos
+
