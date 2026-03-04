@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes CRM - Uziel</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7fe; color: #2b3674; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 250px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .sidebar h2 { color: #003366; font-size: 20px; margin-bottom: 40px; text-align: center; }
+        .menu-btn { padding: 15px; margin-bottom: 10px; border-radius: 10px; text-decoration: none; color: #a3aed1; font-weight: bold; display: block; transition: 0.3s; }
+        .menu-btn:hover, .menu-btn.active { background-color: #4318FF; color: white; }
+        .logout { margin-top: auto; background-color: #ffe5e5; color: #d33; text-align: center; }
+        
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .user-info { background: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+
+        .tabla-caja { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); margin-bottom: 30px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9edf7; }
+        th { color: #a3aed1; font-size: 13px; text-transform: uppercase; }
+        tr:hover { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>📦 Portal Uziel</h2>
+        <a href="{{ url_for('inicio') }}" class="menu-btn">📊 Dashboard general</a>
+        <a href="{{ url_for('catalogo') }}" class="menu-btn">📋 Ver Catálogo (PIM)</a>
+        <a href="{{ url_for('clientes') }}" class="menu-btn active">👥 Ver Clientes (CRM)</a>
+        <a href="{{ url_for('logout') }}" class="menu-btn logout">🚪 Cerrar Sesión</a>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <h1>Módulo de Clientes (CRM)</h1>
+            <div class="user-info">👤 ROL: {{ session['rol'] }}</div>
+        </div>
+
+        <div class="tabla-caja">
+            <h3>Directorio de Clientes Activos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>RIF</th>
+                        <th>Nombre de Empresa</th>
+                        <th>Teléfono</th>
+                        <th>Correo Electrónico</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in clientes %}
+                    <tr>
+                        <td><strong>{{ cliente[0] }}</strong></td>
+                        <td>{{ cliente[1] }}</td>
+                        <td>{{ cliente[2] }}</td>
+                        <td>{{ cliente[3] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: gray;">No hay clientes registrados aún.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>

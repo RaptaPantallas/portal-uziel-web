@@ -2,43 +2,26 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - Importadora Uziel</title>
+    <title>Catálogo PIM - Uziel</title>
     <style>
-        /* Estilos base inspirados en la referencia moderna */
         body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7fe; color: #2b3674; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Menú Lateral (Sidebar) */
         .sidebar { width: 250px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
         .sidebar h2 { color: #003366; font-size: 20px; margin-bottom: 40px; text-align: center; }
         .menu-btn { padding: 15px; margin-bottom: 10px; border-radius: 10px; text-decoration: none; color: #a3aed1; font-weight: bold; display: block; transition: 0.3s; }
         .menu-btn:hover, .menu-btn.active { background-color: #4318FF; color: white; }
-        .logout { margin-top: auto; background-color: #ffe5e5; color: #d33; }
-        .logout:hover { background-color: #ffcccc; }
-
-        /* Contenido Principal */
+        .logout { margin-top: auto; background-color: #ffe5e5; color: #d33; text-align: center; }
+        
         .main-content { flex: 1; padding: 30px; overflow-y: auto; }
         .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .topbar h1 { margin: 0; font-size: 28px; }
         .user-info { background: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
 
-        /* Tarjetas de Estadísticas (Widgets) */
-        .cards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px; }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); }
-        .card h3 { margin: 0 0 10px 0; color: #a3aed1; font-size: 14px; text-transform: uppercase; }
-        .card .numero { font-size: 32px; font-weight: bold; color: #2b3674; margin: 0; }
-
-        /* Tablas */
         .tabla-caja { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); margin-bottom: 30px;}
-        .tabla-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .tabla-header h3 { margin: 0; font-size: 20px; }
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9edf7; }
         th { color: #a3aed1; font-size: 13px; text-transform: uppercase; }
         tr:hover { background-color: #f8f9fa; }
         
-        /* Botones de Acción */
         .btn { padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; cursor: pointer; border: none; }
-        .btn-add { background-color: #4318FF; color: white; }
         .btn-pdf { background-color: #F56565; color: white; }
         .btn-editar { background-color: #F6AD55; color: white; }
         .btn-borrar { background-color: #E53E3E; color: white; }
@@ -48,33 +31,16 @@
 
     <div class="sidebar">
         <h2>📦 Portal Uziel</h2>
-        <a href="{{ url_for('inicio') }}" class="menu-btn active">📊 Dashboard general</a>
-        <a href="{{ url_for('catalogo') }}" class="menu-btn">📋 Ver Catálogo (PIM)</a>
+        <a href="{{ url_for('inicio') }}" class="menu-btn">📊 Dashboard general</a>
+        <a href="{{ url_for('catalogo') }}" class="menu-btn active">📋 Ver Catálogo (PIM)</a>
         <a href="{{ url_for('clientes') }}" class="menu-btn">👥 Ver Clientes (CRM)</a>
-        
-        <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
-            <p style="font-size: 12px; color: gray; margin-bottom: 10px;">ACCIONES</p>
-            <button class="btn btn-pdf" style="width: 100%; text-align: left; margin-bottom: 10px;">📄 Generar PDF Catálogo</button>
-            
-            {% if session['rol'] == 'Admin' %}
-                <a href="{{ url_for('nuevo_producto') }}" class="btn btn-add" style="width: 100%; text-align: left; margin-bottom: 10px; display: block; box-sizing: border-box;">➕ Nuevo Producto</a>
-                <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-add" style="width: 100%; text-align: left; margin-bottom: 10px; background-color: #00b5d8; display: block; box-sizing: border-box;">➕ Nuevo Cliente</a>
-            {% endif %}
-        </div>
-
         <a href="{{ url_for('logout') }}" class="menu-btn logout">🚪 Cerrar Sesión</a>
     </div>
 
     <div class="main-content">
-        
         <div class="topbar">
-            <div>
-                <p style="margin: 0; color: #a3aed1;">Bienvenido de nuevo,</p>
-                <h1>{{ session['usuario'].capitalize() }}</h1>
-            </div>
-            <div class="user-info">
-                👤 ROL: {{ session['rol'] }}
-            </div>
+            <h1>Gestión de Inventario (PIM)</h1>
+            <div class="user-info">👤 ROL: {{ session['rol'] }}</div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -87,28 +53,17 @@
             {% endif %}
         {% endwith %}
 
-        <div class="cards-grid">
-            <div class="card">
-                <h3>Total de Repuestos en BD</h3>
-                <p class="numero">{{ total_prod }}</p>
-            </div>
-            <div class="card">
-                <h3>Total de Clientes Registrados</h3>
-                <p class="numero">{{ total_cli }}</p>
-            </div>
-        </div>
-
         <div class="tabla-caja">
             <form action="{{ url_for('generar_pdf') }}" method="POST">
-                <div class="tabla-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>📋 Últimos Productos</h3>
-                    <button type="submit" class="btn btn-pdf" style="padding: 10px 20px; font-size: 14px;">📄 Generar PDF Seleccionados</button>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Inventario Completo</h3>
+                    <button type="submit" class="btn btn-pdf" style="padding: 10px 20px;">📄 Generar PDF Seleccionados</button>
                 </div>
-                
                 <table>
                     <thead>
                         <tr>
-                            <th>PDF</th> <th>SKU</th>
+                            <th>PDF</th>
+                            <th>SKU</th>
                             <th>Nombre</th>
                             <th>Marca</th>
                             <th>Precio</th>
@@ -119,7 +74,6 @@
                         {% for producto in productos %}
                         <tr>
                             <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}" style="transform: scale(1.3); cursor: pointer;"></td>
-                            
                             <td><strong>{{ producto[0] }}</strong></td>
                             <td>{{ producto[1] }}</td>
                             <td>{{ producto[2] }}</td>
@@ -138,7 +92,6 @@
                 </table>
             </form>
         </div>
-
     </div>
 
 </body>

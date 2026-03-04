@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Nuevo Producto - Uziel</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7fe; color: #111; padding: 40px 20px; }
+        .formulario-caja { background-color: #ffffff; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; }
+        h2 { color: #003366; text-align: center; border-bottom: 2px solid #f4f4f4; padding-bottom: 10px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #a3aed1; font-size: 13px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #e9edf7; border-radius: 8px; box-sizing: border-box; background-color: #f8f9fa;}
+        .btn-guardar { width: 100%; background-color: #4318FF; color: white; padding: 15px; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .btn-guardar:hover { background-color: #3110b5; }
+        .btn-cancelar { display: block; text-align: center; margin-top: 15px; color: #F56565; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="formulario-caja">
+        <h2>📦 Registrar Nuevo Repuesto</h2>
+        <form method="POST">
+            <label>Código SKU:</label>
+            <input type="text" name="sku" placeholder="Ej: BMB-GAS-CORS-01" required>
+            <label>Nombre de la Pieza:</label>
+            <input type="text" name="nombre" required>
+            <label>Descripción:</label>
+            <input type="text" name="descripcion" required>
+            <label>Marca:</label>
+            <input type="text" name="marca" required>
+            <label>Compatibilidad:</label>
+            <input type="text" name="compatibilidad" required>
+            <label>Precio Corporativo ($):</label>
+            <input type="number" step="0.01" name="precio" required>
+            <button type="submit" class="btn-guardar">💾 Guardar Producto</button>
+            <a href="/" class="btn-cancelar">❌ Cancelar</a>
+        </form>
+    </div>
+</body>
+</html>
