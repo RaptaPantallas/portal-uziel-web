@@ -214,3 +214,29 @@ class ConexionBD:
                 cursor.close()
                 conexion.close()
         return usuario_valido
+# ==========================================
+    # MÓDULO ESTADÍSTICAS (DASHBOARD)
+    # ==========================================
+    def contar_productos(self):
+        conexion = self.conectar()
+        total = 0
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("SELECT COUNT(*) FROM productos")
+                total = cursor.fetchone()[0]
+            except Error: pass
+            finally: conexion.close()
+        return total
+
+    def contar_clientes(self):
+        conexion = self.conectar()
+        total = 0
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("SELECT COUNT(*) FROM clientes")
+                total = cursor.fetchone()[0]
+            except Error: pass
+            finally: conexion.close()
+        return total
