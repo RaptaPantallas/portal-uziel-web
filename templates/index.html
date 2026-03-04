@@ -6,7 +6,7 @@
     <title>Portal B2B - Importadora Uziel</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #e8ecef; color: #111; }
-        .header { background: linear-gradient(to right, #003366, #001f3f); padding: 20px 50px; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); }
+        .header { background: linear-gradient(to right, #003366, #001f3f); padding: 20px 50px; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.4); display: flex; justify-content: space-between; align-items: center; }
         .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
         .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
         
@@ -28,7 +28,11 @@
 <body>
 
     <div class="header">
-        <h1>📦 Portal de Consulta - Importadora Uziel</h1>
+        <h1>📦 Portal de Consulta - Uziel</h1>
+        <div style="font-size: 14px;">
+            👤 Usuario: <strong>{{ session['usuario'].capitalize() }}</strong> ({{ session['rol'] }}) | 
+            <a href="{{ url_for('logout') }}" style="color: #F39C12; text-decoration: none; font-weight: bold;">🚪 Salir</a>
+        </div>
     </div>
 
     <div class="container">
@@ -54,7 +58,8 @@
                         <th>Nombre de la Pieza</th>
                         <th>Marca</th>
                         <th>Precio Corporativo</th>
-                        <th>Acciones</th> </tr>
+                        <th>Acciones</th> 
+                    </tr>
                 </thead>
                 <tbody>
                     {% for producto in productos %}
@@ -63,10 +68,16 @@
                         <td>{{ producto[1] }}</td>
                         <td>{{ producto[2] }}</td>
                         <td class="precio">${{ producto[3] }}</td>
+                        
                         <td>
-                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-editar">✏️ Editar</a>
-                            <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" onclick="return confirm('¿Seguro que deseas eliminar el SKU {{ producto[0] }} de la base de datos?');" class="btn btn-eliminar">❌ Borrar</a>
+                            {% if session['rol'] == 'Admin' %}
+                                <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-editar">✏️ Editar</a>
+                                <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" onclick="return confirm('¿Seguro que deseas eliminar el SKU {{ producto[0] }} de la base de datos?');" class="btn btn-eliminar">❌ Borrar</a>
+                            {% else %}
+                                <span style="color: gray; font-size: 13px; font-weight: bold;">🔒 Solo lectura</span>
+                            {% endif %}
                         </td>
+                        
                     </tr>
                     {% else %}
                     <tr>
