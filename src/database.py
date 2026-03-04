@@ -196,5 +196,21 @@ class ConexionBD:
                 cursor.close()
                 conexion.close()
         return datos_completos
-
-
+# ==========================================
+    # MÓDULO DE SEGURIDAD (LOGIN)
+    # ==========================================
+    def verificar_login(self, username, password):
+        conexion = self.conectar()
+        usuario_valido = None
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                # Buscamos si existe ese usuario con esa contraseña
+                cursor.execute("SELECT username, rol FROM usuarios WHERE username = %s AND password = %s", (username, password))
+                usuario_valido = cursor.fetchone() # Trae (username, rol) si existe, o None si no existe
+            except Error as e:
+                print(f"🔴 Error al verificar login: {e}")
+            finally:
+                cursor.close()
+                conexion.close()
+        return usuario_valido
