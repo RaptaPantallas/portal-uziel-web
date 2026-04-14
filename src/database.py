@@ -438,8 +438,11 @@ class ConexionBD:
         cursor = None
         try:
             cursor = conexion.cursor()
+            # LOWER() en ambos lados: el login funciona sin importar si el
+            # usuario escribió "admin", "Admin" o "ADMIN"
             cursor.execute(
-                "SELECT username, rol FROM usuarios WHERE username = %s AND password = %s",
+                "SELECT username, rol FROM usuarios "
+                "WHERE LOWER(username) = LOWER(%s) AND password = %s",
                 (username, password)
             )
             usuario_valido = cursor.fetchone()
