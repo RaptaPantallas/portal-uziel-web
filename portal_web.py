@@ -118,8 +118,9 @@ def login():
           redirige al Dashboard. Si son incorrectas, muestra un mensaje de error.
     """
     if request.method == 'POST':
-        # Convertir a minúscula para evitar problemas de mayúsculas/minúsculas
-        username = request.form['username'].strip().lower()
+        # Se mantiene el username tal como fue escrito; la comparación
+        # insensible a mayúsculas se hace en la consulta SQL con LOWER()
+        username = request.form['username'].strip()
         password = request.form['password']
 
         datos_usuario = bd.verificar_login(username, password)
