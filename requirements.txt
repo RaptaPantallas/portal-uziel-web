@@ -1,4 +1,20 @@
+# =============================================================
+# requirements.txt — Dependencias del Portal Web (Flask)
+# Proyecto: Dashboard de Marketing - Importadora Uziel C.A.
+#
+# Instalación:  pip install -r requirements.txt
+# Despliegue:   Este archivo es leído automáticamente por Render
+#               durante el Build Command.
+# =============================================================
+
+# Framework web
 Flask==3.0.0
+
+# Conexión a PostgreSQL en la nube
 psycopg2-binary==2.9.9
+
+# Servidor WSGI para producción en Render (reemplaza al servidor de desarrollo de Flask)
 gunicorn==21.2.0
-reportlab
+
+# Generación de archivos PDF con coordenadas exactas
+reportlab==4.1.0
