@@ -2,70 +2,209 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Clientes CRM - Uziel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes — Importadora Uziel</title>
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7fe; color: #2b3674; display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 250px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-        .sidebar h2 { color: #003366; font-size: 20px; margin-bottom: 40px; text-align: center; }
-        .menu-btn { padding: 15px; margin-bottom: 10px; border-radius: 10px; text-decoration: none; color: #a3aed1; font-weight: bold; display: block; transition: 0.3s; }
-        .menu-btn:hover, .menu-btn.active { background-color: #4318FF; color: white; }
-        .logout { margin-top: auto; background-color: #ffe5e5; color: #d33; text-align: center; }
-        
-        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .user-info { background: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .tabla-caja { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); margin-bottom: 30px;}
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9edf7; }
-        th { color: #a3aed1; font-size: 13px; text-transform: uppercase; }
-        tr:hover { background-color: #f8f9fa; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f7fa;
+            color: #1a1d27;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 200px; min-height: 100vh; background: #1a1d27;
+            display: flex; flex-direction: column; padding: 20px 0;
+            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
+        }
+        .sidebar-brand {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 18px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
+        }
+        .brand-icon {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
+        }
+        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
+        .sidebar nav { flex: 1; padding: 0 10px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            text-decoration: none; color: #8a93a8;
+            font-size: 14px; font-weight: 500; margin-bottom: 2px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .user-avatar {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
+        }
+        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
+        .user-rol  { color: #8a93a8; font-size: 12px; }
+        .btn-logout {
+            display: flex; align-items: center; gap: 8px;
+            color: #8a93a8; text-decoration: none;
+            font-size: 13px; font-weight: 500; transition: color 0.15s;
+        }
+        .btn-logout:hover { color: #e8ecf5; }
+
+        /* CONTENIDO */
+        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
+        .page-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; }
+        .page-header-left h1 { font-size: 28px; font-weight: 700; }
+        .page-header-left .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
+
+        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
+        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
+        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
+
+        .search-bar {
+            background: white; border-radius: 10px;
+            padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+            margin-bottom: 16px; border: 1px solid #eaedf3;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .search-bar input { border: none; outline: none; font-size: 14px; color: #1a1d27; width: 100%; background: transparent; }
+        .search-bar input::placeholder { color: #b0b8cc; }
+
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3; overflow: hidden; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            padding: 11px 20px; text-align: left;
+            font-size: 12px; font-weight: 600; color: #8a93a8;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid #eaedf3; background: #fafbfc;
+        }
+        td { padding: 14px 20px; font-size: 14px; color: #2c3347; border-bottom: 1px solid #f0f2f5; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafbfc; }
+
+        .rif-badge {
+            font-family: 'Courier New', monospace;
+            font-size: 12px; font-weight: 700;
+            color: #0ea5e9; background: #e0f2fe;
+            padding: 3px 8px; border-radius: 5px;
+        }
+
+        .contacto-linea { display: flex; flex-direction: column; gap: 2px; }
+        .contacto-linea .correo { font-size: 13px; color: #3b5bdb; }
+        .contacto-linea .tel   { font-size: 13px; color: #8a93a8; }
+
+        .btn { display: inline-block; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.15s; }
+        .btn:hover { opacity: 0.82; }
+        .btn-blue { background: #3b5bdb; color: white; }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
-        <h2>📦 Portal Uziel</h2>
-        <a href="{{ url_for('inicio') }}" class="menu-btn">📊 Dashboard general</a>
-        <a href="{{ url_for('catalogo') }}" class="menu-btn">📋 Ver Catálogo (PIM)</a>
-        <a href="{{ url_for('clientes') }}" class="menu-btn active">👥 Ver Clientes (CRM)</a>
-        <a href="{{ url_for('logout') }}" class="menu-btn logout">🚪 Cerrar Sesión</a>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">U</div>
+        <span class="brand-name">Imp. Uziel</span>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('clientes') }}" class="nav-item active">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        <a href="{{ url_for('catalogo') }}" class="nav-item">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
+                <div class="user-rol">{{ session['rol'] }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- CONTENIDO -->
+<main class="main-content">
+
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1>Clientes</h1>
+            <p class="subtitulo">Gestión de cartera de clientes</p>
+        </div>
+        {% if session['rol'] == 'Admin' %}
+            <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-blue">+ Nuevo Cliente</a>
+        {% endif %}
     </div>
 
-    <div class="main-content">
-        <div class="topbar">
-            <h1>Módulo de Clientes (CRM)</h1>
-            <div class="user-info">👤 ROL: {{ session['rol'] }}</div>
-        </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}
+        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
 
-        <div class="tabla-caja">
-            <h3>Directorio de Clientes Activos</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>RIF</th>
-                        <th>Nombre de Empresa</th>
-                        <th>Teléfono</th>
-                        <th>Correo Electrónico</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for cliente in clientes %}
-                    <tr>
-                        <td><strong>{{ cliente[0] }}</strong></td>
-                        <td>{{ cliente[1] }}</td>
-                        <td>{{ cliente[2] }}</td>
-                        <td>{{ cliente[3] }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: gray;">No hay clientes registrados aún.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div class="search-bar">
+        🔍
+        <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarTabla()">
     </div>
 
+    <div class="card">
+        <table id="tabla-clientes">
+            <thead>
+                <tr>
+                    <th>RIF</th>
+                    <th>Empresa</th>
+                    <th>Contacto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td><span class="rif-badge">{{ cliente[0] }}</span></td>
+                    <td><strong>{{ cliente[1] }}</strong></td>
+                    <td>
+                        <div class="contacto-linea">
+                            <span class="correo">{{ cliente[3] or '—' }}</span>
+                            <span class="tel">{{ cliente[2] or '—' }}</span>
+                        </div>
+                    </td>
+                    <td>···</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align:center; color:#b0b8cc; padding:40px;">
+                        No hay clientes registrados aún.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<script>
+function filtrarTabla() {
+    const texto = document.getElementById('buscador').value.toLowerCase();
+    document.querySelectorAll('#tabla-clientes tbody tr').forEach(fila => {
+        fila.style.display = fila.textContent.toLowerCase().includes(texto) ? '' : 'none';
+    });
+}
+</script>
 </body>
 </html>

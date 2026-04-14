@@ -21,6 +21,7 @@
 #   - Estadísticas : Contadores para el Dashboard
 # =============================================================================
 
+import os
 import psycopg2
 from psycopg2 import Error
 
@@ -31,8 +32,20 @@ from psycopg2 import Error
 
 # URL de conexión a PostgreSQL en Render.com
 # Formato: postgresql://usuario:contraseña@host/nombre_base_datos
-# Obtén esta URL desde: Render > Tu BD > "External Database URL"
-URL_BASE_DE_DATOS = "postgresql://admin:Hk4Bn6VaReRb1U38W7aM0t12QAn1aJ4O@dpg-d6ddpkktgctc73f38gv0-a.oregon-postgres.render.com/importadora_uziel"
+#
+# CÓMO CONFIGURAR (elige una opción):
+#
+#   Opción A — Variable de entorno (RECOMENDADO para producción):
+#     Windows CMD : set DATABASE_URL=postgresql://usuario:clave@host/bd
+#     Windows PS  : $env:DATABASE_URL="postgresql://usuario:clave@host/bd"
+#     Linux/Mac   : export DATABASE_URL="postgresql://usuario:clave@host/bd"
+#     Render.com  : Dashboard > Environment > Add Environment Variable
+#
+#   Opción B — Reemplaza directamente la cadena vacía de abajo (solo para
+#              desarrollo local, NUNCA subas esto a GitHub):
+#
+DATABASE_URL_DEFAULT = ""   # <-- Pega aquí tu URL solo para desarrollo local
+URL_BASE_DE_DATOS = os.getenv("DATABASE_URL", DATABASE_URL_DEFAULT)
 
 # =============================================================================
 
@@ -93,6 +106,7 @@ class ConexionBD:
         conexion = self.conectar()
         if not conexion:
             return False
+        cursor = None
         try:
             cursor = conexion.cursor()
             consulta_sql = """
@@ -108,7 +122,8 @@ class ConexionBD:
             conexion.rollback()
             return False
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
 
     def obtener_clientes(self):
@@ -123,6 +138,7 @@ class ConexionBD:
         lista_clientes = []
         if not conexion:
             return lista_clientes
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute(
@@ -133,7 +149,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [CRM] Error al obtener clientes: {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return lista_clientes
 
@@ -159,6 +176,7 @@ class ConexionBD:
         conexion = self.conectar()
         if not conexion:
             return False
+        cursor = None
         try:
             cursor = conexion.cursor()
             consulta_sql = """
@@ -174,7 +192,8 @@ class ConexionBD:
             conexion.rollback()
             return False
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
 
     def obtener_productos(self):
@@ -190,6 +209,7 @@ class ConexionBD:
         lista_productos = []
         if not conexion:
             return lista_productos
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute(
@@ -200,7 +220,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [PIM] Error al obtener lista de productos: {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return lista_productos
 
@@ -220,6 +241,7 @@ class ConexionBD:
         producto = None
         if not conexion:
             return producto
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute(
@@ -231,7 +253,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [PIM] Error al obtener producto '{sku}': {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return producto
 
@@ -254,6 +277,7 @@ class ConexionBD:
         conexion = self.conectar()
         if not conexion:
             return False
+        cursor = None
         try:
             cursor = conexion.cursor()
             consulta_sql = """
@@ -270,7 +294,8 @@ class ConexionBD:
             conexion.rollback()
             return False
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
 
     def eliminar_producto(self, sku):
@@ -288,6 +313,7 @@ class ConexionBD:
         conexion = self.conectar()
         if not conexion:
             return False
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("DELETE FROM productos WHERE sku = %s", (sku,))
@@ -299,7 +325,8 @@ class ConexionBD:
             conexion.rollback()
             return False
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
 
     # =========================================================================
@@ -323,6 +350,7 @@ class ConexionBD:
         conexion = self.conectar()
         if not conexion:
             return False
+        cursor = None
         try:
             cursor = conexion.cursor()
             # Subconsulta: obtiene el id_producto a partir del SKU legible
@@ -342,7 +370,8 @@ class ConexionBD:
             conexion.rollback()
             return False
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
 
     def obtener_producto_con_imagen(self, sku):
@@ -362,6 +391,7 @@ class ConexionBD:
         datos_completos = None
         if not conexion:
             return datos_completos
+        cursor = None
         try:
             cursor = conexion.cursor()
             # LEFT JOIN: trae el producto aunque NO tenga imagen en el DAM
@@ -377,7 +407,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [DAM] Error al obtener producto+imagen para SKU '{sku}': {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return datos_completos
 
@@ -404,6 +435,7 @@ class ConexionBD:
         usuario_valido = None
         if not conexion:
             return usuario_valido
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute(
@@ -414,7 +446,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [Auth] Error al verificar login del usuario '{username}': {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return usuario_valido
 
@@ -433,6 +466,7 @@ class ConexionBD:
         total = 0
         if not conexion:
             return total
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("SELECT COUNT(*) FROM productos")
@@ -440,7 +474,8 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [Stats] Error al contar productos: {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return total
 
@@ -455,6 +490,7 @@ class ConexionBD:
         total = 0
         if not conexion:
             return total
+        cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("SELECT COUNT(*) FROM clientes")
@@ -462,6 +498,7 @@ class ConexionBD:
         except Error as e:
             print(f"🔴 [Stats] Error al contar clientes: {e}")
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             conexion.close()
         return total

@@ -2,97 +2,305 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Catálogo PIM - Uziel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos — Importadora Uziel</title>
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7fe; color: #2b3674; display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 250px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-        .sidebar h2 { color: #003366; font-size: 20px; margin-bottom: 40px; text-align: center; }
-        .menu-btn { padding: 15px; margin-bottom: 10px; border-radius: 10px; text-decoration: none; color: #a3aed1; font-weight: bold; display: block; transition: 0.3s; }
-        .menu-btn:hover, .menu-btn.active { background-color: #4318FF; color: white; }
-        .logout { margin-top: auto; background-color: #ffe5e5; color: #d33; text-align: center; }
-        
-        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .user-info { background: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .tabla-caja { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.02); margin-bottom: 30px;}
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e9edf7; }
-        th { color: #a3aed1; font-size: 13px; text-transform: uppercase; }
-        tr:hover { background-color: #f8f9fa; }
-        
-        .btn { padding: 8px 15px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; cursor: pointer; border: none; }
-        .btn-pdf { background-color: #F56565; color: white; }
-        .btn-editar { background-color: #F6AD55; color: white; }
-        .btn-borrar { background-color: #E53E3E; color: white; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f7fa;
+            color: #1a1d27;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ===================== SIDEBAR ===================== */
+        .sidebar {
+            width: 200px;
+            min-height: 100vh;
+            background: #1a1d27;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            flex-shrink: 0;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 18px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            margin-bottom: 12px;
+        }
+
+        .brand-icon {
+            width: 32px; height: 32px;
+            background: #3b5bdb;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
+
+        .sidebar nav { flex: 1; padding: 0 10px; }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #8a93a8;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59, 91, 219, 0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+        .sidebar-footer {
+            padding: 16px 18px;
+            border-top: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+
+        .user-avatar {
+            width: 32px; height: 32px;
+            background: #3b5bdb;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
+        .user-rol  { color: #8a93a8; font-size: 12px; }
+
+        .btn-logout {
+            display: flex; align-items: center; gap: 8px;
+            color: #8a93a8; text-decoration: none;
+            font-size: 13px; font-weight: 500;
+            transition: color 0.15s;
+        }
+        .btn-logout:hover { color: #e8ecf5; }
+
+        /* ===================== CONTENIDO ===================== */
+        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
+
+        .page-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; }
+        .page-header-left h1 { font-size: 28px; font-weight: 700; }
+        .page-header-left .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
+
+        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
+        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
+        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
+
+        /* Barra de búsqueda */
+        .search-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            border: 1px solid #eaedf3;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+
+        .search-bar input {
+            border: none;
+            outline: none;
+            font-size: 14px;
+            color: #1a1d27;
+            width: 100%;
+            background: transparent;
+        }
+
+        .search-bar input::placeholder { color: #b0b8cc; }
+
+        /* Card / Tabla */
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3; overflow: hidden; }
+
+        .card-header {
+            padding: 18px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #eaedf3;
+        }
+
+        .card-title { font-size: 15px; font-weight: 600; }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th {
+            padding: 11px 20px;
+            text-align: left;
+            font-size: 12px; font-weight: 600;
+            color: #8a93a8;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid #eaedf3;
+            background: #fafbfc;
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 14px; color: #2c3347;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafbfc; }
+
+        .sku-badge {
+            font-family: 'Courier New', monospace;
+            font-size: 12px; font-weight: 700;
+            color: #3b5bdb; background: #eff3ff;
+            padding: 3px 8px; border-radius: 5px;
+        }
+
+        .precio { color: #1a7a47; font-weight: 700; }
+
+        .btn {
+            display: inline-block;
+            padding: 6px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            text-decoration: none; cursor: pointer;
+            border: none; transition: opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.82; }
+        .btn-blue   { background: #3b5bdb; color: white; padding: 9px 18px; font-size: 13px; }
+        .btn-amber  { background: #f59e0b; color: white; }
+        .btn-red    { background: #e74c3c; color: white; }
+        .btn-pdf    { background: #e74c3c; color: white; padding: 8px 16px; font-size: 13px; }
+
+        .readonly-label { color: #b0b8cc; font-size: 12px; }
+
+        input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #3b5bdb; }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
-        <h2>📦 Portal Uziel</h2>
-        <a href="{{ url_for('inicio') }}" class="menu-btn">📊 Dashboard general</a>
-        <a href="{{ url_for('catalogo') }}" class="menu-btn active">📋 Ver Catálogo (PIM)</a>
-        <a href="{{ url_for('clientes') }}" class="menu-btn">👥 Ver Clientes (CRM)</a>
-        <a href="{{ url_for('logout') }}" class="menu-btn logout">🚪 Cerrar Sesión</a>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">U</div>
+        <span class="brand-name">Imp. Uziel</span>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('clientes') }}" class="nav-item">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        <a href="{{ url_for('catalogo') }}" class="nav-item active">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
+                <div class="user-rol">{{ session['rol'] }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- CONTENIDO -->
+<main class="main-content">
+
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1>Productos</h1>
+            <p class="subtitulo">Catálogo de partes y repuestos</p>
+        </div>
+        {% if session['rol'] == 'Admin' %}
+            <a href="{{ url_for('nuevo_producto') }}" class="btn btn-blue">+ Nuevo Producto</a>
+        {% endif %}
     </div>
 
-    <div class="main-content">
-        <div class="topbar">
-            <h1>Gestión de Inventario (PIM)</h1>
-            <div class="user-info">👤 ROL: {{ session['rol'] }}</div>
-        </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}
+        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div style="padding: 15px; margin-bottom: 20px; border-radius: 10px; color: white; background-color: {{ '#48BB78' if category == 'exito' else '#F56565' }};">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="tabla-caja">
-            <form action="{{ url_for('generar_pdf') }}" method="POST">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>Inventario Completo</h3>
-                    <button type="submit" class="btn btn-pdf" style="padding: 10px 20px;">📄 Generar PDF Seleccionados</button>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>PDF</th>
-                            <th>SKU</th>
-                            <th>Nombre</th>
-                            <th>Marca</th>
-                            <th>Precio</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for producto in productos %}
-                        <tr>
-                            <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}" style="transform: scale(1.3); cursor: pointer;"></td>
-                            <td><strong>{{ producto[0] }}</strong></td>
-                            <td>{{ producto[1] }}</td>
-                            <td>{{ producto[2] }}</td>
-                            <td style="color: #48BB78; font-weight: bold;">${{ producto[3] }}</td>
-                            <td>
-                                {% if session['rol'] == 'Admin' %}
-                                    <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-editar">Editar</a>
-                                    <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-borrar" onclick="return confirm('¿Seguro?');">Borrar</a>
-                                {% else %}
-                                    <span style="color: #a3aed1; font-size: 12px;">Solo lectura</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </form>
-        </div>
+    <div class="search-bar">
+        🔍
+        <input type="text" id="buscador" placeholder="Buscar por SKU, nombre, marca..." oninput="filtrarTabla()">
     </div>
+
+    <div class="card">
+        <form action="{{ url_for('generar_pdf') }}" method="POST">
+            <div class="card-header">
+                <span class="card-title">Inventario completo</span>
+                <button type="submit" class="btn btn-pdf">📄 Generar PDF Seleccionados</button>
+            </div>
+            <table id="tabla-productos">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">PDF</th>
+                        <th>SKU</th>
+                        <th>Nombre</th>
+                        <th>Marca</th>
+                        <th>Precio</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr>
+                        <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}"></td>
+                        <td><span class="sku-badge">{{ producto[0] }}</span></td>
+                        <td>{{ producto[1] }}</td>
+                        <td>{{ producto[2] }}</td>
+                        <td class="precio">${{ producto[3] }}</td>
+                        <td>
+                            {% if session['rol'] == 'Admin' %}
+                                <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-amber">Editar</a>
+                                <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-red" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
+                            {% else %}
+                                <span class="readonly-label">Solo lectura</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align:center; color:#b0b8cc; padding:40px;">
+                            No hay productos registrados aún.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </form>
+    </div>
+
+</main>
+
+<script>
+function filtrarTabla() {
+    const texto = document.getElementById('buscador').value.toLowerCase();
+    const filas = document.querySelectorAll('#tabla-productos tbody tr');
+    filas.forEach(fila => {
+        fila.style.display = fila.textContent.toLowerCase().includes(texto) ? '' : 'none';
+    });
+}
+</script>
 
 </body>
 </html>

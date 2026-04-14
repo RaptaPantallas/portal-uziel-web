@@ -26,6 +26,7 @@
 #   Start Command : gunicorn portal_web:app
 # =============================================================================
 
+import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 from functools import wraps
 import io
@@ -38,9 +39,33 @@ from src.database import ConexionBD
 # =============================================================================
 
 # Clave secreta para cifrar las cookies de sesión.
-# IMPORTANTE: Cambia esta cadena por una clave larga y aleatoria en producción.
-# Puedes generar una con: python -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY = 'llave_secreta_uziel_2026'
+#
+# CÓMO CONFIGURAR (elige una opción):
+#
+#   Opción A — Variable de entorno (RECOMENDADO para producción):
+#     Windows CMD : set FLASK_SECRET_KEY=tu_clave_larga_aqui
+#     Windows PS  : $env:FLASK_SECRET_KEY="tu_clave_larga_aqui"
+#     Linux/Mac   : export FLASK_SECRET_KEY="tu_clave_larga_aqui"
+#     Render.com  : Dashboard > Environment > Add Environment Variable
+#
+#   Genera una clave segura con:
+#     python -c "import secrets; print(secrets.token_hex(32))"
+#
+#   Opción B — Reemplaza la cadena de abajo (solo para desarrollo local,
+#              NUNCA subas esto a GitHub):
+#
+SECRET_KEY_DEFAULT = "cambia_esta_clave_antes_de_produccion"
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY", SECRET_KEY_DEFAULT)
+
+# Advertencia si se usa la clave por defecto fuera de desarrollo local
+if SECRET_KEY == SECRET_KEY_DEFAULT:
+    import warnings
+    warnings.warn(
+        "\n⚠️  SEGURIDAD: Se está usando la SECRET_KEY por defecto.\n"
+        "   Configura la variable de entorno FLASK_SECRET_KEY antes de ir a producción.\n"
+        "   Genera una clave segura con: python -c \"import secrets; print(secrets.token_hex(32))\"",
+        stacklevel=1
+    )
 
 # Nombre de la empresa que aparece en el encabezado del PDF generado
 NOMBRE_EMPRESA_PDF = "Catálogo de Productos - Importadora Uziel"
@@ -282,7 +307,7 @@ def eliminar_producto(sku):
         return redirect(url_for('inicio'))
 
     if bd.eliminar_producto(sku):
-        flash(f'🗑️ El producto {sku} fue eliminado del inventario.', 'error')
+        flash(f'🗑️ El producto {sku} fue eliminado del inventario.', 'exito')
     else:
         flash(f'❌ No se pudo eliminar el producto {sku}.', 'error')
 
@@ -387,5 +412,7 @@ def generar_pdf():
 
 if __name__ == '__main__':
     # NOTA: Para producción en Render, usar Gunicorn: gunicorn portal_web:app
-    # debug=True activa el reloader automático. NUNCA usar en producción.
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # El modo debug se activa solo si la variable FLASK_DEBUG=1 está definida,
+    # para evitar su uso accidental en producción.
+    modo_debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host='0.0.0.0', port=5000, debug=modo_debug)

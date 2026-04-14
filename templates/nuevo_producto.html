@@ -2,37 +2,188 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Nuevo Producto - Uziel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevo Producto — Importadora Uziel</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7fe; color: #111; padding: 40px 20px; }
-        .formulario-caja { background-color: #ffffff; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; }
-        h2 { color: #003366; text-align: center; border-bottom: 2px solid #f4f4f4; padding-bottom: 10px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; color: #a3aed1; font-size: 13px; text-transform: uppercase; }
-        input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #e9edf7; border-radius: 8px; box-sizing: border-box; background-color: #f8f9fa;}
-        .btn-guardar { width: 100%; background-color: #4318FF; color: white; padding: 15px; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        .btn-guardar:hover { background-color: #3110b5; }
-        .btn-cancelar { display: block; text-align: center; margin-top: 15px; color: #F56565; text-decoration: none; font-weight: bold; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f7fa; color: #1a1d27;
+            display: flex; min-height: 100vh;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 200px; min-height: 100vh; background: #1a1d27;
+            display: flex; flex-direction: column; padding: 20px 0;
+            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
+        }
+        .sidebar-brand {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 18px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
+        }
+        .brand-icon {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: 800;
+        }
+        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
+        .sidebar nav { flex: 1; padding: 0 10px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: 8px; text-decoration: none; color: #8a93a8;
+            font-size: 14px; font-weight: 500; margin-bottom: 2px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .user-avatar {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 700;
+        }
+        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
+        .user-rol  { color: #8a93a8; font-size: 12px; }
+        .btn-logout {
+            display: flex; align-items: center; gap: 8px;
+            color: #8a93a8; text-decoration: none; font-size: 13px; font-weight: 500;
+        }
+        .btn-logout:hover { color: #e8ecf5; }
+
+        /* CONTENIDO */
+        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
+        .page-header { margin-bottom: 28px; }
+        .page-header h1 { font-size: 28px; font-weight: 700; }
+        .page-header .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
+
+        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
+        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
+        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
+
+        .form-card {
+            background: white; border-radius: 14px;
+            border: 1px solid #eaedf3; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            padding: 32px 36px; max-width: 620px;
+        }
+
+        .campo { margin-bottom: 20px; }
+        .campo label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: #5a6a88; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px;
+        }
+        .campo input {
+            width: 100%; padding: 11px 14px;
+            border: 1.5px solid #e0e5f0; border-radius: 8px;
+            font-size: 15px; color: #1a1d27; background: #fff; outline: none;
+            transition: border-color 0.18s, box-shadow 0.18s;
+        }
+        .campo input::placeholder { color: #b0b8cc; }
+        .campo input:focus {
+            border-color: #3b5bdb;
+            box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
+        }
+
+        .form-actions { display: flex; gap: 12px; margin-top: 28px; }
+        .btn-guardar {
+            background: #3b5bdb; color: white; border: none;
+            padding: 12px 28px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: background 0.18s;
+        }
+        .btn-guardar:hover { background: #3451c7; }
+        .btn-cancelar {
+            display: inline-block; background: #f0f2f5; color: #5a6a88;
+            padding: 12px 24px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; text-decoration: none;
+            transition: background 0.18s;
+        }
+        .btn-cancelar:hover { background: #e2e6ec; }
     </style>
 </head>
 <body>
-    <div class="formulario-caja">
-        <h2>📦 Registrar Nuevo Repuesto</h2>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">U</div>
+        <span class="brand-name">Imp. Uziel</span>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('clientes') }}" class="nav-item">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        <a href="{{ url_for('catalogo') }}" class="nav-item active">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
+                <div class="user-rol">{{ session['rol'] }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- CONTENIDO -->
+<main class="main-content">
+
+    <div class="page-header">
+        <h1>Nuevo Producto</h1>
+        <p class="subtitulo">Registrar una nueva pieza en el inventario</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}
+        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="form-card">
         <form method="POST">
-            <label>Código SKU:</label>
-            <input type="text" name="sku" placeholder="Ej: BMB-GAS-CORS-01" required>
-            <label>Nombre de la Pieza:</label>
-            <input type="text" name="nombre" required>
-            <label>Descripción:</label>
-            <input type="text" name="descripcion" required>
-            <label>Marca:</label>
-            <input type="text" name="marca" required>
-            <label>Compatibilidad:</label>
-            <input type="text" name="compatibilidad" required>
-            <label>Precio Corporativo ($):</label>
-            <input type="number" step="0.01" name="precio" required>
-            <button type="submit" class="btn-guardar">💾 Guardar Producto</button>
-            <a href="/" class="btn-cancelar">❌ Cancelar</a>
+            <div class="campo">
+                <label>Código SKU</label>
+                <input type="text" name="sku" placeholder="Ej: BMB-GAS-CORS-01" required>
+            </div>
+            <div class="campo">
+                <label>Nombre de la Pieza</label>
+                <input type="text" name="nombre" placeholder="Nombre descriptivo del repuesto" required>
+            </div>
+            <div class="campo">
+                <label>Descripción Técnica</label>
+                <input type="text" name="descripcion" placeholder="Descripción del componente" required>
+            </div>
+            <div class="campo">
+                <label>Marca</label>
+                <input type="text" name="marca" placeholder="Fabricante o marca" required>
+            </div>
+            <div class="campo">
+                <label>Compatibilidad (Vehículos)</label>
+                <input type="text" name="compatibilidad" placeholder="Ej: Corsa 2005-2010, Aveo 2008-2012" required>
+            </div>
+            <div class="campo">
+                <label>Precio Corporativo ($)</label>
+                <input type="number" step="0.01" name="precio" placeholder="0.00" required>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-guardar">💾 Guardar Producto</button>
+                <a href="{{ url_for('catalogo') }}" class="btn-cancelar">Cancelar</a>
+            </div>
         </form>
     </div>
+
+</main>
 </body>
 </html>

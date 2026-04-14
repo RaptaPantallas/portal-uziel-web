@@ -3,162 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso — Portal Importadora Uziel</title>
+    <title>Acceso — Importadora Uziel</title>
     <style>
-        /* ================================================================
-           RESET Y BASE
-        ================================================================ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #001f3f 0%, #003a6e 60%, #00518a 100%);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(145deg, #dce8f5 0%, #eaf0f8 40%, #f0f4fb 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+            gap: 0;
         }
 
-        /* ================================================================
-           TARJETA DE LOGIN
-        ================================================================ */
+        /* Ícono flotante sobre la tarjeta */
+        .logo-container {
+            width: 56px;
+            height: 56px;
+            background: #3b5bdb;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(59, 91, 219, 0.35);
+        }
+
+        /* Tarjeta central */
         .login-card {
             background: #ffffff;
-            padding: 48px 40px 40px;
+            padding: 40px 36px 36px;
             border-radius: 16px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 4px 32px rgba(0, 0, 0, 0.09);
             width: 100%;
-            max-width: 380px;
+            max-width: 420px;
             text-align: center;
         }
 
-        .login-card .logo-icon {
-            font-size: 40px;
-            margin-bottom: 8px;
-        }
-
         .login-card h1 {
-            color: #001f3f;
+            color: #1a1d27;
             font-size: 22px;
             font-weight: 700;
             margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         .login-card .subtitulo {
-            color: #7a8aaa;
-            font-size: 13px;
+            color: #8a93a8;
+            font-size: 14px;
             margin-bottom: 32px;
         }
 
-        /* ================================================================
-           FORMULARIO
-        ================================================================ */
+        /* Campos del formulario */
         .campo {
             text-align: left;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .campo label {
             display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: #5a6a88;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2c3347;
+            margin-bottom: 7px;
         }
 
         .campo input {
             width: 100%;
             padding: 12px 14px;
-            border: 1.5px solid #dde2ef;
+            border: 1.5px solid #e0e5f0;
             border-radius: 8px;
             font-size: 15px;
-            color: #1a2540;
-            background-color: #f7f9fc;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            color: #1a1d27;
+            background-color: #fff;
+            transition: border-color 0.18s, box-shadow 0.18s;
             outline: none;
         }
 
-        .campo input:focus {
-            border-color: #003a6e;
-            background-color: #fff;
-            box-shadow: 0 0 0 3px rgba(0, 58, 110, 0.12);
+        .campo input::placeholder {
+            color: #b0b8cc;
         }
 
-        /* ================================================================
-           BOTÓN PRINCIPAL
-        ================================================================ */
+        .campo input:focus {
+            border-color: #3b5bdb;
+            box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.13);
+        }
+
+        /* Botón principal */
         .btn-ingresar {
             width: 100%;
-            background: linear-gradient(135deg, #27AE60, #1e8449);
+            background: #3b5bdb;
             color: white;
             border: none;
-            padding: 14px;
+            padding: 13px;
             border-radius: 8px;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: opacity 0.2s, transform 0.15s;
+            letter-spacing: 0.2px;
+            transition: background 0.18s, transform 0.12s;
             margin-top: 8px;
         }
 
         .btn-ingresar:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
+            background: #3451c7;
         }
 
         .btn-ingresar:active {
-            transform: translateY(0);
+            transform: scale(0.99);
         }
 
-        /* ================================================================
-           MENSAJES FLASH
-        ================================================================ */
+        /* Mensajes flash */
         .mensaje {
-            padding: 12px 16px;
+            padding: 11px 14px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             font-size: 14px;
             font-weight: 500;
             text-align: left;
         }
 
         .mensaje-error {
-            background-color: #fef2f2;
+            background-color: #fff0f0;
             color: #c0392b;
-            border-left: 4px solid #E74C3C;
+            border-left: 4px solid #e74c3c;
         }
 
         .mensaje-exito {
             background-color: #f0fdf4;
-            color: #1e7a47;
-            border-left: 4px solid #27AE60;
+            color: #1a7a47;
+            border-left: 4px solid #27ae60;
         }
 
-        /* ================================================================
-           PIE
-        ================================================================ */
-        .footer-texto {
+        /* Texto de pie */
+        .pie-seguridad {
             margin-top: 24px;
-            font-size: 12px;
-            color: #a0aabf;
+            font-size: 13px;
+            color: #9aa3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
     </style>
 </head>
 <body>
 
+    <!-- Ícono U flotante -->
+    <div class="logo-container">U</div>
+
+    <!-- Tarjeta de login -->
     <div class="login-card">
+        <h1>Importadora Uziel</h1>
+        <p class="subtitulo">Sistema de Gestión Empresarial</p>
 
-        <div class="logo-icon">📦</div>
-        <h1>Portal Uziel</h1>
-        <p class="subtitulo">Sistema de Información de Marketing</p>
-
-        <!-- Mensajes de retroalimentación (Flash Messages) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
@@ -169,7 +172,6 @@
           {% endif %}
         {% endwith %}
 
-        <!-- Formulario de inicio de sesión -->
         <form method="POST" autocomplete="on">
             <div class="campo">
                 <label for="username">Usuario</label>
@@ -177,7 +179,7 @@
                     type="text"
                     id="username"
                     name="username"
-                    placeholder="Ej: jefe"
+                    placeholder="admin"
                     autocomplete="username"
                     required
                     autofocus
@@ -194,11 +196,14 @@
                     required
                 >
             </div>
-            <button type="submit" class="btn-ingresar">🔐 Ingresar al Sistema</button>
+            <button type="submit" class="btn-ingresar">Ingresar al Sistema</button>
         </form>
-
-        <p class="footer-texto">Importadora Uziel C.A. &copy; 2026</p>
     </div>
+
+    <!-- Pie de seguridad -->
+    <p class="pie-seguridad">
+        🛡️ Acceso restringido a personal autorizado
+    </p>
 
 </body>
 </html>
