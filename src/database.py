@@ -31,7 +31,7 @@ from psycopg2 import Error
 # =============================================================================
 
 # URL de conexión a PostgreSQL en Render.com
-# Formato: postgresql://usuario:contraseña@host/nombre_base_datos
+# Formato: postgresql://variable:LYqte0xjYaVb1EfvIs0aNrjq8G4nsxra@dpg-d6ddpkktgctc73f38gv0-a.oregon-postgres.render.com/importadora_uziel
 #
 # CÓMO CONFIGURAR (elige una opción):
 #
@@ -45,7 +45,7 @@ from psycopg2 import Error
 #              desarrollo local, NUNCA subas esto a GitHub):
 #
 DATABASE_URL_DEFAULT = ""   # <-- Pega aquí tu URL solo para desarrollo local
-URL_BASE_DE_DATOS = os.getenv("DATABASE_URL", DATABASE_URL_DEFAULT)
+URL_BASE_DE_DATOS = os.getenv("postgresql://variable:LYqte0xjYaVb1EfvIs0aNrjq8G4nsxra@dpg-d6ddpkktgctc73f38gv0-a.oregon-postgres.render.com/importadora_uziel", DATABASE_URL_DEFAULT)
 
 # =============================================================================
 
