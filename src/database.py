@@ -19,6 +19,7 @@
 #   - DAM    : Gestión de activos digitales (fotografías)
 #   - Seguridad : Autenticación de usuarios
 #   - Estadísticas : Contadores para el Dashboard
+#   - Tareas : Asignación y seguimiento de tareas internas
 # =============================================================================
 
 import os
@@ -505,3 +506,273 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
         return total
+
+    # =========================================================================
+    # MÓDULO TAREAS — Asignación y seguimiento de tareas internas
+    # =========================================================================
+    #
+    # Las tareas permiten que los supervisores (rol Admin) asignen trabajo
+    # a diseñadores o editores relacionado con un cliente específico.
+    # Cada tarea lleva: cliente, responsable, tipo de trabajo, descripción,
+    # fecha límite y estado de avance.
+    #
+    # Tabla en BD: tareas
+    #   id             — Identificador único automático
+    #   cliente_rif    — RIF del cliente asociado a la tarea
+    #   cliente_nombre — Nombre de la empresa (guardado para evitar JOINs)
+    #   asignado_a     — Username del responsable de ejecutar la tarea
+    #   tipo_tarea     — Categoría del trabajo: Diseño, Edición, Fotografía, etc.
+    #   descripcion    — Detalle libre de lo que hay que hacer
+    #   fecha_limite   — Fecha tope para entregar el trabajo
+    #   estado         — Pendiente | En Progreso | Completada
+    #   creado_por     — Username del supervisor que creó la tarea
+    #   fecha_creacion — Timestamp automático al insertar
+    # =========================================================================
+
+    def inicializar_tareas(self):
+        """
+        Crea la tabla 'tareas' en la base de datos si aún no existe.
+        Se llama automáticamente al arrancar el servidor Flask para garantizar
+        que la tabla esté disponible sin necesidad de scripts externos.
+
+        Returns:
+            bool: True si la tabla existe o fue creada, False si hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Crear tabla solo si no existe — operación idempotente y segura
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tareas (
+                    id             SERIAL PRIMARY KEY,
+                    cliente_rif    VARCHAR(30)  NOT NULL,
+                    cliente_nombre VARCHAR(200) NOT NULL,
+                    asignado_a     VARCHAR(100) NOT NULL,
+                    tipo_tarea     VARCHAR(60)  NOT NULL,
+                    descripcion    TEXT,
+                    fecha_limite   DATE         NOT NULL,
+                    estado         VARCHAR(20)  DEFAULT 'Pendiente',
+                    creado_por     VARCHAR(100) NOT NULL,
+                    fecha_creacion TIMESTAMP    DEFAULT NOW()
+                )
+            """)
+            conexion.commit()
+            print("🟢 [Tareas] Tabla 'tareas' verificada/creada correctamente.")
+            return True
+        except Error as e:
+            print(f"🔴 [Tareas] Error al inicializar tabla de tareas: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def crear_tarea(self, cliente_rif, cliente_nombre, asignado_a,
+                    tipo_tarea, descripcion, fecha_limite, creado_por):
+        """
+        Inserta una nueva tarea en la base de datos.
+
+        Args:
+            cliente_rif    (str): RIF del cliente al que se refiere la tarea.
+            cliente_nombre (str): Nombre de la empresa del cliente.
+            asignado_a     (str): Username del usuario que debe ejecutar la tarea.
+            tipo_tarea     (str): Tipo de trabajo (Diseño, Edición, Fotografía...).
+            descripcion    (str): Descripción detallada de lo que se necesita.
+            fecha_limite   (str): Fecha tope en formato YYYY-MM-DD.
+            creado_por     (str): Username del supervisor que asignó la tarea.
+
+        Returns:
+            bool: True si se creó correctamente, False en caso de error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            consulta_sql = """
+                INSERT INTO tareas
+                    (cliente_rif, cliente_nombre, asignado_a, tipo_tarea,
+                     descripcion, fecha_limite, creado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(consulta_sql, (
+                cliente_rif, cliente_nombre, asignado_a,
+                tipo_tarea, descripcion, fecha_limite, creado_por
+            ))
+            conexion.commit()
+            print(f"🟢 [Tareas] Tarea creada para '{asignado_a}' "
+                  f"(cliente: {cliente_nombre}, tipo: {tipo_tarea}).")
+            return True
+        except Error as e:
+            print(f"🔴 [Tareas] Error al crear tarea: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def obtener_tareas_asignadas(self, asignado_a):
+        """
+        Devuelve todas las tareas PENDIENTES o EN PROGRESO asignadas a un usuario.
+        Se usa para generar las notificaciones que ve el diseñador/editor al entrar.
+
+        Args:
+            asignado_a (str): Username del usuario cuyas tareas se quieren consultar.
+
+        Returns:
+            list[tuple]: Lista de tuplas con los campos:
+                (id, cliente_rif, cliente_nombre, tipo_tarea,
+                 descripcion, fecha_limite, estado, creado_por, fecha_creacion)
+                Ordenadas por fecha_limite ascendente (las más urgentes primero).
+        """
+        conexion = self.conectar()
+        tareas = []
+        if not conexion:
+            return tareas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, cliente_rif, cliente_nombre, tipo_tarea,
+                       descripcion, fecha_limite, estado, creado_por, fecha_creacion
+                FROM tareas
+                WHERE LOWER(asignado_a) = LOWER(%s)
+                  AND estado != 'Completada'
+                ORDER BY fecha_limite ASC
+            """, (asignado_a,))
+            tareas = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Tareas] Error al obtener tareas de '{asignado_a}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return tareas
+
+    def obtener_todas_tareas(self):
+        """
+        Devuelve el listado completo de tareas (todas las personas, todos los estados).
+        Usado en la vista de gestión de tareas del supervisor.
+
+        Returns:
+            list[tuple]: Lista de tuplas con todos los campos de la tabla tareas,
+                         ordenadas por fecha de creación descendente.
+        """
+        conexion = self.conectar()
+        tareas = []
+        if not conexion:
+            return tareas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, cliente_rif, cliente_nombre, asignado_a,
+                       tipo_tarea, descripcion, fecha_limite,
+                       estado, creado_por, fecha_creacion
+                FROM tareas
+                ORDER BY fecha_creacion DESC
+            """)
+            tareas = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Tareas] Error al obtener todas las tareas: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return tareas
+
+    def actualizar_estado_tarea(self, tarea_id, nuevo_estado):
+        """
+        Cambia el estado de una tarea (Pendiente → En Progreso → Completada).
+
+        Args:
+            tarea_id     (int): ID de la tarea a modificar.
+            nuevo_estado (str): El nuevo estado: 'En Progreso' o 'Completada'.
+
+        Returns:
+            bool: True si se actualizó, False en caso de error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE tareas SET estado = %s WHERE id = %s",
+                (nuevo_estado, tarea_id)
+            )
+            conexion.commit()
+            print(f"🟢 [Tareas] Tarea #{tarea_id} actualizada a '{nuevo_estado}'.")
+            return True
+        except Error as e:
+            print(f"🔴 [Tareas] Error al actualizar estado de tarea #{tarea_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def contar_tareas_pendientes(self, asignado_a):
+        """
+        Cuenta cuántas tareas activas (Pendiente + En Progreso) tiene un usuario.
+        Se usa para mostrar el número en la campana de notificaciones del sidebar.
+
+        Args:
+            asignado_a (str): Username del usuario.
+
+        Returns:
+            int: Número de tareas activas. Retorna 0 en caso de error.
+        """
+        conexion = self.conectar()
+        total = 0
+        if not conexion:
+            return total
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM tareas
+                WHERE LOWER(asignado_a) = LOWER(%s)
+                  AND estado != 'Completada'
+            """, (asignado_a,))
+            total = cursor.fetchone()[0]
+        except Error as e:
+            print(f"🔴 [Tareas] Error al contar tareas de '{asignado_a}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return total
+
+    def obtener_usuarios(self):
+        """
+        Devuelve todos los usuarios registrados en el sistema.
+        Se usa para popular el dropdown de asignación de tareas.
+
+        Returns:
+            list[tuple]: Lista de tuplas (username, rol) ordenadas por username.
+        """
+        conexion = self.conectar()
+        usuarios = []
+        if not conexion:
+            return usuarios
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT username, rol FROM usuarios ORDER BY username")
+            usuarios = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Auth] Error al obtener lista de usuarios: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return usuarios
