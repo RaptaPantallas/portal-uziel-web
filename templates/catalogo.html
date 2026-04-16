@@ -207,6 +207,15 @@
         <a href="{{ url_for('catalogo') }}" class="nav-item active">
             <span class="nav-icon">📦</span> Productos
         </a>
+        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
+            <span class="nav-icon">📋</span> Tareas
+            {% if total_notif > 0 %}
+                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
+                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
+                    {{ total_notif }}
+                </span>
+            {% endif %}
+        </a>
     </nav>
     <div class="sidebar-footer">
         <div class="user-info">
