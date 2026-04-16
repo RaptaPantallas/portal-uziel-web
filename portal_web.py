@@ -10,16 +10,19 @@
 #   verifica permisos, consulta la base de datos y devuelve el HTML correcto.
 #
 #   Rutas disponibles:
-#     GET/POST /login         — Pantalla de inicio de sesión
-#     GET      /logout        — Cierra la sesión del usuario
-#     GET      /              — Dashboard principal con estadísticas
-#     GET      /catalogo      — Módulo PIM: lista completa de productos
-#     GET      /clientes      — Módulo CRM: directorio de clientes
-#     GET/POST /nuevo_producto — Formulario para agregar producto (solo Admin)
-#     GET/POST /nuevo_cliente  — Formulario para agregar cliente (solo Admin)
-#     GET/POST /editar/<sku>  — Formulario para editar producto (solo Admin)
-#     GET      /eliminar/<sku>— Elimina un producto (solo Admin)
-#     POST     /generar_pdf   — Genera y descarga un PDF con productos seleccionados
+#     GET/POST /login              — Pantalla de inicio de sesión
+#     GET      /logout             — Cierra la sesión del usuario
+#     GET      /                   — Dashboard principal con estadísticas y tareas
+#     GET      /catalogo           — Módulo PIM: lista completa de productos
+#     GET      /clientes           — Módulo CRM: directorio de clientes
+#     GET/POST /nuevo_producto     — Formulario para agregar producto (solo Admin)
+#     GET/POST /nuevo_cliente      — Formulario para agregar cliente (solo Admin)
+#     GET/POST /editar/<sku>       — Formulario para editar producto (solo Admin)
+#     GET      /eliminar/<sku>     — Elimina un producto (solo Admin)
+#     POST     /generar_pdf        — Genera y descarga un PDF con productos seleccionados
+#     GET      /tareas             — Gestión de tareas (todas para Admin, propias para otros)
+#     POST     /asignar_tarea      — Crea una nueva tarea (solo Admin)
+#     POST     /actualizar_tarea/<id> — Cambia el estado de una tarea
 #
 # DESPLIEGUE EN RENDER:
 #   Build Command : pip install -r requirements.txt
@@ -81,6 +84,31 @@ app.secret_key = SECRET_KEY
 
 # Instancia global del módulo de base de datos
 bd = ConexionBD()
+
+# Crear la tabla de tareas automáticamente al arrancar el servidor,
+# así no hace falta ejecutar ningún script SQL externo
+bd.inicializar_tareas()
+
+
+# =============================================================================
+# CONTEXTO GLOBAL — disponible en TODOS los templates automáticamente
+# =============================================================================
+
+@app.context_processor
+def inyectar_notificaciones():
+    """
+    Inyecta el conteo de tareas pendientes del usuario logueado en todos
+    los templates. Así cualquier página puede mostrar el badge de campana
+    sin que cada ruta tenga que calcularlo por separado.
+
+    La variable 'total_notif' queda disponible en todos los Jinja2 templates.
+    """
+    # Si no hay sesión activa, no hay notificaciones que mostrar
+    if 'usuario' not in session:
+        return {'total_notif': 0}
+
+    total = bd.contar_tareas_pendientes(session['usuario'])
+    return {'total_notif': total}
 
 
 # =============================================================================
@@ -158,20 +186,31 @@ def inicio():
     """
     Dashboard principal del portal.
 
-    Muestra las tarjetas de estadísticas (total productos, total clientes)
-    y la tabla de los últimos productos registrados con opciones de gestión.
+    Muestra las tarjetas de estadísticas (total productos, total clientes,
+    total tareas activas) y la tabla de los últimos productos registrados.
+    También pasa al template:
+      - Las tareas pendientes del usuario actual (para el modal de notificación)
+      - La lista de clientes (para el formulario de asignación de tareas)
+      - La lista de usuarios (para el dropdown de asignación)
     """
-    inventario = bd.obtener_productos()
-    clientes = bd.obtener_clientes()
-    total_prod = bd.contar_productos()
-    total_cli = bd.contar_clientes()
+    # Datos de inventario y estadísticas
+    inventario  = bd.obtener_productos()
+    total_prod  = bd.contar_productos()
+    total_cli   = bd.contar_clientes()
+
+    # Datos para el módulo de tareas en el dashboard
+    lista_clientes = bd.obtener_clientes()      # dropdown "seleccionar cliente"
+    lista_usuarios = bd.obtener_usuarios()       # dropdown "asignar a"
+    mis_tareas     = bd.obtener_tareas_asignadas(session['usuario'])  # notificaciones
 
     return render_template(
         'index.html',
         productos=inventario,
-        clientes=clientes,
         total_prod=total_prod,
-        total_cli=total_cli
+        total_cli=total_cli,
+        lista_clientes=lista_clientes,
+        lista_usuarios=lista_usuarios,
+        mis_tareas=mis_tareas
     )
 
 
@@ -313,6 +352,113 @@ def eliminar_producto(sku):
         flash(f'❌ No se pudo eliminar el producto {sku}.', 'error')
 
     return redirect(url_for('catalogo'))
+
+
+# =============================================================================
+# MÓDULO DE TAREAS — Asignación y seguimiento de trabajo interno
+# =============================================================================
+
+@app.route('/tareas')
+@login_requerido
+def tareas():
+    """
+    Página de gestión de tareas del sistema.
+
+    El supervisor (Admin) ve todas las tareas creadas con filtros de estado.
+    Los demás usuarios ven únicamente sus tareas activas.
+    """
+    # Cargar datos según el rol del usuario que accede
+    if session.get('rol') == 'Admin':
+        # El supervisor ve el panorama completo de todas las tareas
+        lista_tareas    = bd.obtener_todas_tareas()
+        lista_clientes  = bd.obtener_clientes()
+        lista_usuarios  = bd.obtener_usuarios()
+    else:
+        # El diseñador/editor solo ve sus propias tareas pendientes
+        lista_tareas    = bd.obtener_tareas_asignadas(session['usuario'])
+        lista_clientes  = []
+        lista_usuarios  = []
+
+    return render_template(
+        'tareas.html',
+        lista_tareas=lista_tareas,
+        lista_clientes=lista_clientes,
+        lista_usuarios=lista_usuarios
+    )
+
+
+@app.route('/asignar_tarea', methods=['POST'])
+@login_requerido
+def asignar_tarea():
+    """
+    Crea una nueva tarea a partir del formulario del dashboard o de la
+    página de tareas. Solo accesible para usuarios con rol 'Admin'.
+
+    Datos esperados del formulario (POST):
+        cliente_rif    — RIF del cliente seleccionado en el dropdown
+        cliente_nombre — Nombre de la empresa (campo oculto del dropdown)
+        asignado_a     — Username del responsable
+        tipo_tarea     — Categoría del trabajo
+        descripcion    — Descripción libre
+        fecha_limite   — Fecha tope (YYYY-MM-DD)
+    """
+    # Verificar que el usuario tenga permiso de crear tareas
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los supervisores pueden asignar tareas.', 'error')
+        return redirect(url_for('inicio'))
+
+    # Leer y limpiar campos del formulario
+    cliente_rif    = request.form.get('cliente_rif', '').strip()
+    cliente_nombre = request.form.get('cliente_nombre', '').strip()
+    asignado_a     = request.form.get('asignado_a', '').strip()
+    tipo_tarea     = request.form.get('tipo_tarea', '').strip()
+    descripcion    = request.form.get('descripcion', '').strip()
+    fecha_limite   = request.form.get('fecha_limite', '').strip()
+    creado_por     = session['usuario']
+
+    # Validar que todos los campos obligatorios estén completos
+    if not all([cliente_rif, asignado_a, tipo_tarea, fecha_limite]):
+        flash('⚠️ Completa todos los campos obligatorios de la tarea.', 'error')
+        return redirect(request.referrer or url_for('tareas'))
+
+    # Guardar la tarea en la base de datos
+    if bd.crear_tarea(cliente_rif, cliente_nombre, asignado_a,
+                      tipo_tarea, descripcion, fecha_limite, creado_por):
+        flash(f'✅ Tarea asignada a "{asignado_a}" correctamente.', 'exito')
+    else:
+        flash('❌ No se pudo crear la tarea. Intenta de nuevo.', 'error')
+
+    # Regresar a la página desde donde se envió el formulario
+    return redirect(request.referrer or url_for('tareas'))
+
+
+@app.route('/actualizar_tarea/<int:tarea_id>', methods=['POST'])
+@login_requerido
+def actualizar_tarea(tarea_id):
+    """
+    Actualiza el estado de una tarea (Pendiente → En Progreso → Completada).
+    Cualquier usuario puede actualizar el estado de sus propias tareas.
+
+    Args (URL):
+        tarea_id (int): ID de la tarea a actualizar.
+
+    Datos esperados del formulario (POST):
+        nuevo_estado — 'En Progreso' o 'Completada'
+    """
+    nuevo_estado = request.form.get('nuevo_estado', '').strip()
+
+    # Validar que el estado recibido sea uno de los permitidos
+    estados_validos = {'Pendiente', 'En Progreso', 'Completada'}
+    if nuevo_estado not in estados_validos:
+        flash('⚠️ Estado no válido.', 'error')
+        return redirect(url_for('tareas'))
+
+    if bd.actualizar_estado_tarea(tarea_id, nuevo_estado):
+        flash(f'✅ Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
+    else:
+        flash(f'❌ No se pudo actualizar la tarea #{tarea_id}.', 'error')
+
+    return redirect(url_for('tareas'))
 
 
 # =============================================================================
