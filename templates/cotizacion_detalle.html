@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ datos.cabecera[1] }} — Importadora Uziel</title>
+    <title>{{ cab[1] }} — Importadora Uziel</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -166,9 +166,8 @@
 </head>
 <body>
 
-{% set cab   = datos.cabecera %}
-{% set items = datos.items %}
 {# cab = (id, numero, cliente_rif, cliente_nombre, estado, notas, total_usd, creado_por, fecha_creacion) #}
+{# items = (id, sku, nombre_producto, cantidad, precio_unitario, subtotal) #}
 
 <!-- ===================== SIDEBAR ===================== -->
 <aside class="sidebar">
