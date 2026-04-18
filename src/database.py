@@ -127,12 +127,123 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
 
+    def obtener_cliente(self, rif: str):
+        """
+        Recupera todos los datos de un cliente específico por su RIF.
+
+        Args:
+            rif (str): RIF del cliente (clave primaria).
+
+        Returns:
+            tuple | None: (rif, nombre_empresa, telefono, correo, direccion,
+                           fecha_registro) o None si no existe.
+        """
+        conexion = self.conectar()
+        cliente = None
+        if not conexion:
+            return cliente
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT rif, nombre_empresa, telefono, correo, direccion, fecha_registro "
+                "FROM clientes WHERE UPPER(rif) = UPPER(%s)",
+                (rif,)
+            )
+            cliente = cursor.fetchone()
+        except Error as e:
+            print(f"🔴 [CRM] Error al obtener cliente '{rif}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return cliente
+
+    def actualizar_cliente(self, rif: str, nombre_empresa: str, telefono: str,
+                           correo: str, direccion: str) -> bool:
+        """
+        Actualiza los datos de contacto de un cliente existente.
+
+        Args:
+            rif            (str): RIF del cliente (clave primaria, no editable).
+            nombre_empresa (str): Nuevo nombre de la empresa.
+            telefono       (str): Nuevo número de teléfono.
+            correo         (str): Nuevo correo electrónico.
+            direccion      (str): Nueva dirección física.
+
+        Returns:
+            bool: True si se actualizó correctamente, False en caso de error
+                  o si el RIF no existe.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE clientes
+                SET nombre_empresa = %s, telefono = %s, correo = %s, direccion = %s
+                WHERE UPPER(rif) = UPPER(%s)
+            """, (nombre_empresa, telefono, correo, direccion, rif))
+            if cursor.rowcount == 0:
+                print(f"⚠️  [CRM] Cliente '{rif}' no encontrado al intentar actualizar.")
+                conexion.rollback()
+                return False
+            conexion.commit()
+            print(f"🟢 [CRM] Cliente '{rif}' actualizado correctamente.")
+            return True
+        except Error as e:
+            print(f"🔴 [CRM] Error al actualizar cliente '{rif}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def obtener_tareas_por_cliente(self, cliente_rif: str) -> list:
+        """
+        Recupera todas las tareas asociadas a un cliente ordenadas por fecha límite.
+
+        Args:
+            cliente_rif (str): RIF del cliente.
+
+        Returns:
+            list[tuple]: Lista de tuplas
+                (id, tipo_tarea, descripcion, fecha_limite, estado,
+                 asignado_a, creado_por, fecha_creacion)
+                ordenadas por fecha_limite ascendente.
+        """
+        conexion = self.conectar()
+        tareas = []
+        if not conexion:
+            return tareas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, tipo_tarea, descripcion, fecha_limite,
+                       estado, asignado_a, creado_por, fecha_creacion
+                FROM tareas
+                WHERE UPPER(cliente_rif) = UPPER(%s)
+                ORDER BY fecha_limite ASC
+            """, (cliente_rif,))
+            tareas = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [CRM] Error al obtener tareas del cliente '{cliente_rif}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return tareas
+
     def obtener_clientes(self):
         """
         Recupera todos los clientes ordenados por fecha de registro (más nuevo primero).
 
         Returns:
-            list[tuple]: Lista de tuplas (rif, nombre_empresa, telefono, correo).
+            list[tuple]: Lista de tuplas (rif, nombre_empresa, telefono, correo, direccion).
                          Retorna lista vacía si no hay datos o hay error.
         """
         conexion = self.conectar()
@@ -143,7 +254,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT rif, nombre_empresa, telefono, correo "
+                "SELECT rif, nombre_empresa, telefono, correo, direccion "
                 "FROM clientes ORDER BY fecha_registro DESC"
             )
             lista_clientes = cursor.fetchall()
@@ -412,6 +523,89 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
         return datos_completos
+
+    def obtener_activos_por_sku(self, sku):
+        """
+        Devuelve todos los activos digitales (fotografías) vinculados a un
+        producto, ordenados por tipo de ángulo para mostrarlos en tabs.
+
+        Args:
+            sku (str): SKU del producto a consultar.
+
+        Returns:
+            list[tuple]: Lista de tuplas (id, ruta_archivo, tipo_archivo, angulo).
+                         Lista vacía si el producto no tiene fotos o no existe.
+        """
+        conexion = self.conectar()
+        activos = []
+        if not conexion:
+            return activos
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            consulta = """
+                SELECT a.id, a.ruta_archivo, a.tipo_archivo, a.angulo
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE p.sku = %s
+                ORDER BY CASE a.angulo
+                    WHEN 'Frontal'    THEN 1
+                    WHEN 'Lateral'    THEN 2
+                    WHEN 'Detalle'    THEN 3
+                    WHEN 'En-contexto' THEN 4
+                    ELSE 5
+                END, a.id
+            """
+            cursor.execute(consulta, (sku,))
+            activos = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [DAM] Error al obtener activos del SKU '{sku}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return activos
+
+    def obtener_fotos_principales(self):
+        """
+        Recupera la foto principal (preferiblemente Frontal) de cada producto
+        en una sola consulta, para mostrar miniaturas en el catálogo.
+
+        Returns:
+            dict: Mapa {sku: ruta_archivo}. Solo incluye SKUs que tienen fotos.
+        """
+        conexion = self.conectar()
+        fotos = {}
+        if not conexion:
+            return fotos
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # DISTINCT ON (sku): toma la primera fila por SKU después de ordenar
+            # por prioridad de ángulo, resultando en la foto principal de cada producto
+            consulta = """
+                SELECT DISTINCT ON (p.sku) p.sku, a.ruta_archivo
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                ORDER BY p.sku,
+                    CASE a.angulo
+                        WHEN 'Frontal'     THEN 1
+                        WHEN 'Lateral'     THEN 2
+                        WHEN 'Detalle'     THEN 3
+                        WHEN 'En-contexto' THEN 4
+                        ELSE 5
+                    END, a.id
+            """
+            cursor.execute(consulta)
+            for sku, ruta in cursor.fetchall():
+                fotos[sku] = ruta
+        except Error as e:
+            print(f"🔴 [DAM] Error al obtener fotos principales: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return fotos
 
     # =========================================================================
     # MÓDULO DE SEGURIDAD — Autenticación de Usuarios
@@ -776,3 +970,425 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
         return usuarios
+
+    # =========================================================================
+    # MÓDULO COTIZACIONES — Presupuestos para clientes
+    # =========================================================================
+    #
+    # Dos tablas relacionadas:
+    #   cotizaciones      — Cabecera del documento (cliente, estado, total, notas)
+    #   cotizacion_items  — Líneas del presupuesto (sku, nombre, cantidad, precio)
+    #
+    # Estados posibles: Borrador | Enviada | Aceptada | Rechazada
+    # =========================================================================
+
+    def inicializar_cotizaciones(self):
+        """
+        Crea las tablas 'cotizaciones' y 'cotizacion_items' si aún no existen.
+        Se llama automáticamente al arrancar el servidor Flask.
+
+        Returns:
+            bool: True si las tablas existen o fueron creadas, False si hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS cotizaciones (
+                    id             SERIAL PRIMARY KEY,
+                    numero         VARCHAR(25)   NOT NULL UNIQUE,
+                    cliente_rif    VARCHAR(30)   NOT NULL,
+                    cliente_nombre VARCHAR(200)  NOT NULL,
+                    estado         VARCHAR(20)   DEFAULT 'Borrador',
+                    notas          TEXT,
+                    total_usd      NUMERIC(12,2) DEFAULT 0,
+                    creado_por     VARCHAR(100)  NOT NULL,
+                    fecha_creacion TIMESTAMP     DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS cotizacion_items (
+                    id              SERIAL PRIMARY KEY,
+                    cotizacion_id   INTEGER       NOT NULL
+                                    REFERENCES cotizaciones(id) ON DELETE CASCADE,
+                    sku             VARCHAR(100)  NOT NULL,
+                    nombre_producto VARCHAR(300)  NOT NULL,
+                    cantidad        INTEGER       NOT NULL DEFAULT 1,
+                    precio_unitario NUMERIC(12,2) NOT NULL,
+                    subtotal        NUMERIC(12,2) NOT NULL
+                )
+            """)
+            conexion.commit()
+            print("🟢 [Cotiz] Tablas 'cotizaciones' y 'cotizacion_items' verificadas.")
+            return True
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al inicializar tablas de cotizaciones: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def _siguiente_numero_cotizacion(self, cursor, anio: int) -> str:
+        """
+        Genera el siguiente número correlativo de cotización del año dado.
+        Formato: COT-AAAA-NNNN  (ej. COT-2026-0001)
+
+        Args:
+            cursor: Cursor de BD ya abierto (no se cierra aquí).
+            anio   : Año de 4 dígitos.
+
+        Returns:
+            str: Número de cotización único.
+        """
+        cursor.execute(
+            "SELECT COUNT(*) FROM cotizaciones WHERE numero LIKE %s",
+            (f"COT-{anio}-%",)
+        )
+        n = cursor.fetchone()[0] + 1
+        return f"COT-{anio}-{n:04d}"
+
+    def agregar_item_cotizacion(self, cotizacion_id: int, sku: str,
+                               nombre: str, cantidad: int,
+                               precio_unitario: float) -> bool:
+        """
+        Inserta un ítem en una cotización existente y recalcula su total.
+
+        Args:
+            cotizacion_id   (int)  : ID de la cotización padre.
+            sku             (str)  : Código de producto.
+            nombre          (str)  : Nombre del producto.
+            cantidad        (int)  : Unidades.
+            precio_unitario (float): Precio en USD por unidad.
+
+        Returns:
+            bool: True si se insertó correctamente, False en caso de error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            subtotal = cantidad * precio_unitario
+            cursor.execute("""
+                INSERT INTO cotizacion_items
+                    (cotizacion_id, sku, nombre_producto, cantidad,
+                     precio_unitario, subtotal)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (cotizacion_id, sku, nombre, cantidad, precio_unitario, subtotal))
+            # Recalcular total de la cotización
+            cursor.execute("""
+                UPDATE cotizaciones
+                SET total_usd = (
+                    SELECT COALESCE(SUM(subtotal), 0)
+                    FROM cotizacion_items
+                    WHERE cotizacion_id = %s
+                )
+                WHERE id = %s
+            """, (cotizacion_id, cotizacion_id))
+            conexion.commit()
+            print(f"🟢 [Cotiz] Ítem '{sku}' agregado a cotización #{cotizacion_id}.")
+            return True
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al agregar ítem a cotización #{cotizacion_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def crear_cotizacion(self, cliente_rif, cliente_nombre, creado_por,
+                         items: list[dict], notas: str = "") -> int | None:
+        """
+        Crea una cotización completa (cabecera + ítems) en una sola transacción.
+
+        Args:
+            cliente_rif    (str): RIF del cliente.
+            cliente_nombre (str): Nombre de la empresa.
+            creado_por     (str): Username del Admin.
+            items (list[dict]): Lista de {'sku', 'nombre', 'cantidad', 'precio_unitario'}.
+            notas          (str): Observaciones opcionales.
+
+        Returns:
+            int | None: ID de la cotización creada, o None si hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return None
+        cursor = None
+        try:
+            from datetime import datetime
+            cursor = conexion.cursor()
+            anio = datetime.now().year
+            numero = self._siguiente_numero_cotizacion(cursor, anio)
+
+            # Calcular total
+            total = sum(
+                float(it['cantidad']) * float(it['precio_unitario'])
+                for it in items
+            )
+
+            cursor.execute("""
+                INSERT INTO cotizaciones
+                    (numero, cliente_rif, cliente_nombre, creado_por, notas, total_usd)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (numero, cliente_rif, cliente_nombre, creado_por, notas, total))
+            cotizacion_id = cursor.fetchone()[0]
+
+            for it in items:
+                subtotal = float(it['cantidad']) * float(it['precio_unitario'])
+                cursor.execute("""
+                    INSERT INTO cotizacion_items
+                        (cotizacion_id, sku, nombre_producto, cantidad,
+                         precio_unitario, subtotal)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    cotizacion_id,
+                    it['sku'],
+                    it['nombre'],
+                    int(it['cantidad']),
+                    float(it['precio_unitario']),
+                    subtotal
+                ))
+
+            conexion.commit()
+            print(f"🟢 [Cotiz] Cotización '{numero}' creada (ID {cotizacion_id}).")
+            return cotizacion_id
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al crear cotización: {e}")
+            conexion.rollback()
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def obtener_cotizaciones_por_cliente(self, cliente_rif: str) -> list:
+        """
+        Recupera todas las cotizaciones asociadas a un cliente ordenadas por fecha.
+
+        Args:
+            cliente_rif (str): RIF del cliente.
+
+        Returns:
+            list[tuple]: (id, numero, estado, total_usd, creado_por, fecha_creacion)
+                         ordenadas por fecha_creacion DESC.
+        """
+        conexion = self.conectar()
+        resultado = []
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, numero, estado, total_usd, creado_por, fecha_creacion
+                FROM cotizaciones
+                WHERE UPPER(cliente_rif) = UPPER(%s)
+                ORDER BY fecha_creacion DESC
+            """, (cliente_rif,))
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al obtener cotizaciones del cliente '{cliente_rif}': {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_cotizaciones(self, estado: str = None) -> list:
+        """
+        Lista todas las cotizaciones, opcionalmente filtradas por estado.
+
+        Args:
+            estado (str | None): 'Borrador', 'Enviada', 'Aceptada', 'Rechazada', o None.
+
+        Returns:
+            list[tuple]: (id, numero, cliente_nombre, estado, total_usd, creado_por, fecha_creacion)
+        """
+        conexion = self.conectar()
+        resultado = []
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            if estado:
+                cursor.execute("""
+                    SELECT id, numero, cliente_nombre, estado,
+                           total_usd, creado_por, fecha_creacion
+                    FROM cotizaciones
+                    WHERE estado = %s
+                    ORDER BY fecha_creacion DESC
+                """, (estado,))
+            else:
+                cursor.execute("""
+                    SELECT id, numero, cliente_nombre, estado,
+                           total_usd, creado_por, fecha_creacion
+                    FROM cotizaciones
+                    ORDER BY fecha_creacion DESC
+                """)
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al listar cotizaciones: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_cotizacion_con_items(self, cotizacion_id: int) -> dict | None:
+        """
+        Recupera la cabecera y todos los ítems de una cotización.
+
+        Args:
+            cotizacion_id (int): ID de la cotización.
+
+        Returns:
+            dict | None: {'cabecera': tuple, 'items': list[tuple]} o None si no existe.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return None
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, numero, cliente_rif, cliente_nombre,
+                       estado, notas, total_usd, creado_por, fecha_creacion
+                FROM cotizaciones
+                WHERE id = %s
+            """, (cotizacion_id,))
+            cabecera = cursor.fetchone()
+            if not cabecera:
+                return None
+
+            cursor.execute("""
+                SELECT id, sku, nombre_producto, cantidad,
+                       precio_unitario, subtotal
+                FROM cotizacion_items
+                WHERE cotizacion_id = %s
+                ORDER BY id
+            """, (cotizacion_id,))
+            items = cursor.fetchall()
+            return {'cabecera': cabecera, 'items': items}
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al obtener cotización #{cotizacion_id}: {e}")
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def actualizar_estado_cotizacion(self, cotizacion_id: int, nuevo_estado: str) -> bool:
+        """
+        Cambia el estado de una cotización.
+
+        Args:
+            cotizacion_id (int): ID de la cotización.
+            nuevo_estado  (str): Uno de: 'Borrador', 'Enviada', 'Aceptada', 'Rechazada'.
+
+        Returns:
+            bool: True si se actualizó, False en caso de error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE cotizaciones SET estado = %s WHERE id = %s",
+                (nuevo_estado, cotizacion_id)
+            )
+            # Verificar que la fila existía y fue actualizada
+            if cursor.rowcount == 0:
+                print(f"⚠️  [Cotiz] Cotización #{cotizacion_id} no encontrada al actualizar estado.")
+                conexion.rollback()
+                return False
+            conexion.commit()
+            print(f"🟢 [Cotiz] Cotización #{cotizacion_id} → '{nuevo_estado}'.")
+            return True
+        except Error as e:
+            print(f"🔴 [Cotiz] Error al actualizar cotización #{cotizacion_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    # =========================================================================
+    # IMPORTACIÓN MASIVA DE PRODUCTOS
+    # =========================================================================
+
+    def importar_productos_masivo(self, lista_productos: list[dict]) -> tuple[int, int]:
+        """
+        Inserta múltiples productos en la base de datos, ignorando los que ya
+        existen (comparación por SKU).
+
+        Usa INSERT ... ON CONFLICT (sku) DO NOTHING para que la operación sea
+        atómica y no genere errores en productos duplicados.
+
+        Args:
+            lista_productos (list[dict]): Lista de diccionarios con las claves
+                'sku', 'nombre', 'descripcion', 'marca', 'compatibilidad', 'precio'.
+
+        Returns:
+            tuple[int, int]: (insertados, omitidos)
+                - insertados : Cantidad de productos nuevos añadidos a la BD.
+                - omitidos   : Cantidad de productos que ya existían y se saltaron.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return 0, len(lista_productos)
+
+        insertados = 0
+        omitidos   = 0
+        cursor     = None
+
+        try:
+            cursor = conexion.cursor()
+            for p in lista_productos:
+                cursor.execute(
+                    """
+                    INSERT INTO productos
+                        (sku, nombre, descripcion, marca, compatibilidad, precio)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (sku) DO NOTHING
+                    """,
+                    (
+                        str(p.get("sku", "")).strip(),
+                        str(p.get("nombre", "")).strip(),
+                        str(p.get("descripcion", "")).strip(),
+                        str(p.get("marca", "")).strip(),
+                        str(p.get("compatibilidad", "")).strip(),
+                        str(p.get("precio", "0")),
+                    )
+                )
+                # rowcount = 1 si se insertó, 0 si ya existía (DO NOTHING)
+                if cursor.rowcount > 0:
+                    insertados += 1
+                else:
+                    omitidos += 1
+
+            conexion.commit()
+            print(f"🟢 [Import] {insertados} productos nuevos, {omitidos} omitidos.")
+
+        except Error as e:
+            print(f"🔴 [Import] Error durante la importación masiva: {e}")
+            conexion.rollback()
+
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+        return insertados, omitidos
