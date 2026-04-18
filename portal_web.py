@@ -13,7 +13,9 @@
 #     GET/POST /login              — Pantalla de inicio de sesión
 #     GET      /logout             — Cierra la sesión del usuario
 #     GET      /                   — Dashboard principal con estadísticas y tareas
-#     GET      /catalogo           — Módulo PIM: lista completa de productos
+#     GET      /catalogo           — Módulo PIM: lista completa de productos con miniaturas
+#     GET      /producto/<sku>     — Ficha de detalle del producto con galería DAM
+#     GET      /activos/<archivo>  — Sirve archivos estáticos de almacen_activos/
 #     GET      /clientes           — Módulo CRM: directorio de clientes
 #     GET/POST /nuevo_producto     — Formulario para agregar producto (solo Admin)
 #     GET/POST /nuevo_cliente      — Formulario para agregar cliente (solo Admin)
@@ -22,7 +24,14 @@
 #     POST     /generar_pdf        — Genera y descarga un PDF con productos seleccionados
 #     GET      /tareas             — Gestión de tareas (todas para Admin, propias para otros)
 #     POST     /asignar_tarea      — Crea una nueva tarea (solo Admin)
-#     POST     /actualizar_tarea/<id> — Cambia el estado de una tarea
+#     POST     /actualizar_tarea/<id>   — Cambia el estado de una tarea
+#     GET      /cliente/<rif>           — Ficha completa del cliente con historial
+#     POST     /cliente/<rif>/editar    — Actualizar datos de contacto del cliente
+#     GET      /cotizaciones            — Lista todas las cotizaciones
+#     GET/POST /cotizacion/nueva        — Crear nueva cotización (acepta ?cliente_rif=)
+#     GET      /cotizacion/<id>         — Detalle de una cotización
+#     POST     /cotizacion/<id>/estado  — Cambiar estado de cotización
+#     GET      /cotizacion/<id>/pdf     — Descargar PDF de cotización
 #
 # DESPLIEGUE EN RENDER:
 #   Build Command : pip install -r requirements.txt
@@ -30,12 +39,13 @@
 # =============================================================================
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory
 from functools import wraps
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
+from src.generador_pdf import generar_pdf_cotizacion
 
 # =============================================================================
 # ██████████████ CONFIGURACIÓN - EDITAR AQUÍ ██████████████
@@ -85,9 +95,10 @@ app.secret_key = SECRET_KEY
 # Instancia global del módulo de base de datos
 bd = ConexionBD()
 
-# Crear la tabla de tareas automáticamente al arrancar el servidor,
-# así no hace falta ejecutar ningún script SQL externo
+# Crear tablas automáticamente al arrancar el servidor —
+# operaciones idempotentes, seguras de ejecutar en cada inicio
 bd.inicializar_tareas()
+bd.inicializar_cotizaciones()
 
 
 # =============================================================================
@@ -220,10 +231,79 @@ def catalogo():
     """
     Módulo PIM — Vista completa del catálogo de productos.
     Permite seleccionar productos para generar un PDF y, si es Admin,
-    editar o eliminar registros.
+    editar o eliminar registros. Incluye la foto principal de cada producto
+    para mostrar miniaturas en la tabla.
     """
     inventario = bd.obtener_productos()
-    return render_template('catalogo.html', productos=inventario)
+    # Extraer solo el nombre de archivo para construir URLs en el template.
+    # Se normalizan las barras antes de basename para manejar rutas Windows (\)
+    # guardadas por la app de escritorio en sistemas Linux/Mac.
+    fotos_por_sku = {
+        sku: os.path.basename(ruta.replace('\\', '/'))
+        for sku, ruta in bd.obtener_fotos_principales().items()
+    }
+    return render_template('catalogo.html', productos=inventario, fotos_por_sku=fotos_por_sku)
+
+
+@app.route('/producto/<sku>')
+@login_requerido
+def detalle_producto(sku):
+    """
+    Ficha de detalle de un producto con galería de fotos por ángulo.
+
+    Muestra todos los datos técnicos del producto y las fotografías
+    vinculadas desde el módulo DAM, organizadas en tabs por tipo de ángulo
+    (Frontal, Lateral, Detalle, En-contexto).
+
+    Args:
+        sku (str): Código SKU del producto a mostrar.
+    """
+    producto = bd.obtener_producto(sku)
+    if not producto:
+        flash(f'❌ Producto "{sku}" no encontrado en el catálogo.', 'error')
+        return redirect(url_for('catalogo'))
+
+    activos = bd.obtener_activos_por_sku(sku)
+
+    # Agrupar activos por ángulo para los tabs de la galería
+    galeria = {}
+    for activo in activos:
+        angulo = activo[3]
+        if angulo not in galeria:
+            galeria[angulo] = []
+        # Normalizar separadores antes de basename para rutas Windows guardadas por el desktop app
+        nombre_archivo = os.path.basename(activo[1].replace('\\', '/'))
+        galeria[angulo].append({
+            'id': activo[0],
+            'ruta': activo[1],
+            'tipo': activo[2],
+            'nombre': nombre_archivo
+        })
+
+    total_fotos = sum(len(lista) for lista in galeria.values())
+
+    return render_template(
+        'producto_detalle.html',
+        producto=producto,
+        galeria=galeria,
+        total_fotos=total_fotos
+    )
+
+
+@app.route('/activos/<path:nombre_archivo>')
+@login_requerido
+def servir_activo(nombre_archivo):
+    """
+    Sirve archivos estáticos desde la carpeta 'almacen_activos/'.
+
+    Esta ruta permite que el portal web acceda a las fotografías copiadas
+    por la app de escritorio DAM. Solo accesible para usuarios autenticados.
+
+    Args:
+        nombre_archivo (str): Nombre del archivo (con extensión) dentro de almacen_activos/.
+    """
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    return send_from_directory(carpeta_activos, nombre_archivo)
 
 
 @app.route('/clientes')
@@ -235,6 +315,70 @@ def clientes():
     """
     lista_clientes = bd.obtener_clientes()
     return render_template('clientes.html', clientes=lista_clientes)
+
+
+@app.route('/cliente/<path:rif>')
+@login_requerido
+def cliente_detalle(rif):
+    """
+    Ficha completa de un cliente: datos de contacto, tareas asociadas
+    y cotizaciones generadas para él.
+
+    Args:
+        rif (str): RIF del cliente (puede contener guiones y barras).
+    """
+    cliente = bd.obtener_cliente(rif)
+    if not cliente:
+        flash('⚠️ Cliente no encontrado.', 'error')
+        return redirect(url_for('clientes'))
+
+    tareas = bd.obtener_tareas_por_cliente(rif)
+
+    # Las cotizaciones son visibles solo para Admin, ya que /cotizaciones
+    # y sus rutas derivadas también son exclusivas de Admin.
+    cotizaciones = []
+    if session.get('rol') == 'Admin':
+        cotizaciones = bd.obtener_cotizaciones_por_cliente(rif)
+
+    return render_template(
+        'cliente_detalle.html',
+        cliente=cliente,
+        tareas=tareas,
+        cotizaciones=cotizaciones,
+        es_admin=(session.get('rol') == 'Admin')
+    )
+
+
+@app.route('/cliente/<path:rif>/editar', methods=['POST'])
+@login_requerido
+def cliente_editar(rif):
+    """
+    Actualiza los datos de contacto de un cliente.
+    Solo accesible para usuarios con rol 'Admin'.
+
+    Args:
+        rif (str): RIF del cliente a actualizar.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden editar clientes.', 'error')
+        return redirect(url_for('cliente_detalle', rif=rif))
+
+    nombre_empresa = request.form.get('nombre_empresa', '').strip()
+    telefono       = request.form.get('telefono', '').strip()
+    correo         = request.form.get('correo', '').strip()
+    direccion      = request.form.get('direccion', '').strip()
+
+    if not nombre_empresa:
+        flash('⚠️ El nombre de la empresa es obligatorio.', 'error')
+        return redirect(url_for('cliente_detalle', rif=rif))
+
+    ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion)
+    if ok:
+        flash('✅ Datos del cliente actualizados correctamente.', 'success')
+    else:
+        flash('🔴 Error al actualizar el cliente. Intenta de nuevo.', 'error')
+
+    return redirect(url_for('cliente_detalle', rif=rif))
 
 
 @app.route('/nuevo_producto', methods=['GET', 'POST'])
@@ -549,6 +693,177 @@ def generar_pdf():
         buffer,
         as_attachment=True,
         download_name=NOMBRE_ARCHIVO_PDF,
+        mimetype='application/pdf'
+    )
+
+
+# =============================================================================
+# MÓDULO COTIZACIONES
+# =============================================================================
+
+@app.route('/cotizaciones')
+@login_requerido
+def cotizaciones():
+    """
+    Lista todas las cotizaciones registradas.
+    Permite filtrar por estado mediante el parámetro GET ?estado=...
+    Solo accesible para usuarios con rol 'Admin'.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden acceder a las cotizaciones.', 'error')
+        return redirect(url_for('inicio'))
+    estado_filtro = request.args.get('estado', '')
+    lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
+    estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    return render_template(
+        'cotizaciones.html',
+        cotizaciones=lista,
+        estados=estados,
+        estado_activo=estado_filtro
+    )
+
+
+@app.route('/cotizacion/nueva', methods=['GET', 'POST'])
+@login_requerido
+def cotizacion_nueva():
+    """
+    Crear una nueva cotización.
+
+    GET:  Muestra el formulario con selector de cliente y buscador de productos.
+    POST: Valida los datos, guarda la cotización y redirige al detalle.
+    Solo permite rol Admin.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden crear cotizaciones.', 'error')
+        return redirect(url_for('cotizaciones'))
+
+    if request.method == 'POST':
+        cliente_rif    = request.form.get('cliente_rif', '').strip()
+        cliente_nombre = request.form.get('cliente_nombre', '').strip()
+        notas          = request.form.get('notas', '').strip()
+
+        # Recopilar ítems del formulario (arrays paralelos)
+        skus       = request.form.getlist('sku[]')
+        nombres    = request.form.getlist('nombre[]')
+        cantidades = request.form.getlist('cantidad[]')
+        precios    = request.form.getlist('precio_unitario[]')
+
+        if not cliente_rif or not cliente_nombre or not skus:
+            flash('⚠️ Debes seleccionar un cliente y agregar al menos un producto.', 'error')
+        else:
+            # Parseo completo primero — si algo falla, no se guarda nada
+            items = []
+            error_validacion = False
+            for i, sku in enumerate(skus):
+                if not sku:
+                    continue
+                try:
+                    cant  = int(cantidades[i])
+                    prec  = float(precios[i])
+                    if cant <= 0 or prec < 0:
+                        raise ValueError("Valores fuera de rango")
+                except (ValueError, IndexError):
+                    flash('⚠️ Cantidad o precio inválido en uno de los productos.', 'error')
+                    error_validacion = True
+                    break
+                items.append({
+                    'sku': sku,
+                    'nombre': nombres[i] if i < len(nombres) else sku,
+                    'cantidad': cant,
+                    'precio_unitario': prec
+                })
+
+            # Solo persistir si NO hubo error y hay al menos un ítem válido
+            if not error_validacion and items:
+                cot_id = bd.crear_cotizacion(
+                    cliente_rif, cliente_nombre,
+                    session['usuario'], items, notas
+                )
+                if cot_id:
+                    flash('✅ Cotización creada exitosamente.', 'success')
+                    return redirect(url_for('cotizacion_detalle', cotizacion_id=cot_id))
+                else:
+                    flash('🔴 Error al guardar la cotización. Intenta de nuevo.', 'error')
+            elif not error_validacion:
+                flash('⚠️ Debes agregar al menos un producto válido.', 'error')
+
+    # GET — cargar clientes y productos para los selectores.
+    # Si viene ?cliente_rif=<rif>, pre-seleccionar ese cliente.
+    cliente_preseleccionado = request.args.get('cliente_rif', '')
+    clientes_lista  = bd.obtener_clientes()
+    productos_lista = bd.obtener_productos()
+    return render_template(
+        'cotizacion_nueva.html',
+        clientes=clientes_lista,
+        productos=productos_lista,
+        cliente_preseleccionado=cliente_preseleccionado
+    )
+
+
+@app.route('/cotizacion/<int:cotizacion_id>')
+@login_requerido
+def cotizacion_detalle(cotizacion_id):
+    """
+    Muestra la cotización completa con todos sus ítems, estado y opciones de acción.
+    Solo accesible para usuarios con rol 'Admin'.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden ver cotizaciones.', 'error')
+        return redirect(url_for('inicio'))
+    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    if not datos:
+        flash('⚠️ Cotización no encontrada.', 'error')
+        return redirect(url_for('cotizaciones'))
+    estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    return render_template('cotizacion_detalle.html', datos=datos, estados=estados)
+
+
+@app.route('/cotizacion/<int:cotizacion_id>/estado', methods=['POST'])
+@login_requerido
+def cotizacion_estado(cotizacion_id):
+    """
+    Cambia el estado de una cotización (solo Admin).
+    POST param: nuevo_estado
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden cambiar el estado.', 'error')
+        return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+
+    nuevo_estado = request.form.get('nuevo_estado', '').strip()
+    estados_validos = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    if nuevo_estado not in estados_validos:
+        flash('⚠️ Estado no válido.', 'error')
+    else:
+        ok = bd.actualizar_estado_cotizacion(cotizacion_id, nuevo_estado)
+        if ok:
+            flash(f'✅ Estado actualizado a "{nuevo_estado}".', 'success')
+        else:
+            flash('🔴 Error al actualizar el estado.', 'error')
+
+    return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+
+
+@app.route('/cotizacion/<int:cotizacion_id>/pdf')
+@login_requerido
+def cotizacion_pdf(cotizacion_id):
+    """
+    Genera y descarga el PDF de la cotización indicada.
+    Solo accesible para usuarios con rol 'Admin'.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden descargar cotizaciones.', 'error')
+        return redirect(url_for('inicio'))
+    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    if not datos:
+        flash('⚠️ Cotización no encontrada.', 'error')
+        return redirect(url_for('cotizaciones'))
+
+    buffer = generar_pdf_cotizacion(datos)
+    numero = datos['cabecera'][1]   # numero  (columna 1)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"Cotizacion_{numero}.pdf",
         mimetype='application/pdf'
     )
 
