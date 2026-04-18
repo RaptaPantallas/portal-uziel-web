@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ producto[1] }} — Importadora Uziel</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f7fa;
+            color: #1a1d27;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 200px; min-height: 100vh; background: #1a1d27;
+            display: flex; flex-direction: column; padding: 20px 0;
+            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
+        }
+        .sidebar-brand {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 18px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
+        }
+        .brand-icon {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
+        }
+        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
+        .sidebar nav { flex: 1; padding: 0 10px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            text-decoration: none; color: #8a93a8;
+            font-size: 14px; font-weight: 500; margin-bottom: 2px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .user-avatar {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
+        }
+        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
+        .user-rol  { color: #8a93a8; font-size: 12px; }
+        .btn-logout {
+            display: flex; align-items: center; gap: 8px;
+            color: #8a93a8; text-decoration: none;
+            font-size: 13px; font-weight: 500; transition: color 0.15s;
+        }
+        .btn-logout:hover { color: #e8ecf5; }
+
+        /* CONTENIDO */
+        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
+
+        /* BREADCRUMB */
+        .breadcrumb {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; color: #8a93a8; margin-bottom: 24px;
+        }
+        .breadcrumb a { color: #7b9fff; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb-sep { color: #c0c8d8; }
+
+        /* FLASH */
+        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
+        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
+        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
+
+        /* LAYOUT DETALLE */
+        .detalle-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .detalle-grid { grid-template-columns: 1fr; }
+        }
+
+        /* CARD */
+        .card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3;
+        }
+        .card-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid #eaedf3;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .card-title { font-size: 15px; font-weight: 600; }
+        .card-body { padding: 24px; }
+
+        /* FICHA TÉCNICA */
+        .ficha-nombre {
+            font-size: 22px; font-weight: 700; margin-bottom: 4px;
+        }
+        .ficha-sku {
+            font-family: 'Courier New', monospace;
+            font-size: 13px; font-weight: 700;
+            color: #3b5bdb; background: #eff3ff;
+            padding: 4px 10px; border-radius: 6px;
+            display: inline-block; margin-bottom: 20px;
+        }
+        .ficha-precio {
+            font-size: 28px; font-weight: 800;
+            color: #1a7a47; margin-bottom: 20px;
+        }
+
+        .ficha-campo { margin-bottom: 16px; }
+        .ficha-campo label {
+            display: block; font-size: 11px; font-weight: 600;
+            color: #8a93a8; text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .ficha-campo p {
+            font-size: 14px; color: #2c3347; line-height: 1.5;
+        }
+        .ficha-campo p.vacio { color: #b0b8cc; font-style: italic; }
+
+        .divider { border: none; border-top: 1px solid #eaedf3; margin: 20px 0; }
+
+        /* GALERÍA */
+        .tab-bar {
+            display: flex; gap: 4px; flex-wrap: wrap;
+            padding: 16px 24px 0;
+        }
+        .tab-btn {
+            padding: 7px 16px; border-radius: 20px;
+            font-size: 13px; font-weight: 600;
+            border: 1.5px solid #eaedf3;
+            background: none; cursor: pointer; color: #8a93a8;
+            transition: all 0.15s;
+        }
+        .tab-btn:hover { border-color: #7b9fff; color: #7b9fff; }
+        .tab-btn.activo { background: #3b5bdb; border-color: #3b5bdb; color: white; }
+
+        .tab-panel { display: none; padding: 20px 24px; }
+        .tab-panel.activo { display: block; }
+
+        .galeria-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .galeria-item {
+            border-radius: 10px; overflow: hidden;
+            border: 1.5px solid #eaedf3;
+            background: #fafbfc;
+            transition: box-shadow 0.15s, border-color 0.15s;
+            cursor: pointer;
+        }
+        .galeria-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #7b9fff; }
+
+        .galeria-item img {
+            width: 100%; aspect-ratio: 1;
+            object-fit: cover; display: block;
+        }
+        .galeria-item .item-nombre {
+            padding: 6px 8px;
+            font-size: 11px; color: #8a93a8;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .sin-fotos {
+            text-align: center; padding: 48px 24px;
+            color: #b0b8cc;
+        }
+        .sin-fotos .icono { font-size: 48px; margin-bottom: 12px; }
+        .sin-fotos p { font-size: 14px; }
+
+        /* LIGHTBOX */
+        .lightbox {
+            display: none; position: fixed; inset: 0;
+            background: rgba(10,12,20,0.88); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .lightbox.abierto { display: flex; }
+        .lightbox img {
+            max-width: 90vw; max-height: 88vh;
+            border-radius: 10px; object-fit: contain;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+        }
+        .lightbox-close {
+            position: absolute; top: 20px; right: 28px;
+            font-size: 32px; color: white; cursor: pointer;
+            opacity: 0.7; transition: opacity 0.15s; line-height: 1;
+            background: none; border: none;
+        }
+        .lightbox-close:hover { opacity: 1; }
+
+        /* BOTONES */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; border-radius: 8px;
+            font-size: 13px; font-weight: 600;
+            text-decoration: none; cursor: pointer;
+            border: none; transition: opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.82; }
+        .btn-blue   { background: #3b5bdb; color: white; }
+        .btn-amber  { background: #f59e0b; color: white; }
+        .btn-ghost  {
+            background: none; color: #8a93a8;
+            border: 1.5px solid #d0d5e0;
+        }
+        .btn-ghost:hover { color: #1a1d27; border-color: #b0b8cc; opacity: 1; }
+
+        .acciones { display: flex; gap: 10px; margin-top: 24px; }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">U</div>
+        <span class="brand-name">Imp. Uziel</span>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('clientes') }}" class="nav-item">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        <a href="{{ url_for('catalogo') }}" class="nav-item active">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
+            <span class="nav-icon">📋</span> Tareas
+            {% if total_notif > 0 %}
+                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
+                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
+                    {{ total_notif }}
+                </span>
+            {% endif %}
+        </a>
+        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
+            <span class="nav-icon">🧾</span> Cotizaciones
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
+                <div class="user-rol">{{ session['rol'] }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- CONTENIDO -->
+<main class="main-content">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Navegación">
+        <a href="{{ url_for('catalogo') }}">📦 Productos</a>
+        <span class="breadcrumb-sep">/</span>
+        <span>{{ producto[0] }}</span>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for category, message in messages %}
+        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
+
+    <div class="detalle-grid">
+
+        <!-- ===== COLUMNA IZQUIERDA: Ficha técnica ===== -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Ficha Técnica</span>
+                {% if session['rol'] == 'Admin' %}
+                    <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-amber" style="padding:6px 14px;font-size:12px;">✏️ Editar</a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="ficha-nombre">{{ producto[1] }}</div>
+                <div class="ficha-sku">SKU: {{ producto[0] }}</div>
+                <div class="ficha-precio">${{ producto[5] }}</div>
+
+                <hr class="divider">
+
+                <div class="ficha-campo">
+                    <label>Marca / Fabricante</label>
+                    <p>{{ producto[3] or '' }}
+                        {% if not producto[3] %}<span class="vacio">Sin especificar</span>{% endif %}
+                    </p>
+                </div>
+
+                <div class="ficha-campo">
+                    <label>Compatibilidad</label>
+                    <p>{{ producto[4] or '' }}
+                        {% if not producto[4] %}<span class="vacio">Sin especificar</span>{% endif %}
+                    </p>
+                </div>
+
+                <div class="ficha-campo">
+                    <label>Descripción técnica</label>
+                    <p>{{ producto[2] or '' }}
+                        {% if not producto[2] %}<span class="vacio">Sin descripción</span>{% endif %}
+                    </p>
+                </div>
+
+                <div class="acciones">
+                    <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Volver al catálogo</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== COLUMNA DERECHA: Galería de fotos ===== -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Galería de Fotos</span>
+                <span style="font-size:12px;color:#8a93a8;">
+                    {{ galeria | length }} ángulo{{ 's' if galeria | length != 1 else '' }} •
+                    {{ total_fotos }} foto{{ 's' if total_fotos != 1 else '' }}
+                </span>
+            </div>
+
+            {% if galeria %}
+                <!-- Tabs de ángulo -->
+                <div class="tab-bar" id="tab-bar">
+                    {% for angulo in galeria %}
+                        <button class="tab-btn {% if loop.first %}activo{% endif %}"
+                                data-tab="tab-{{ loop.index }}"
+                                onclick="cambiarTab(this)">
+                            {{ angulo }}
+                            <span style="font-size:11px;opacity:0.7;">({{ galeria[angulo] | length }})</span>
+                        </button>
+                    {% endfor %}
+                </div>
+
+                <!-- Paneles de fotos por ángulo -->
+                {% for angulo, fotos in galeria.items() %}
+                <div class="tab-panel {% if loop.first %}activo{% endif %}" id="tab-{{ loop.index }}">
+                    <div class="galeria-grid">
+                        {% for foto in fotos %}
+                        <div class="galeria-item" onclick="abrirLightbox('{{ url_for('servir_activo', nombre_archivo=foto['nombre']) }}')">
+                            <img src="{{ url_for('servir_activo', nombre_archivo=foto['nombre']) }}"
+                                 alt="{{ angulo }} — {{ foto['nombre'] }}"
+                                 onerror="this.parentElement.style.display='none';">
+                            <div class="item-nombre">{{ foto['nombre'] }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="sin-fotos">
+                    <div class="icono">📷</div>
+                    <p>Este producto no tiene fotos vinculadas aún.</p>
+                    <p style="margin-top:6px;font-size:12px;">Usa la app de escritorio DAM para agregar fotografías.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    </div><!-- fin detalle-grid -->
+
+</main>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="cerrarLightbox(event)">
+    <button class="lightbox-close" onclick="cerrarLightbox()" aria-label="Cerrar">✕</button>
+    <img src="" alt="Vista ampliada" id="lightbox-img">
+</div>
+
+<script>
+function cambiarTab(btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
+    btn.classList.add('activo');
+    document.getElementById(btn.dataset.tab).classList.add('activo');
+}
+
+function abrirLightbox(src) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').classList.add('abierto');
+}
+
+function cerrarLightbox(e) {
+    if (!e || e.target !== document.getElementById('lightbox-img')) {
+        document.getElementById('lightbox').classList.remove('abierto');
+    }
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') cerrarLightbox();
+});
+</script>
+
+</body>
+</html>

@@ -114,10 +114,12 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 16px;
-            border: 1px solid #eaedf3;
+            margin-bottom: 8px;
+            border: 1.5px solid #eaedf3;
             box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            transition: border-color 0.15s;
         }
+        .search-bar:focus-within { border-color: #7b9fff; box-shadow: 0 0 0 3px rgba(123,159,255,0.12); }
 
         .search-bar input {
             border: none;
@@ -127,8 +129,22 @@
             width: 100%;
             background: transparent;
         }
-
         .search-bar input::placeholder { color: #b0b8cc; }
+
+        .btn-limpiar {
+            background: none; border: none; cursor: pointer;
+            color: #b0b8cc; font-size: 16px; padding: 0 2px;
+            line-height: 1; transition: color 0.15s;
+            display: none;
+        }
+        .btn-limpiar:hover { color: #e74c3c; }
+        .btn-limpiar.visible { display: block; }
+
+        .search-contador {
+            font-size: 13px; color: #8a93a8;
+            margin-bottom: 12px; padding-left: 4px;
+        }
+        .search-contador span { color: #7b9fff; font-weight: 700; }
 
         /* Card / Tabla */
         .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3; overflow: hidden; }
@@ -187,6 +203,28 @@
         .readonly-label { color: #b0b8cc; font-size: 12px; }
 
         input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #3b5bdb; }
+
+        /* Miniaturas de producto */
+        .thumb-cell { width: 60px; text-align: center; padding: 8px 10px !important; }
+
+        .thumb-img {
+            width: 48px; height: 48px; border-radius: 8px;
+            object-fit: cover; border: 1px solid #eaedf3;
+            transition: transform 0.15s;
+        }
+        .thumb-img:hover { transform: scale(1.08); }
+
+        .thumb-sin-foto {
+            width: 48px; height: 48px; border-radius: 8px;
+            background: #f0f2f5; border: 1px dashed #d0d5e0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: #c0c8d8; margin: 0 auto;
+        }
+
+        .link-detalle {
+            color: #1a1d27; text-decoration: none; font-weight: 600;
+        }
+        .link-detalle:hover { color: #3b5bdb; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -215,6 +253,9 @@
                     {{ total_notif }}
                 </span>
             {% endif %}
+        </a>
+        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
+            <span class="nav-icon">🧾</span> Cotizaciones
         </a>
     </nav>
     <div class="sidebar-footer">
@@ -249,9 +290,11 @@
     {% endwith %}
 
     <div class="search-bar">
-        🔍
-        <input type="text" id="buscador" placeholder="Buscar por SKU, nombre, marca..." oninput="filtrarTabla()">
+        <span style="color:#b0b8cc;font-size:16px;">🔍</span>
+        <input type="text" id="buscador" placeholder="Buscar por SKU, nombre o marca..." oninput="filtrarProductos()" autocomplete="off">
+        <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
     </div>
+    <p class="search-contador" id="contador-productos"></p>
 
     <div class="card">
         <form action="{{ url_for('generar_pdf') }}" method="POST">
@@ -263,6 +306,7 @@
                 <thead>
                     <tr>
                         <th style="width:40px;">PDF</th>
+                        <th style="width:68px;">Foto</th>
                         <th>SKU</th>
                         <th>Nombre</th>
                         <th>Marca</th>
@@ -272,24 +316,42 @@
                 </thead>
                 <tbody>
                     {% for producto in productos %}
+                    {% set sku = producto[0] %}
                     <tr>
-                        <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}"></td>
-                        <td><span class="sku-badge">{{ producto[0] }}</span></td>
-                        <td>{{ producto[1] }}</td>
+                        <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
+                        <td class="thumb-cell">
+                            <a href="{{ url_for('detalle_producto', sku=sku) }}">
+                                {% if sku in fotos_por_sku %}
+                                    <img class="thumb-img"
+                                         src="{{ url_for('servir_activo', nombre_archivo=fotos_por_sku[sku]) }}"
+                                         alt="Foto de {{ producto[1] }}"
+                                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                                    <div class="thumb-sin-foto" style="display:none;">📷</div>
+                                {% else %}
+                                    <div class="thumb-sin-foto">📷</div>
+                                {% endif %}
+                            </a>
+                        </td>
+                        <td><span class="sku-badge">{{ sku }}</span></td>
+                        <td>
+                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">
+                                {{ producto[1] }}
+                            </a>
+                        </td>
                         <td>{{ producto[2] }}</td>
                         <td class="precio">${{ producto[3] }}</td>
                         <td>
                             {% if session['rol'] == 'Admin' %}
-                                <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-amber">Editar</a>
-                                <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-red" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
+                                <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-amber">Editar</a>
+                                <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-red" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
                             {% else %}
-                                <span class="readonly-label">Solo lectura</span>
+                                <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-blue" style="padding:6px 10px;font-size:12px;">Ver ficha</a>
                             {% endif %}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" style="text-align:center; color:#b0b8cc; padding:40px;">
+                        <td colspan="7" style="text-align:center; color:#b0b8cc; padding:40px;">
                             No hay productos registrados aún.
                         </td>
                     </tr>
@@ -302,13 +364,56 @@
 </main>
 
 <script>
-function filtrarTabla() {
-    const texto = document.getElementById('buscador').value.toLowerCase();
-    const filas = document.querySelectorAll('#tabla-productos tbody tr');
-    filas.forEach(fila => {
-        fila.style.display = fila.textContent.toLowerCase().includes(texto) ? '' : 'none';
-    });
+function normalizar(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
+
+function contarFilasReales(selector) {
+    return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length;
+}
+
+function actualizarContadorProductos(visibles, total) {
+    const contador = document.getElementById('contador-productos');
+    if (total === 0) { contador.innerHTML = ''; return; }
+    if (visibles === total) {
+        contador.innerHTML = `<span>${total}</span> producto${total === 1 ? '' : 's'} en catálogo`;
+    } else {
+        contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> productos`;
+    }
+}
+
+function filtrarProductos() {
+    const texto = normalizar(document.getElementById('buscador').value);
+    const filas = document.querySelectorAll('#tabla-productos tbody tr');
+    const btnLimpiar = document.getElementById('btn-limpiar');
+    let visibles = 0;
+    let total = 0;
+
+    filas.forEach(fila => {
+        if (fila.cells.length <= 1) return;
+        total++;
+        const sku    = normalizar(fila.cells[2].textContent);
+        const nombre = normalizar(fila.cells[3].textContent);
+        const marca  = normalizar(fila.cells[4].textContent);
+        const coincide = !texto || sku.includes(texto) || nombre.includes(texto) || marca.includes(texto);
+        fila.style.display = coincide ? '' : 'none';
+        if (coincide) visibles++;
+    });
+
+    btnLimpiar.classList.toggle('visible', texto.length > 0);
+    actualizarContadorProductos(visibles, total);
+}
+
+function limpiarBusqueda() {
+    document.getElementById('buscador').value = '';
+    filtrarProductos();
+    document.getElementById('buscador').focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const total = contarFilasReales('#tabla-productos tbody tr');
+    actualizarContadorProductos(total, total);
+});
 </script>
 
 </body>

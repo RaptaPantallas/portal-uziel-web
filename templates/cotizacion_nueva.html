@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Cotización — Importadora Uziel</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f7fa; color: #1a1d27;
+            display: flex; min-height: 100vh;
+        }
+
+        /* ===================== SIDEBAR ===================== */
+        .sidebar {
+            width: 210px; min-height: 100vh; background: #1a1d27;
+            display: flex; flex-direction: column; padding: 20px 0;
+            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
+        }
+        .sidebar-brand {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 18px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
+        }
+        .brand-icon {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
+        }
+        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
+        .sidebar nav { flex: 1; padding: 0 10px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            text-decoration: none; color: #8a93a8;
+            font-size: 14px; font-weight: 500; margin-bottom: 2px;
+            transition: background 0.15s, color 0.15s; position: relative;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .sidebar-footer { padding: 16px 14px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .user-avatar {
+            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 13px; font-weight: 700;
+        }
+        .user-name { font-size: 13px; font-weight: 600; color: #e8ecf5; }
+        .user-rol  { font-size: 11px; color: #6b7a99; }
+        .btn-logout {
+            display: block; text-align: center; padding: 8px;
+            background: rgba(231,76,60,0.12); color: #e74c3c;
+            border-radius: 7px; text-decoration: none; font-size: 13px;
+            font-weight: 600; transition: background 0.15s;
+        }
+        .btn-logout:hover { background: rgba(231,76,60,0.22); }
+
+        /* ===================== CONTENIDO ===================== */
+        .main { margin-left: 210px; flex: 1; padding: 32px 36px; }
+
+        .page-header {
+            display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+        }
+        .page-title { font-size: 22px; font-weight: 700; }
+        .breadcrumb { font-size: 13px; color: #7b8499; }
+        .breadcrumb a { color: #3b5bdb; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        .card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 24px; margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 15px; font-weight: 700; color: #2c3650;
+            margin-bottom: 16px; padding-bottom: 10px;
+            border-bottom: 1px solid #edf0f7;
+        }
+
+        /* Formulario */
+        .form-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group.full { grid-column: 1 / -1; }
+        label { font-size: 12px; font-weight: 700; color: #7b8499; text-transform: uppercase; }
+        select, input, textarea {
+            padding: 9px 12px; border: 1.5px solid #dde1ec; border-radius: 8px;
+            font-size: 14px; font-family: inherit; color: #1a1d27;
+            transition: border-color 0.15s; background: white;
+        }
+        select:focus, input:focus, textarea:focus {
+            outline: none; border-color: #3b5bdb;
+        }
+        textarea { resize: vertical; min-height: 70px; }
+
+        /* Buscador de productos */
+        .search-row {
+            display: flex; gap: 10px; align-items: center; margin-bottom: 12px;
+        }
+        #buscador-producto {
+            flex: 1; padding: 9px 12px; border: 1.5px solid #dde1ec;
+            border-radius: 8px; font-size: 14px;
+        }
+        #buscador-producto:focus { outline: none; border-color: #3b5bdb; }
+
+        /* Tabla de ítems */
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #f8f9fc; font-size: 11px; font-weight: 700;
+            color: #7b8499; text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 10px 12px; text-align: left;
+            border-bottom: 1px solid #edf0f7;
+        }
+        td { padding: 8px 12px; border-bottom: 1px solid #f0f2f8; }
+        tr:last-child td { border-bottom: none; }
+
+        .td-subtotal { font-weight: 700; color: #1a7a45; text-align: right; }
+        .td-sku { font-size: 12px; color: #6b7a99; }
+
+        input.qty, input.price {
+            width: 90px; text-align: right; padding: 6px 8px;
+        }
+
+        .btn-remove {
+            background: none; border: none; color: #e74c3c;
+            font-size: 18px; cursor: pointer; line-height: 1;
+            padding: 0 4px; transition: opacity 0.15s;
+        }
+        .btn-remove:hover { opacity: 0.6; }
+
+        /* Total */
+        .total-row {
+            display: flex; justify-content: flex-end;
+            align-items: center; gap: 12px; padding: 14px 0 0;
+            border-top: 2px solid #edf0f7; margin-top: 8px;
+        }
+        .total-label { font-size: 15px; font-weight: 600; color: #7b8499; }
+        .total-valor { font-size: 22px; font-weight: 800; color: #1a7a45; }
+
+        /* Botones del formulario */
+        .form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 10px 20px; border-radius: 8px; font-size: 14px;
+            font-weight: 600; text-decoration: none; cursor: pointer;
+            border: none; transition: opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.88; }
+        .btn-blue   { background: #3b5bdb; color: white; }
+        .btn-ghost  { background: #f0f2f8; color: #5a6280; }
+
+        /* Flash messages */
+        .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
+        .flash.success { background: #d1fae5; color: #065f46; }
+        .flash.error   { background: #fee2e2; color: #991b1b; }
+
+        /* Tabla de productos del catálogo (lista de sugerencias) */
+        #lista-productos {
+            border: 1.5px solid #dde1ec; border-radius: 8px;
+            max-height: 220px; overflow-y: auto;
+            display: none; margin-top: 4px;
+        }
+        .prod-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 14px; cursor: pointer; font-size: 13px;
+            border-bottom: 1px solid #f0f2f8;
+            transition: background 0.12s;
+        }
+        .prod-item:last-child { border-bottom: none; }
+        .prod-item:hover { background: #f0f4ff; }
+        .prod-sku { font-size: 11px; color: #7b8499; margin-left: 8px; }
+        .prod-precio { font-weight: 700; color: #1a7a45; font-size: 13px; }
+
+        #sin-resultados { padding: 12px 14px; color: #a0aab8; font-size: 13px; display: none; }
+    </style>
+</head>
+<body>
+
+<!-- ===================== SIDEBAR ===================== -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">U</div>
+        <span class="brand-name">Importadora Uziel</span>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="{{ url_for('clientes') }}" class="nav-item">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        <a href="{{ url_for('catalogo') }}" class="nav-item">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
+            <span class="nav-icon">📋</span> Tareas
+            {% if total_notif > 0 %}
+                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
+                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
+                    {{ total_notif }}
+                </span>
+            {% endif %}
+        </a>
+        <a href="{{ url_for('cotizaciones') }}" class="nav-item active">
+            <span class="nav-icon">🧾</span> Cotizaciones
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div>
+                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
+                <div class="user-rol">{{ session['rol'] }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- ===================== CONTENIDO ===================== -->
+<main class="main">
+    <!-- Encabezado -->
+    <div class="page-header">
+        <div>
+            <div class="breadcrumb">
+                <a href="{{ url_for('cotizaciones') }}">🧾 Cotizaciones</a> › Nueva
+            </div>
+            <div class="page-title">Nueva Cotización</div>
+        </div>
+    </div>
+
+    <!-- Mensajes flash -->
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in msgs %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('cotizacion_nueva') }}" id="form-cotizacion">
+
+        <!-- Datos del cliente -->
+        <div class="card">
+            <div class="card-title">👤 Cliente</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Empresa</label>
+                    <select name="cliente_rif" id="sel-cliente" required
+                            onchange="autocompletarCliente(this)">
+                        <option value="">— Selecciona un cliente —</option>
+                        {% for cli in clientes %}
+                        {# cli = (rif, nombre_empresa, telefono, correo, direccion) #}
+                        <option value="{{ cli[0] }}" data-nombre="{{ cli[1] }}"
+                            {% if cli[0] == cliente_preseleccionado %}selected{% endif %}>
+                            {{ cli[1] }} ({{ cli[0] }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>RIF</label>
+                    <input type="text" id="campo-rif" value="" readonly
+                           style="background:#f8f9fc;">
+                </div>
+                <!-- Campo oculto con el nombre del cliente para enviar al servidor -->
+                <input type="hidden" name="cliente_nombre" id="campo-nombre-hidden">
+            </div>
+        </div>
+
+        <!-- Productos -->
+        <div class="card">
+            <div class="card-title">📦 Productos</div>
+
+            <!-- Buscador -->
+            <div class="search-row">
+                <input type="text" id="buscador-producto"
+                       placeholder="Buscar producto por nombre o SKU..."
+                       autocomplete="off">
+            </div>
+            <div id="lista-productos">
+                {% for p in productos %}
+                {# p = (sku, nombre, marca, precio) #}
+                <div class="prod-item"
+                     data-sku="{{ p[0] }}"
+                     data-nombre="{{ p[1] }}"
+                     data-precio="{{ p[3] }}"
+                     onclick="agregarProducto(this)">
+                    <span>
+                        {{ p[1] }}
+                        <span class="prod-sku">{{ p[0] }}</span>
+                    </span>
+                    <span class="prod-precio">$ {{ p[3] }}</span>
+                </div>
+                {% endfor %}
+                <div id="sin-resultados">Sin resultados para tu búsqueda.</div>
+            </div>
+
+            <!-- Tabla de ítems seleccionados -->
+            <table id="tabla-items" style="margin-top:16px;">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Producto</th>
+                        <th style="text-align:right;">Cantidad</th>
+                        <th style="text-align:right;">Precio Unit. (USD)</th>
+                        <th style="text-align:right;">Subtotal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpo-items">
+                    <!-- Las filas se agregan dinámicamente con JS -->
+                </tbody>
+            </table>
+
+            <!-- Total -->
+            <div class="total-row">
+                <span class="total-label">TOTAL USD:</span>
+                <span class="total-valor" id="total-display">$ 0.00</span>
+            </div>
+        </div>
+
+        <!-- Notas -->
+        <div class="card">
+            <div class="card-title">📝 Notas / Observaciones (opcional)</div>
+            <textarea name="notas" placeholder="Condiciones de pago, tiempo de entrega, descuentos, etc."></textarea>
+        </div>
+
+        <!-- Botones -->
+        <div class="form-actions">
+            <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">Cancelar</a>
+            <button type="submit" class="btn btn-blue">✅ Guardar Cotización</button>
+        </div>
+    </form>
+</main>
+
+<script>
+// ---- Autocompletar nombre de cliente ----
+function autocompletarCliente(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const rif    = opt.value;
+    const nombre = opt.dataset.nombre || '';
+    document.getElementById('campo-rif').value = rif;
+    document.getElementById('campo-nombre-hidden').value = nombre;
+}
+
+// Si el select ya tiene un cliente preseleccionado desde el servidor,
+// ejecutar autocompletarCliente al cargar para rellenar los campos ocultos.
+document.addEventListener('DOMContentLoaded', function () {
+    const selCliente = document.getElementById('sel-cliente');
+    if (selCliente && selCliente.value) {
+        autocompletarCliente(selCliente);
+    }
+});
+
+// ---- Buscador de productos ----
+const buscador      = document.getElementById('buscador-producto');
+const listaProds    = document.getElementById('lista-productos');
+const prodItems     = listaProds.querySelectorAll('.prod-item');
+const sinResultados = document.getElementById('sin-resultados');
+
+buscador.addEventListener('focus', () => listaProds.style.display = 'block');
+
+document.addEventListener('click', (e) => {
+    if (!buscador.contains(e.target) && !listaProds.contains(e.target)) {
+        listaProds.style.display = 'none';
+    }
+});
+
+buscador.addEventListener('input', () => {
+    const q = buscador.value.trim().toLowerCase();
+    let visibles = 0;
+    prodItems.forEach(item => {
+        const texto = item.textContent.toLowerCase();
+        const mostrar = !q || texto.includes(q);
+        item.style.display = mostrar ? '' : 'none';
+        if (mostrar) visibles++;
+    });
+    sinResultados.style.display = visibles === 0 ? 'block' : 'none';
+    listaProds.style.display = 'block';
+});
+
+// ---- Agregar producto a la tabla ----
+let itemCount = 0;
+
+function agregarProducto(el) {
+    const sku    = el.dataset.sku;
+    const nombre = el.dataset.nombre;
+    const precio = parseFloat(el.dataset.precio) || 0;
+
+    // Evitar duplicados: verificar si el SKU ya está en la tabla
+    const filas = document.querySelectorAll('#cuerpo-items tr');
+    for (const fila of filas) {
+        if (fila.dataset.sku === sku) {
+            // Incrementar cantidad en lugar de duplicar
+            const campoCant = fila.querySelector('.qty');
+            campoCant.value = parseInt(campoCant.value) + 1;
+            recalcularFila(fila);
+            recalcularTotal();
+            listaProds.style.display = 'none';
+            buscador.value = '';
+            return;
+        }
+    }
+
+    const idx  = itemCount++;
+    const sub  = precio;
+    const fila = document.createElement('tr');
+    fila.dataset.sku = sku;
+    fila.innerHTML = `
+        <td class="td-sku">
+            ${sku}
+            <input type="hidden" name="sku[]" value="${sku}">
+            <input type="hidden" name="nombre[]" value="${nombre}">
+        </td>
+        <td>${nombre}</td>
+        <td style="text-align:right;">
+            <input type="number" class="qty" name="cantidad[]"
+                   value="1" min="1" onchange="recalcularFila(this.closest('tr'));recalcularTotal();"
+                   oninput="recalcularFila(this.closest('tr'));recalcularTotal();">
+        </td>
+        <td style="text-align:right;">
+            <input type="number" class="price" name="precio_unitario[]"
+                   value="${precio.toFixed(2)}" min="0" step="0.01"
+                   onchange="recalcularFila(this.closest('tr'));recalcularTotal();"
+                   oninput="recalcularFila(this.closest('tr'));recalcularTotal();">
+        </td>
+        <td class="td-subtotal">$ ${sub.toFixed(2)}</td>
+        <td>
+            <button type="button" class="btn-remove"
+                    onclick="eliminarFila(this)">✕</button>
+        </td>
+    `;
+    document.getElementById('cuerpo-items').appendChild(fila);
+    recalcularTotal();
+
+    listaProds.style.display = 'none';
+    buscador.value = '';
+}
+
+function recalcularFila(fila) {
+    const qty   = parseFloat(fila.querySelector('.qty').value)   || 0;
+    const price = parseFloat(fila.querySelector('.price').value) || 0;
+    const sub   = qty * price;
+    fila.querySelector('.td-subtotal').textContent = '$ ' + sub.toFixed(2);
+}
+
+function recalcularTotal() {
+    let total = 0;
+    document.querySelectorAll('#cuerpo-items tr').forEach(fila => {
+        const qty   = parseFloat(fila.querySelector('.qty').value)   || 0;
+        const price = parseFloat(fila.querySelector('.price').value) || 0;
+        total += qty * price;
+    });
+    document.getElementById('total-display').textContent = '$ ' + total.toFixed(2);
+}
+
+function eliminarFila(btn) {
+    btn.closest('tr').remove();
+    recalcularTotal();
+}
+
+// Validar antes de enviar
+document.getElementById('form-cotizacion').addEventListener('submit', function(e) {
+    const rif   = document.getElementById('sel-cliente').value;
+    const filas = document.querySelectorAll('#cuerpo-items tr');
+    if (!rif) {
+        e.preventDefault();
+        alert('Debes seleccionar un cliente.');
+        return;
+    }
+    if (filas.length === 0) {
+        e.preventDefault();
+        alert('Debes agregar al menos un producto a la cotización.');
+        return;
+    }
+});
+</script>
+
+</body>
+</html>

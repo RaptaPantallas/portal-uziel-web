@@ -72,11 +72,27 @@
         .search-bar {
             background: white; border-radius: 10px;
             padding: 10px 16px; display: flex; align-items: center; gap: 10px;
-            margin-bottom: 16px; border: 1px solid #eaedf3;
+            margin-bottom: 8px; border: 1.5px solid #eaedf3;
             box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            transition: border-color 0.15s;
         }
+        .search-bar:focus-within { border-color: #7b9fff; box-shadow: 0 0 0 3px rgba(123,159,255,0.12); }
         .search-bar input { border: none; outline: none; font-size: 14px; color: #1a1d27; width: 100%; background: transparent; }
         .search-bar input::placeholder { color: #b0b8cc; }
+
+        .btn-limpiar {
+            background: none; border: none; cursor: pointer;
+            color: #b0b8cc; font-size: 16px; padding: 0 2px;
+            line-height: 1; transition: color 0.15s; display: none;
+        }
+        .btn-limpiar:hover { color: #e74c3c; }
+        .btn-limpiar.visible { display: block; }
+
+        .search-contador {
+            font-size: 13px; color: #8a93a8;
+            margin-bottom: 12px; padding-left: 4px;
+        }
+        .search-contador span { color: #7b9fff; font-weight: 700; }
 
         .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3; overflow: hidden; }
 
@@ -134,6 +150,9 @@
                 </span>
             {% endif %}
         </a>
+        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
+            <span class="nav-icon">🧾</span> Cotizaciones
+        </a>
     </nav>
     <div class="sidebar-footer">
         <div class="user-info">
@@ -167,9 +186,11 @@
     {% endwith %}
 
     <div class="search-bar">
-        🔍
-        <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarTabla()">
+        <span style="color:#b0b8cc;font-size:16px;">🔍</span>
+        <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarClientes()" autocomplete="off">
+        <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
     </div>
+    <p class="search-contador" id="contador-clientes"></p>
 
     <div class="card">
         <table id="tabla-clientes">
@@ -192,7 +213,12 @@
                             <span class="tel">{{ cliente[2] or '—' }}</span>
                         </div>
                     </td>
-                    <td>···</td>
+                    <td>
+                        <a href="{{ url_for('cliente_detalle', rif=cliente[0]) }}"
+                           class="btn btn-blue" style="padding:6px 14px;font-size:12px;">
+                            Ver Ficha →
+                        </a>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
@@ -208,12 +234,56 @@
 </main>
 
 <script>
-function filtrarTabla() {
-    const texto = document.getElementById('buscador').value.toLowerCase();
-    document.querySelectorAll('#tabla-clientes tbody tr').forEach(fila => {
-        fila.style.display = fila.textContent.toLowerCase().includes(texto) ? '' : 'none';
-    });
+function normalizar(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
+
+function contarFilasReales(selector) {
+    return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length;
+}
+
+function actualizarContadorClientes(visibles, total) {
+    const contador = document.getElementById('contador-clientes');
+    if (total === 0) { contador.innerHTML = ''; return; }
+    if (visibles === total) {
+        contador.innerHTML = `<span>${total}</span> cliente${total === 1 ? '' : 's'} registrado${total === 1 ? '' : 's'}`;
+    } else {
+        contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> clientes`;
+    }
+}
+
+function filtrarClientes() {
+    const texto = normalizar(document.getElementById('buscador').value);
+    const filas = document.querySelectorAll('#tabla-clientes tbody tr');
+    const btnLimpiar = document.getElementById('btn-limpiar');
+    let visibles = 0;
+    let total = 0;
+
+    filas.forEach(fila => {
+        if (fila.cells.length <= 1) return;
+        total++;
+        const rif    = normalizar(fila.cells[0].textContent);
+        const nombre = normalizar(fila.cells[1].textContent);
+        const contacto = normalizar(fila.cells[2].textContent);
+        const coincide = !texto || rif.includes(texto) || nombre.includes(texto) || contacto.includes(texto);
+        fila.style.display = coincide ? '' : 'none';
+        if (coincide) visibles++;
+    });
+
+    btnLimpiar.classList.toggle('visible', texto.length > 0);
+    actualizarContadorClientes(visibles, total);
+}
+
+function limpiarBusqueda() {
+    document.getElementById('buscador').value = '';
+    filtrarClientes();
+    document.getElementById('buscador').focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const total = contarFilasReales('#tabla-clientes tbody tr');
+    actualizarContadorClientes(total, total);
+});
 </script>
 </body>
 </html>
