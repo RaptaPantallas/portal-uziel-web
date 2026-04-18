@@ -815,7 +815,13 @@ def cotizacion_detalle(cotizacion_id):
         flash('⚠️ Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
     estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
-    return render_template('cotizacion_detalle.html', datos=datos, estados=estados)
+    # El template usa 'cab' e 'items' directamente (desestructurado del dict)
+    return render_template(
+        'cotizacion_detalle.html',
+        cab=datos['cabecera'],
+        items=datos['items'],
+        estados=estados
+    )
 
 
 @app.route('/cotizacion/<int:cotizacion_id>/estado', methods=['POST'])
