@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Usuarios — Importadora Uziel C.A.</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #c8d0e0; min-height: 100vh; display: flex; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 220px; min-height: 100vh;
+            background: #161b27;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            display: flex; flex-direction: column;
+            padding: 24px 0; flex-shrink: 0;
+        }
+        .sidebar-logo {
+            padding: 0 20px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .sidebar-logo h2 { font-size: 14px; font-weight: 700; color: #7b9fff; letter-spacing: 0.5px; }
+        .sidebar-logo p  { font-size: 11px; color: #5a6378; margin-top: 2px; }
+        nav { padding: 16px 10px; flex: 1; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 12px; border-radius: 7px;
+            color: #8a93a6; font-size: 13.5px; font-weight: 500;
+            text-decoration: none; transition: background .15s, color .15s;
+            margin-bottom: 2px;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
+        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
+        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .nav-divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 12px; }
+        .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .user-avatar { width:34px; height:34px; border-radius:50%; background:#3b5bdb; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:white; flex-shrink:0; }
+        .user-details .user-name { font-size: 13px; font-weight: 600; color: #c8d0e0; }
+        .user-details .user-role { font-size: 11px; color: #5a6378; }
+        .btn-logout { display:block; width:100%; padding:8px 12px; background:rgba(231,76,60,0.12); color:#e74c3c; border:1px solid rgba(231,76,60,0.2); border-radius:7px; font-size:12.5px; font-weight:600; text-align:center; text-decoration:none; cursor:pointer; transition:background .15s; }
+        .btn-logout:hover { background:rgba(231,76,60,0.22); }
+
+        /* ── Main content ── */
+        .main { flex: 1; padding: 32px 40px; overflow-y: auto; }
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 28px; }
+        .page-header h1 { font-size: 22px; font-weight: 700; color: #e0e6f0; }
+        .page-header p  { font-size: 13px; color: #5a6378; margin-top: 3px; }
+
+        /* ── Flash messages ── */
+        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13.5px; }
+        .flash.success { background: rgba(39,174,96,.15); border: 1px solid rgba(39,174,96,.3); color: #2ecc71; }
+        .flash.error   { background: rgba(231,76,60,.15); border: 1px solid rgba(231,76,60,.3); color: #e74c3c; }
+        .flash.exito   { background: rgba(39,174,96,.15); border: 1px solid rgba(39,174,96,.3); color: #2ecc71; }
+
+        /* ── Cards ── */
+        .card {
+            background: #161b27; border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px; padding: 24px; margin-bottom: 28px;
+        }
+        .card-title {
+            font-size: 15px; font-weight: 600; color: #c8d0e0;
+            margin-bottom: 18px; padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* ── Tabla ── */
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+        th { text-align: left; padding: 9px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: #5a6378; border-bottom: 1px solid rgba(255,255,255,.07); }
+        td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+        tr:hover td { background: rgba(255,255,255,.025); }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-block; padding: 2px 9px; border-radius: 20px;
+            font-size: 11px; font-weight: 700; margin-right: 4px; margin-bottom: 2px;
+        }
+        .badge-blue   { background: rgba(59,91,219,.2);  color: #7b9fff; border: 1px solid rgba(59,91,219,.3); }
+        .badge-green  { background: rgba(39,174,96,.15); color: #2ecc71; border: 1px solid rgba(39,174,96,.25); }
+        .badge-amber  { background: rgba(243,156,18,.15); color: #f39c12; border: 1px solid rgba(243,156,18,.25); }
+        .badge-purple { background: rgba(155,89,182,.18); color: #a855f7; border: 1px solid rgba(155,89,182,.3); }
+        .badge-red    { background: rgba(231,76,60,.15);  color: #e74c3c; border: 1px solid rgba(231,76,60,.25); }
+
+        .rol-admin    { background: rgba(59,91,219,.2);  color: #7b9fff; padding: 3px 10px; border-radius: 20px; font-size:11px; font-weight:700; }
+        .rol-empleado { background: rgba(90,99,120,.18); color: #8a93a6; padding: 3px 10px; border-radius: 20px; font-size:11px; font-weight:700; }
+
+        /* ── Botones ── */
+        .btn { display:inline-block; padding:6px 13px; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; border:none; text-decoration:none; transition:opacity .15s; }
+        .btn:hover { opacity: .85; }
+        .btn-sm   { padding: 4px 10px; font-size: 11.5px; }
+        .btn-blue  { background: #3b5bdb; color: white; }
+        .btn-amber { background: rgba(243,156,18,.18); color: #f39c12; border: 1px solid rgba(243,156,18,.3); }
+        .btn-red   { background: rgba(231,76,60,.15);  color: #e74c3c; border: 1px solid rgba(231,76,60,.3); }
+        .btn-ghost { background: rgba(255,255,255,.07); color: #8a93a6; border: 1px solid rgba(255,255,255,.1); }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* ── Formularios ── */
+        .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 150px; }
+        .form-group label { font-size: 11px; font-weight: 600; color: #5a6378; text-transform: uppercase; letter-spacing: .5px; }
+        .form-control {
+            padding: 8px 12px; background: #0f1117;
+            border: 1px solid rgba(255,255,255,.12); border-radius: 7px;
+            color: #c8d0e0; font-size: 13.5px; width: 100%;
+        }
+        .form-control:focus { outline: none; border-color: #3b5bdb; }
+        .permisos-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 6px 0; }
+        .permiso-check { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #8a93a6; cursor: pointer; }
+        .permiso-check input { accent-color: #3b5bdb; width: 14px; height: 14px; cursor: pointer; }
+        .permiso-check span { user-select: none; }
+
+        /* ── Modal ── */
+        .modal-bg {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.65); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-bg.open { display: flex; }
+        .modal {
+            background: #161b27; border: 1px solid rgba(255,255,255,.1);
+            border-radius: 14px; padding: 28px; width: 100%; max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.5); position: relative;
+        }
+        .modal h3 { font-size: 16px; font-weight: 700; color: #e0e6f0; margin-bottom: 20px; }
+        .modal-close {
+            position: absolute; top: 16px; right: 16px;
+            background: none; border: none; color: #5a6378;
+            font-size: 20px; cursor: pointer; padding: 4px;
+        }
+        .modal-close:hover { color: #c8d0e0; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .form-group-block { margin-bottom: 14px; }
+        .form-group-block label { display:block; font-size:11px; font-weight:600; color:#5a6378; text-transform:uppercase; letter-spacing:.5px; margin-bottom:5px; }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <h2>UZIEL C.A.</h2>
+        <p>Sistema de Información</p>
+    </div>
+    <nav>
+        <a href="{{ url_for('inicio') }}" class="nav-item">
+            <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        {% if puede_ver('clientes') %}
+        <a href="{{ url_for('clientes') }}" class="nav-item">
+            <span class="nav-icon">👤</span> Clientes
+        </a>
+        {% endif %}
+        {% if puede_ver('productos') %}
+        <a href="{{ url_for('catalogo') }}" class="nav-item">
+            <span class="nav-icon">📦</span> Productos
+        </a>
+        {% endif %}
+        {% if puede_ver('tareas') %}
+        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
+            <span class="nav-icon">📋</span> Tareas
+            {% if total_notif > 0 %}
+                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
+                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
+                    {{ total_notif }}
+                </span>
+            {% endif %}
+        </a>
+        {% endif %}
+        {% if puede_ver('cotizaciones') %}
+        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
+            <span class="nav-icon">🧾</span> Cotizaciones
+        </a>
+        {% endif %}
+        {% if session.get('rol') == 'Admin' %}
+        <hr class="nav-divider">
+        <a href="{{ url_for('admin_usuarios') }}" class="nav-item active">
+            <span class="nav-icon">⚙️</span> Usuarios
+        </a>
+        {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
+            <div class="user-details">
+                <div class="user-name">{{ session['usuario'] }}</div>
+                <div class="user-role">{{ session.get('rol','Usuario') }}</div>
+            </div>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    </div>
+</aside>
+
+<!-- ══════════════════ CONTENIDO PRINCIPAL ══════════════════ -->
+<div class="main">
+
+    <div class="page-header">
+        <div>
+            <h1>⚙️ Gestión de Usuarios</h1>
+            <p>Administra cuentas, roles y permisos de acceso a módulos</p>
+        </div>
+        <button class="btn btn-blue" onclick="abrirModalNuevo()">+ Nuevo Usuario</button>
+    </div>
+
+    <!-- Flash messages -->
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% if mensajes %}
+            {% for categoria, msg in mensajes %}
+                <div class="flash {{ categoria }}">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- ── Tabla de usuarios ── -->
+    <div class="card">
+        <div class="card-title">👥 Usuarios del Sistema</div>
+        {% if usuarios %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Módulos Permitidos</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in usuarios %}
+            {% set uname    = u[0] %}
+            {% set urol     = u[1] %}
+            {% set upermisos = u[2].split(',') if u[2] else [] %}
+            <tr>
+                <td>
+                    <span style="font-weight:600;color:#e0e6f0;">{{ uname }}</span>
+                </td>
+                <td>
+                    {% if urol == 'Admin' %}
+                        <span class="rol-admin">Admin</span>
+                    {% else %}
+                        <span class="rol-empleado">{{ urol }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if urol == 'Admin' %}
+                        <span style="color:#5a6378;font-size:12px;font-style:italic;">Acceso total</span>
+                    {% else %}
+                        {% for m in upermisos %}
+                            {% if m == 'clientes' %}
+                                <span class="badge badge-blue">Clientes</span>
+                            {% elif m == 'productos' %}
+                                <span class="badge badge-green">Productos</span>
+                            {% elif m == 'tareas' %}
+                                <span class="badge badge-amber">Tareas</span>
+                            {% elif m == 'cotizaciones' %}
+                                <span class="badge badge-purple">Cotizaciones</span>
+                            {% endif %}
+                        {% else %}
+                            <span style="color:#5a6378;font-size:12px;">Sin acceso</span>
+                        {% endfor %}
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-amber"
+                            onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}')">
+                            ✏️ Editar
+                        </button>
+                        <button class="btn btn-sm btn-ghost"
+                            onclick="abrirModalPass('{{ uname }}')">
+                            🔑 Contraseña
+                        </button>
+                        {% if uname != session['usuario'] %}
+                        <form method="POST"
+                              action="{{ url_for('admin_usuario_borrar', username=uname) }}"
+                              style="display:inline;"
+                              onsubmit="return confirm('¿Eliminar al usuario {{ uname }}? Esta acción no se puede deshacer.');">
+                            <button type="submit" class="btn btn-sm btn-red">🗑 Eliminar</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#5a6378;text-align:center;padding:24px 0;">No hay usuarios registrados.</p>
+        {% endif %}
+    </div>
+
+</div><!-- /main -->
+
+
+<!-- ══════════════════ MODAL: NUEVO USUARIO ══════════════════ -->
+<div class="modal-bg" id="modalNuevo">
+    <div class="modal">
+        <button class="modal-close" onclick="cerrarModal('modalNuevo')">✕</button>
+        <h3>➕ Nuevo Usuario</h3>
+        <form method="POST" action="{{ url_for('admin_usuario_nuevo') }}">
+            <div class="form-group-block">
+                <label>Nombre de Usuario</label>
+                <input type="text" name="username" class="form-control"
+                       placeholder="ej: jperez" required autocomplete="off">
+            </div>
+            <div class="form-group-block">
+                <label>Contraseña</label>
+                <input type="password" name="password" class="form-control"
+                       placeholder="Contraseña inicial" required autocomplete="new-password">
+            </div>
+            <div class="form-group-block">
+                <label>Rol</label>
+                <select name="rol" class="form-control" id="nuevoRol"
+                        onchange="togglePermisos('nuevoRol','nuevosPermisos')">
+                    <option value="Empleado">Empleado</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+            <div class="form-group-block" id="nuevosPermisos">
+                <label>Módulos Permitidos</label>
+                <div class="permisos-group">
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="clientes" checked>
+                        <span>Clientes</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="productos" checked>
+                        <span>Productos</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="tareas" checked>
+                        <span>Tareas</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="cotizaciones" checked>
+                        <span>Cotizaciones</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost"
+                        onclick="cerrarModal('modalNuevo')">Cancelar</button>
+                <button type="submit" class="btn btn-blue">Crear Usuario</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ══════════════════ MODAL: EDITAR USUARIO ══════════════════ -->
+<div class="modal-bg" id="modalEditar">
+    <div class="modal">
+        <button class="modal-close" onclick="cerrarModal('modalEditar')">✕</button>
+        <h3>✏️ Editar Usuario</h3>
+        <form method="POST" id="formEditar">
+            <div class="form-group-block">
+                <label>Nombre de Usuario</label>
+                <input type="text" name="nuevo_username" id="editUsername"
+                       class="form-control" required autocomplete="off">
+            </div>
+            <div class="form-group-block">
+                <label>Rol</label>
+                <select name="rol" class="form-control" id="editRol"
+                        onchange="togglePermisos('editRol','editPermisos')">
+                    <option value="Empleado">Empleado</option>
+                    <option value="Admin">Admin</option>
+                </select>
+            </div>
+            <div class="form-group-block" id="editPermisos">
+                <label>Módulos Permitidos</label>
+                <div class="permisos-group">
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="clientes" id="eck_clientes">
+                        <span>Clientes</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="productos" id="eck_productos">
+                        <span>Productos</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="tareas" id="eck_tareas">
+                        <span>Tareas</span>
+                    </label>
+                    <label class="permiso-check">
+                        <input type="checkbox" name="permisos" value="cotizaciones" id="eck_cotizaciones">
+                        <span>Cotizaciones</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost"
+                        onclick="cerrarModal('modalEditar')">Cancelar</button>
+                <button type="submit" class="btn btn-blue">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ══════════════════ MODAL: CAMBIAR CONTRASEÑA ══════════════════ -->
+<div class="modal-bg" id="modalPass">
+    <div class="modal">
+        <button class="modal-close" onclick="cerrarModal('modalPass')">✕</button>
+        <h3 id="modalPassTitle">🔑 Cambiar Contraseña</h3>
+        <form method="POST" id="formPass">
+            <div class="form-group-block">
+                <label>Nueva Contraseña</label>
+                <input type="password" name="nueva_password" class="form-control"
+                       placeholder="Nueva contraseña" required autocomplete="new-password">
+            </div>
+            <div class="form-group-block">
+                <label>Confirmar Contraseña</label>
+                <input type="password" name="confirmar_password" class="form-control"
+                       placeholder="Repite la contraseña" required autocomplete="new-password">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost"
+                        onclick="cerrarModal('modalPass')">Cancelar</button>
+                <button type="submit" class="btn btn-blue">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<script>
+    /* ── Gestión de modales ── */
+    function abrirModalNuevo() {
+        document.getElementById('modalNuevo').classList.add('open');
+    }
+
+    function abrirModalEditar(username, rol, permisosStr) {
+        const modal   = document.getElementById('modalEditar');
+        const form    = document.getElementById('formEditar');
+
+        // Construir la URL del endpoint con el username actual
+        form.action = '/admin/usuario/' + encodeURIComponent(username) + '/editar';
+
+        document.getElementById('editUsername').value = username;
+
+        // Seleccionar el rol correcto
+        const selRol = document.getElementById('editRol');
+        selRol.value = rol;
+
+        // Marcar los módulos según permisos actuales
+        const modulos = permisosStr ? permisosStr.split(',').map(m => m.trim()) : [];
+        ['clientes','productos','tareas','cotizaciones'].forEach(m => {
+            const cb = document.getElementById('eck_' + m);
+            if (cb) cb.checked = modulos.includes(m);
+        });
+
+        // Mostrar/ocultar sección de permisos según el rol
+        togglePermisos('editRol', 'editPermisos');
+
+        modal.classList.add('open');
+    }
+
+    function abrirModalPass(username) {
+        const modal = document.getElementById('modalPass');
+        document.getElementById('formPass').action =
+            '/admin/usuario/' + encodeURIComponent(username) + '/pass';
+        document.getElementById('modalPassTitle').textContent =
+            '🔑 Contraseña de "' + username + '"';
+        modal.classList.add('open');
+    }
+
+    function cerrarModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+
+    /* Cerrar al hacer clic fuera del modal */
+    document.querySelectorAll('.modal-bg').forEach(bg => {
+        bg.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('open');
+        });
+    });
+
+    /* ── Ocultar sección de permisos si el rol es Admin ── */
+    function togglePermisos(rolSelectId, permisosContainerId) {
+        const rol       = document.getElementById(rolSelectId).value;
+        const container = document.getElementById(permisosContainerId);
+        if (!container) return;
+        container.style.display = (rol === 'Admin') ? 'none' : 'block';
+    }
+
+    /* Ejecutar al cargar la página para el modal de edición si quedara abierto */
+    togglePermisos('nuevoRol', 'nuevosPermisos');
+</script>
+</body>
+</html>

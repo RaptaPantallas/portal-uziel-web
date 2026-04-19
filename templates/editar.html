@@ -141,12 +141,17 @@
         <a href="{{ url_for('inicio') }}" class="nav-item">
             <span class="nav-icon">⊞</span> Dashboard
         </a>
+        {% if puede_ver('clientes') %}
         <a href="{{ url_for('clientes') }}" class="nav-item">
             <span class="nav-icon">👤</span> Clientes
         </a>
+        {% endif %}
+        {% if puede_ver('productos') %}
         <a href="{{ url_for('catalogo') }}" class="nav-item active">
             <span class="nav-icon">📦</span> Productos
         </a>
+        {% endif %}
+        {% if puede_ver('tareas') %}
         <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
             <span class="nav-icon">📋</span> Tareas
             {% if total_notif > 0 %}
@@ -156,9 +161,18 @@
                 </span>
             {% endif %}
         </a>
+        {% endif %}
+        {% if puede_ver('cotizaciones') %}
         <a href="{{ url_for('cotizaciones') }}" class="nav-item">
             <span class="nav-icon">🧾</span> Cotizaciones
         </a>
+        {% endif %}
+        {% if session.get('rol') == 'Admin' %}
+        <hr class="nav-divider">
+        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
+            <span class="nav-icon">⚙️</span> Usuarios
+        </a>
+        {% endif %}
     </nav>
     <div class="sidebar-footer">
         <div class="user-info">
