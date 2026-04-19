@@ -946,6 +946,42 @@ class ConexionBD:
             conexion.close()
         return total
 
+    def inicializar_permisos_usuarios(self) -> bool:
+        """
+        Agrega la columna 'permisos' a la tabla 'usuarios' si no existe.
+        Operación idempotente — segura de ejecutar en cada arranque.
+
+        La columna almacena los módulos a los que tiene acceso cada usuario
+        como texto separado por comas: 'clientes,productos,tareas,cotizaciones'.
+        Los usuarios con rol 'Admin' ignoran estos permisos (acceso total).
+
+        Returns:
+            bool: True si la columna existe o fue creada, False si hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # ADD COLUMN IF NOT EXISTS es idempotente en PostgreSQL 9.6+
+            cursor.execute("""
+                ALTER TABLE usuarios
+                ADD COLUMN IF NOT EXISTS permisos TEXT
+                    DEFAULT 'clientes,productos,tareas,cotizaciones'
+            """)
+            conexion.commit()
+            print("🟢 [Auth] Columna 'permisos' en tabla 'usuarios' verificada/creada.")
+            return True
+        except Error as e:
+            print(f"🔴 [Auth] Error al inicializar permisos de usuarios: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
     def obtener_usuarios(self):
         """
         Devuelve todos los usuarios registrados en el sistema.
@@ -970,6 +1006,233 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
         return usuarios
+
+    def obtener_todos_usuarios(self) -> list:
+        """
+        Devuelve todos los usuarios con sus datos completos para el panel Admin.
+
+        Returns:
+            list[tuple]: (username, rol, permisos) ordenados por username.
+        """
+        conexion = self.conectar()
+        resultado = []
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT username, rol, COALESCE(permisos,'') "
+                "FROM usuarios ORDER BY username"
+            )
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Auth] Error al obtener todos los usuarios: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_permisos_usuario(self, username: str) -> list:
+        """
+        Devuelve la lista de módulos permitidos para un usuario.
+
+        Args:
+            username (str): Nombre de usuario.
+
+        Returns:
+            list[str]: Módulos como lista, p.ej. ['clientes', 'tareas'].
+                       Lista vacía si el usuario no existe.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return []
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT COALESCE(permisos,'') FROM usuarios "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            if not fila or not fila[0]:
+                return []
+            return [m.strip() for m in fila[0].split(',') if m.strip()]
+        except Error as e:
+            print(f"🔴 [Auth] Error al obtener permisos de '{username}': {e}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def crear_usuario(self, username: str, password: str,
+                      rol: str, permisos: str) -> bool:
+        """
+        Registra un nuevo usuario en la tabla 'usuarios'.
+
+        Args:
+            username (str): Nombre de usuario (único).
+            password (str): Contraseña en texto plano.
+            rol      (str): 'Admin' u otro rol definido.
+            permisos (str): Módulos separados por coma.
+
+        Returns:
+            bool: True si se creó, False si ya existe o hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "INSERT INTO usuarios (username, password, rol, permisos) "
+                "VALUES (%s, %s, %s, %s)",
+                (username.strip().lower(), password, rol, permisos)
+            )
+            conexion.commit()
+            print(f"🟢 [Auth] Usuario '{username}' creado correctamente.")
+            return True
+        except Error as e:
+            print(f"🔴 [Auth] Error al crear usuario '{username}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def actualizar_usuario(self, username_actual: str, nuevo_username: str,
+                           rol: str, permisos: str) -> bool:
+        """
+        Actualiza nombre, rol y permisos de un usuario existente.
+
+        Args:
+            username_actual (str): Username actual (clave de búsqueda).
+            nuevo_username  (str): Nuevo nombre de usuario.
+            rol             (str): Nuevo rol.
+            permisos        (str): Nuevos permisos separados por coma.
+
+        Returns:
+            bool: True si se actualizó, False si no se encontró o hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE usuarios
+                SET username = %s, rol = %s, permisos = %s
+                WHERE LOWER(username) = LOWER(%s)
+            """, (nuevo_username.strip().lower(), rol, permisos, username_actual))
+            if cursor.rowcount == 0:
+                print(f"⚠️  [Auth] Usuario '{username_actual}' no encontrado al actualizar.")
+                conexion.rollback()
+                return False
+            conexion.commit()
+            print(f"🟢 [Auth] Usuario '{username_actual}' actualizado a '{nuevo_username}'.")
+            return True
+        except Error as e:
+            print(f"🔴 [Auth] Error al actualizar usuario '{username_actual}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def actualizar_password_usuario(self, username: str,
+                                    nueva_password: str) -> bool:
+        """
+        Cambia la contraseña de un usuario.
+
+        Args:
+            username        (str): Nombre del usuario.
+            nueva_password  (str): Nueva contraseña en texto plano.
+
+        Returns:
+            bool: True si se actualizó, False si no existe o hubo error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE usuarios SET password = %s "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (nueva_password, username)
+            )
+            if cursor.rowcount == 0:
+                print(f"⚠️  [Auth] Usuario '{username}' no encontrado al cambiar contraseña.")
+                conexion.rollback()
+                return False
+            conexion.commit()
+            print(f"🟢 [Auth] Contraseña de '{username}' actualizada.")
+            return True
+        except Error as e:
+            print(f"🔴 [Auth] Error al cambiar contraseña de '{username}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def eliminar_usuario(self, username: str) -> bool:
+        """
+        Elimina un usuario del sistema.
+        No permite eliminar al último Admin ni al Admin 'jefe'.
+
+        Args:
+            username (str): Nombre del usuario a eliminar.
+
+        Returns:
+            bool: True si se eliminó, False si hay restricción o error.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Proteger: no eliminar si quedaría sin ningún Admin
+            cursor.execute(
+                "SELECT COUNT(*) FROM usuarios WHERE rol = 'Admin'"
+            )
+            total_admins = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT rol FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            if not fila:
+                return False
+            if fila[0] == 'Admin' and total_admins <= 1:
+                print(f"⚠️  [Auth] No se puede eliminar al último Admin '{username}'.")
+                return False
+
+            cursor.execute(
+                "DELETE FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            conexion.commit()
+            print(f"🟢 [Auth] Usuario '{username}' eliminado.")
+            return True
+        except Error as e:
+            print(f"🔴 [Auth] Error al eliminar usuario '{username}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
 
     # =========================================================================
     # MÓDULO COTIZACIONES — Presupuestos para clientes
