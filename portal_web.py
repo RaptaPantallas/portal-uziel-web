@@ -25,6 +25,11 @@
 #     GET      /tareas             — Gestión de tareas (todas para Admin, propias para otros)
 #     POST     /asignar_tarea      — Crea una nueva tarea (solo Admin)
 #     POST     /actualizar_tarea/<id>   — Cambia el estado de una tarea
+#     GET      /admin/usuarios           — Panel de gestión de usuarios (solo Admin)
+#     POST     /admin/usuario/nuevo      — Crear un nuevo usuario (solo Admin)
+#     POST     /admin/usuario/<u>/editar — Actualizar datos y permisos (solo Admin)
+#     POST     /admin/usuario/<u>/pass   — Cambiar contraseña de usuario (solo Admin)
+#     POST     /admin/usuario/<u>/borrar — Eliminar usuario (solo Admin)
 #     GET      /cliente/<rif>           — Ficha completa del cliente con historial
 #     POST     /cliente/<rif>/editar    — Actualizar datos de contacto del cliente
 #     GET      /cotizaciones            — Lista todas las cotizaciones
@@ -99,6 +104,7 @@ bd = ConexionBD()
 # operaciones idempotentes, seguras de ejecutar en cada inicio
 bd.inicializar_tareas()
 bd.inicializar_cotizaciones()
+bd.inicializar_permisos_usuarios()
 
 
 # =============================================================================
@@ -113,13 +119,24 @@ def inyectar_notificaciones():
     sin que cada ruta tenga que calcularlo por separado.
 
     La variable 'total_notif' queda disponible en todos los Jinja2 templates.
+    Además inyecta 'puede_ver(modulo)' para controlar la visibilidad del sidebar.
     """
     # Si no hay sesión activa, no hay notificaciones que mostrar
     if 'usuario' not in session:
-        return {'total_notif': 0}
+        return {'total_notif': 0, 'puede_ver': lambda m: False}
 
     total = bd.contar_tareas_pendientes(session['usuario'])
-    return {'total_notif': total}
+
+    def puede_ver(modulo: str) -> bool:
+        """
+        Devuelve True si el usuario actual puede acceder al módulo indicado.
+        Los Admin siempre tienen acceso total.
+        """
+        if session.get('rol') == 'Admin':
+            return True
+        return modulo in session.get('permisos', [])
+
+    return {'total_notif': total, 'puede_ver': puede_ver}
 
 
 # =============================================================================
@@ -168,6 +185,8 @@ def login():
             # Guardar datos del usuario en la cookie de sesión (cifrada)
             session['usuario'] = datos_usuario[0]
             session['rol'] = datos_usuario[1]
+            # Cargar permisos del usuario en la sesión para el sidebar dinámico
+            session['permisos'] = bd.obtener_permisos_usuario(datos_usuario[0])
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
@@ -872,6 +891,137 @@ def cotizacion_pdf(cotizacion_id):
         download_name=f"Cotizacion_{numero}.pdf",
         mimetype='application/pdf'
     )
+
+
+# =============================================================================
+# MÓDULO: GESTIÓN DE USUARIOS (solo Admin)
+# =============================================================================
+
+@app.route('/admin/usuarios')
+@login_requerido
+def admin_usuarios():
+    """
+    Panel de administración de usuarios.
+    Muestra la lista completa de usuarios con sus roles y permisos.
+    Solo accesible para el rol Admin.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden gestionar usuarios.', 'error')
+        return redirect(url_for('inicio'))
+
+    usuarios = bd.obtener_todos_usuarios()
+    return render_template('admin_usuarios.html', usuarios=usuarios)
+
+
+@app.route('/admin/usuario/nuevo', methods=['POST'])
+@login_requerido
+def admin_usuario_nuevo():
+    """
+    Crea un nuevo usuario en el sistema.
+    Solo Admin puede usar esta ruta.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden crear usuarios.', 'error')
+        return redirect(url_for('inicio'))
+
+    username   = request.form.get('username', '').strip()
+    password   = request.form.get('password', '').strip()
+    rol        = request.form.get('rol', 'Empleado').strip()
+    # Los módulos activados vienen como checkboxes: ['clientes', 'tareas', ...]
+    permisos   = ','.join(request.form.getlist('permisos'))
+
+    if not username or not password:
+        flash('⚠️ El usuario y la contraseña son obligatorios.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
+    ok = bd.crear_usuario(username, password, rol, permisos)
+    if ok:
+        flash(f'✅ Usuario "{username}" creado correctamente.', 'success')
+    else:
+        flash(f'🔴 No se pudo crear el usuario "{username}". '
+              'Es posible que ya exista.', 'error')
+
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/usuario/<username>/editar', methods=['POST'])
+@login_requerido
+def admin_usuario_editar(username):
+    """
+    Actualiza nombre de usuario, rol y permisos.
+    Solo Admin puede usar esta ruta.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden editar usuarios.', 'error')
+        return redirect(url_for('inicio'))
+
+    nuevo_username = request.form.get('nuevo_username', '').strip()
+    nuevo_rol      = request.form.get('rol', 'Empleado').strip()
+    permisos       = ','.join(request.form.getlist('permisos'))
+
+    if not nuevo_username:
+        flash('⚠️ El nombre de usuario no puede quedar vacío.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
+    ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos)
+    if ok:
+        flash(f'✅ Usuario "{username}" actualizado correctamente.', 'success')
+    else:
+        flash(f'🔴 No se pudo actualizar el usuario "{username}".', 'error')
+
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/usuario/<username>/pass', methods=['POST'])
+@login_requerido
+def admin_usuario_pass(username):
+    """
+    Cambia la contraseña de un usuario.
+    Solo Admin puede usar esta ruta.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden cambiar contraseñas.', 'error')
+        return redirect(url_for('inicio'))
+
+    nueva_pass   = request.form.get('nueva_password', '').strip()
+    confirmar    = request.form.get('confirmar_password', '').strip()
+
+    if not nueva_pass or not confirmar:
+        flash('⚠️ Ambos campos de contraseña son obligatorios.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
+    if nueva_pass != confirmar:
+        flash('⚠️ Las contraseñas no coinciden.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
+    ok = bd.actualizar_password_usuario(username, nueva_pass)
+    if ok:
+        flash(f'✅ Contraseña de "{username}" actualizada.', 'success')
+    else:
+        flash(f'🔴 No se pudo cambiar la contraseña de "{username}".', 'error')
+
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/usuario/<username>/borrar', methods=['POST'])
+@login_requerido
+def admin_usuario_borrar(username):
+    """
+    Elimina un usuario del sistema.
+    Solo Admin puede usar esta ruta. No permite eliminar al último Admin.
+    """
+    if session.get('rol') != 'Admin':
+        flash('⛔ Solo los administradores pueden eliminar usuarios.', 'error')
+        return redirect(url_for('inicio'))
+
+    ok = bd.eliminar_usuario(username)
+    if ok:
+        flash(f'✅ Usuario "{username}" eliminado.', 'success')
+    else:
+        flash(f'🔴 No se pudo eliminar "{username}". '
+              'Asegúrate de que no sea el único administrador.', 'error')
+
+    return redirect(url_for('admin_usuarios'))
 
 
 # =============================================================================
