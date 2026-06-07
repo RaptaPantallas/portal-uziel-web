@@ -13,7 +13,7 @@
 #        tabla Bootstrap. Se parsea usando el html.parser de la librería
 #        estándar de Python (sin dependencias externas).
 #      — Columnas esperadas (en orden): IMAGEN | CÓDIGO | REFERENCIA |
-#        DESCRIPCIÓN | UNIDAD | MARCA | MODELO | PRECIO SIN IVA | ...
+#        DESCRIPCIÓN | UNIDAD | MARCA | MODELO | PRECIO SIN IVA | STOCK | CATEGORÍA
 #
 #   2. XLSX estándar (Open XML)
 #      — Misma estructura de columnas en formato real de Excel.
@@ -25,7 +25,7 @@
 # USO:
 #   from src.importador_excel import leer_archivo_excel
 #   productos = leer_archivo_excel("/ruta/al/archivo.xls")
-#   # → [{'sku': 'EDJ7-7163', 'nombre': '...', 'marca': '...', ...}, ...]
+#   # → [{'sku': '...', 'nombre': '...', 'stock': 10, 'categoria': '...', ...}, ...]
 # =============================================================================
 
 import html as _html_module
@@ -34,7 +34,7 @@ from html.parser import HTMLParser
 
 
 # ---------------------------------------------------------------------------
-# FUNCIÓN AUXILIAR — Limpieza de texto
+# FUNCIONES AUXILIARES — Limpieza y conversión
 # ---------------------------------------------------------------------------
 
 def _limpiar(texto: str) -> str:
@@ -67,10 +67,50 @@ def _precio_float(texto: str) -> float:
         return 0.0
 
 
+def _stock_int(texto: str) -> int:
+    """Convierte un texto de stock/existencia ('15', '0.0') a entero."""
+    if not texto:
+        return 0
+    limpio = texto.replace(",", ".").strip()
+    try:
+        return int(float(limpio))
+    except ValueError:
+        return 0
+
+
 def _es_encabezado(textos: list[str]) -> bool:
     """Detecta si una lista de textos corresponde al encabezado de la tabla."""
     unidos = " ".join(textos).upper()
-    return any(kw in unidos for kw in ("CODIGO", "CÓDIGO", "DESCRIP", "PRECIO SIN IVA"))
+    return any(kw in unidos for kw in ("CODIGO", "CÓDIGO", "DESCRIP", "PRECIO", "STOCK", "EXISTENCIA", "PRODUCTO", "ARTICULO"))
+
+
+def _mapear_columnas(textos: list[str]) -> dict:
+    """
+    Analiza la fila de encabezado y detecta en qué posición (índice) está
+    cada columna vital mediante palabras clave. Permite leer archivos de 
+    cualquier formato o ERP.
+    """
+    mapa = {
+        'sku': -1, 'descripcion': -1, 'marca': -1, 'compatibilidad': -1,
+        'precio': -1, 'stock': -1, 'categoria': -1
+    }
+    for i, col in enumerate(textos):
+        c_up = col.upper()
+        if any(k in c_up for k in ("CODIGO", "CÓDIGO", "SKU", "REFERENCIA", "ARTICULO", "ARTÍCULO")):
+            if mapa['sku'] == -1: mapa['sku'] = i
+        elif any(k in c_up for k in ("DESCRIP", "PRODUCTO", "NOMBRE")):
+            if mapa['descripcion'] == -1: mapa['descripcion'] = i
+        elif any(k in c_up for k in ("MARCA", "FABRICANTE")):
+            if mapa['marca'] == -1: mapa['marca'] = i
+        elif any(k in c_up for k in ("MODELO", "COMPAT", "APLICAC")):
+            if mapa['compatibilidad'] == -1: mapa['compatibilidad'] = i
+        elif any(k in c_up for k in ("PRECIO", "COSTO", "PVP")):
+            if mapa['precio'] == -1: mapa['precio'] = i
+        elif any(k in c_up for k in ("STOCK", "EXISTENCIA", "CANTIDAD", "DISPON", "SALDO")):
+            if mapa['stock'] == -1: mapa['stock'] = i
+        elif any(k in c_up for k in ("CATEGORIA", "CATEGORÍA", "LINEA", "GRUPO", "FAMILIA")):
+            if mapa['categoria'] == -1: mapa['categoria'] = i
+    return mapa
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +178,7 @@ def leer_archivo_excel(ruta: str) -> list[dict]:
     Returns:
         list[dict]: Lista de diccionarios con las claves:
                     'sku', 'nombre', 'descripcion', 'marca',
-                    'compatibilidad', 'precio'
+                    'compatibilidad', 'precio', 'stock', 'categoria'
                     Lista vacía si el archivo no pudo parsearse.
 
     Raises:
@@ -173,10 +213,6 @@ def _leer_html_xls(ruta: str) -> list[dict]:
     """
     Parsea un archivo XLS cuyo contenido real es una tabla HTML.
     Usa únicamente el módulo 'html.parser' de la librería estándar de Python.
-
-    Estructura esperada (columnas de la tabla del ERP):
-      0: IMAGEN | 1: CÓDIGO | 2: REFERENCIA | 3: DESCRIPCIÓN |
-      4: UNIDAD | 5: MARCA  | 6: MODELO     | 7: PRECIO SIN IVA | ...
     """
     with open(ruta, "rb") as f:
         raw = f.read()
@@ -202,52 +238,61 @@ def _leer_html_xls(ruta: str) -> list[dict]:
         print("🔴 [Importador] No se encontraron filas de tabla en el archivo.")
         return []
 
-    productos           = []
+    productos            = []
     encabezado_detectado = False
+    mapa_columnas        = {}
 
     for fila_raw in parser.filas:
         # Limpiar cada celda de la fila
         textos = [_limpiar(c) for c in fila_raw]
 
-        # Saltar la fila de encabezado de columnas
-        if _es_encabezado(textos):
+        # Saltar filas hasta encontrar el encabezado y mapearlo
+        if not encabezado_detectado and _es_encabezado(textos):
             encabezado_detectado = True
+            mapa_columnas = _mapear_columnas(textos)
+            print(f"📊 [Importador] Mapa de columnas detectado: {mapa_columnas}")
             continue
 
-        # Saltar filas antes del encabezado (título del panel, navegación, etc.)
         if not encabezado_detectado:
             continue
 
-        # Necesitamos al menos 7 columnas para extraer los campos mínimos
-        if len(textos) < 7:
-            continue
+        # --- LÓGICA DE EXTRACCIÓN ROBUSTA (Para lidiar con HTML malformado del ERP) ---
+        # Si la fila tiene menos columnas de las esperadas (ej. falta una celda vacía de Modelo)
+        # intentamos adivinar dónde están el precio y el stock basándonos en si parecen números.
+        
+        sku  = textos[mapa_columnas.get('sku', 1)] if len(textos) > mapa_columnas.get('sku', 1) else ""
+        desc = textos[mapa_columnas.get('descripcion', 3)] if len(textos) > mapa_columnas.get('descripcion', 3) else ""
+        marc = textos[mapa_columnas.get('marca', 5)] if len(textos) > mapa_columnas.get('marca', 5) else ""
+        
+        # Por defecto, intentamos usar el mapa estricto
+        mode = textos[mapa_columnas.get('compatibilidad', 6)] if len(textos) > mapa_columnas.get('compatibilidad', 6) else ""
+        prec_str = textos[mapa_columnas.get('precio', 7)] if len(textos) > mapa_columnas.get('precio', 7) else ""
+        stock_str = textos[mapa_columnas.get('stock', 8)] if len(textos) > mapa_columnas.get('stock', 8) else ""
+        cat_str   = textos[mapa_columnas.get('categoria', 9)] if len(textos) > mapa_columnas.get('categoria', 9) else "Sin Categoría"
 
-        sku  = textos[1].strip()
-        desc = textos[3].strip()
-        marc = textos[5].strip()
-
-        # Ajuste de índice de PRECIO según la cantidad de columnas de la fila.
-        # Algunos archivos de ERP tienen el <th> de MODELO sin cerrar, lo que
-        # hace que Python's HTMLParser pierda esa celda y desplace los índices:
-        #   10 columnas → estructura completa: MODELO en [6], PRECIO en [7]
-        #    9 columnas → MODELO perdido por <th> sin cerrar, PRECIO en [6]
-        if len(textos) >= 10:
-            mode = textos[6].strip()
-            prec = textos[7].strip()
-        else:
-            mode = ""               # MODELO no disponible (th sin cerrar)
-            prec = textos[6].strip()
-
+        # Heurística: Si lo que capturamos como 'modelo' parece un precio (ej. "4,16")
+        # y lo que capturamos como 'precio' parece un stock alto (ej. "291"),
+        # significa que la columna Modelo estaba vacía y el parser se comió el <td>.
+        # Desplazamos los valores hacia la derecha.
+        if mode and re.match(r'^\d+[\.,]\d{2}$', mode): 
+            # Si el modelo parece un precio exacto con dos decimales
+            stock_str = prec_str # El precio que agarramos era en realidad el stock
+            prec_str = mode      # El modelo que agarramos era en realidad el precio
+            mode = ""            # Asumimos que no había modelo
+            
         # Ignorar filas vacías o de navegación
-        if not sku or sku.lower() in ("", "nbsp", "&nbsp;", "none"):
+        if not sku or sku.lower() in ("", "nbsp", "&nbsp;", "none", "0", "código"):
             continue
 
         # El nombre es la primera línea de la descripción (antes del salto de línea)
         nombre = re.split(r'[\n\r]', desc)[0].strip() if desc else sku
 
-        # Truncar campos muy largos para no saturar la BD
+        # Truncar campos muy largos
         if len(nombre) > 500:
             nombre = nombre[:500]
+            
+        if not cat_str or cat_str.lower() in ("nbsp", "&nbsp;", "none"):
+            cat_str = "Sin Categoría"
 
         producto = {
             "sku":            sku,
@@ -255,7 +300,9 @@ def _leer_html_xls(ruta: str) -> list[dict]:
             "descripcion":    desc[:1000] if desc else nombre,
             "marca":          marc[:100]  if marc else "",
             "compatibilidad": mode[:500]  if mode else "",
-            "precio":         _precio_float(prec),
+            "precio":         _precio_float(prec_str),
+            "stock":          _stock_int(stock_str),
+            "categoria":      cat_str[:60]
         }
         productos.append(producto)
 
@@ -266,11 +313,11 @@ def _leer_html_xls(ruta: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # PARSER — XLSX estándar (requiere openpyxl)
 # ---------------------------------------------------------------------------
-
 def _leer_xlsx(ruta: str) -> list[dict]:
     """
     Parsea un archivo .xlsx estándar con openpyxl.
     Asume la misma estructura de columnas que la exportación HTML del ERP.
+    Agrega extracción de columnas de STOCK y CATEGORÍA.
 
     Requiere: pip install openpyxl
     """
@@ -285,8 +332,9 @@ def _leer_xlsx(ruta: str) -> list[dict]:
 
     wb = openpyxl.load_workbook(ruta, data_only=True)
     ws = wb.active
-    productos           = []
+    productos            = []
     encabezado_detectado = False
+    mapa_columnas        = {}
 
     for fila in ws.iter_rows(values_only=True):
         if not fila:
@@ -294,25 +342,34 @@ def _leer_xlsx(ruta: str) -> list[dict]:
 
         textos = [str(c) if c is not None else "" for c in fila]
 
-        if _es_encabezado(textos):
+        if not encabezado_detectado and _es_encabezado(textos):
             encabezado_detectado = True
+            mapa_columnas = _mapear_columnas(textos)
+            print(f"📊 [Importador] Mapa de columnas detectado (XLSX): {mapa_columnas}")
             continue
+
         if not encabezado_detectado:
             continue
 
-        if len(fila) < 8:
-            continue
+        def get_val(llave: str) -> str:
+            idx = mapa_columnas.get(llave, -1)
+            return textos[idx] if idx != -1 and idx < len(textos) else ""
 
-        sku  = _limpiar(str(fila[1]) if fila[1] else "")
-        desc = _limpiar(str(fila[3]) if fila[3] else "")
-        marc = _limpiar(str(fila[5]) if fila[5] else "")
-        mode = _limpiar(str(fila[6]) if fila[6] else "")
-        prec = _limpiar(str(fila[7]) if fila[7] else "")
+        sku  = _limpiar(get_val('sku'))
+        desc = _limpiar(get_val('descripcion'))
+        marc = _limpiar(get_val('marca'))
+        mode = _limpiar(get_val('compatibilidad'))
+        prec = _limpiar(get_val('precio'))
+        stock_str = _limpiar(get_val('stock'))
+        cat_str   = _limpiar(get_val('categoria'))
 
         if not sku:
             continue
 
         nombre = re.split(r'[\n\r]', desc)[0].strip() if desc else sku
+        
+        if not cat_str or cat_str.lower() in ("nbsp", "&nbsp;", "none"):
+            cat_str = "Sin Categoría"
 
         productos.append({
             "sku":            sku,
@@ -321,6 +378,8 @@ def _leer_xlsx(ruta: str) -> list[dict]:
             "marca":          marc[:100]  if marc else "",
             "compatibilidad": mode[:500]  if mode else "",
             "precio":         _precio_float(prec),
+            "stock":          _stock_int(stock_str),
+            "categoria":      cat_str[:60]
         })
 
     print(f"📦 [Importador] Total leídos del XLSX: {len(productos)} producto(s).")

@@ -254,10 +254,10 @@ def catalogo():
     para mostrar miniaturas en la tabla.
     """
     inventario = bd.obtener_productos()
-    # DEBUG: verificar datos del primer producto
+    # DEBUG: verificar datos del primer producto (NamedTupleCursor: acceso por nombre y por índice)
     if inventario:
         p = inventario[0]
-        print(f"[DEBUG catalogo] sku={p[0]}, nombre={p[1]}, marca[3]={repr(p[3])}, precio[5]={repr(p[5])}")
+        print(f"[DEBUG catalogo] sku={p.sku}, nombre={p.nombre}, marca={p.marca}, precio={p.precio}")
     return render_template('catalogo.html', productos=inventario)
 
 
@@ -713,7 +713,7 @@ def generar_pdf():
             c.showPage()
             encabezado()
             y = ALTO_PAG - 115
-        dibujar_fila(prod[0], prod[1], prod[3], prod[4], prod[5], y, idx)
+        dibujar_fila(prod.sku, prod.nombre, prod.marca, prod.compatibilidad, prod.precio, y, idx)
         y -= ALTO_FILA
         idx += 1
 

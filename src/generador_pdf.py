@@ -41,6 +41,13 @@ Y_IMAGEN_OFFSET = 340
 ANCHO_IMAGEN    = 230
 ALTO_IMAGEN     = 230
 
+# Layout compacto del catálogo (varios productos por página)
+ANCHO_THUMB     = 55          # Tamaño del thumbnail
+ALTO_THUMB      = 55
+ALTO_FILA       = 75          # Altura por producto
+X_DETALLE       = 120         # X donde empieza el texto del producto
+ANCHO_LABEL     = 85          # Ancho de las etiquetas (SKU:, Marca:, etc.)
+
 # Colores RGB (valores 0.0 – 1.0)
 COLOR_AZUL_EMP   = (0.18, 0.27, 0.86)   # Encabezado empresa  (#2e45db)
 COLOR_NEGRO      = (0.17, 0.22, 0.31)   # Texto general       (#2c3850)
@@ -125,41 +132,145 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
     # Precio en verde y grande
     c.setFont("Helvetica-Bold", FUENTE_PREC)
     c.setFillColorRGB(*COLOR_VERDE_PREC)
-    c.drawString(MARGEN_X + 130, alto - 204, f"$ {precio}")
+    precio_str = f"$ {precio}" if precio is not None else "—"
+    c.drawString(MARGEN_X + 130, alto - 204, precio_str)
 
     # ---- Fotografía del producto ----
     c.setFillColorRGB(*COLOR_NEGRO)
     if ruta_img and os.path.exists(ruta_img):
-        c.drawImage(
-            ruta_img,
-            X_IMAGEN,
-            alto - Y_IMAGEN_OFFSET,
-            width=ANCHO_IMAGEN,
-            height=ALTO_IMAGEN,
-            preserveAspectRatio=True,
-            mask="auto"
-        )
+        try:
+            c.drawImage(
+                ruta_img,
+                X_IMAGEN,
+                alto - Y_IMAGEN_OFFSET,
+                width=ANCHO_IMAGEN,
+                height=ALTO_IMAGEN,
+                preserveAspectRatio=True,
+                mask="auto"
+            )
+        except Exception:
+            _dibujar_placeholder_imagen(c, X_IMAGEN, alto - Y_IMAGEN_OFFSET, ANCHO_IMAGEN, ALTO_IMAGEN)
     else:
-        # Marco de "sin imagen"
-        c.setStrokeColorRGB(*COLOR_LINEA)
-        c.setFillColorRGB(0.96, 0.97, 0.99)
-        c.roundRect(X_IMAGEN, alto - Y_IMAGEN_OFFSET,
-                    ANCHO_IMAGEN, ALTO_IMAGEN, 8, fill=True, stroke=True)
-        c.setFont("Helvetica-Oblique", 10)
-        c.setFillColorRGB(*COLOR_GRIS)
-        c.drawCentredString(
-            X_IMAGEN + ANCHO_IMAGEN / 2,
-            alto - Y_IMAGEN_OFFSET + ALTO_IMAGEN / 2,
-            "Sin imagen en el DAM"
-        )
+        _dibujar_placeholder_imagen(c, X_IMAGEN, alto - Y_IMAGEN_OFFSET, ANCHO_IMAGEN, ALTO_IMAGEN)
 
     # ---- Pie de página ----
+    _dibujar_pie(c, ancho)
+
+
+# ---------------------------------------------------------------------------
+# FUNCIÓN AUXILIAR — Placeholder para "sin imagen"
+# ---------------------------------------------------------------------------
+
+def _dibujar_placeholder_imagen(c, x, y, ancho, alto):
+    """Dibuja un recuadro gris con texto 'Sin imagen'."""
+    c.setStrokeColorRGB(*COLOR_LINEA)
+    c.setFillColorRGB(0.96, 0.97, 0.99)
+    c.roundRect(x, y, ancho, alto, 8, fill=True, stroke=True)
+    c.setFont("Helvetica-Oblique", 10)
+    c.setFillColorRGB(*COLOR_GRIS)
+    c.drawCentredString(x + ancho / 2, y + alto / 2, "Sin imagen")
+
+
+# ---------------------------------------------------------------------------
+# FUNCIÓN AUXILIAR — Pie de página
+# ---------------------------------------------------------------------------
+
+def _dibujar_pie(c, ancho):
+    """Dibuja el pie de página estándar."""
     c.setFont("Helvetica", FUENTE_PIE)
     c.setFillColorRGB(*COLOR_GRIS)
     c.drawString(MARGEN_X, 35, PIE_DE_PAGINA)
-    # Número de página
     c.drawRightString(ancho - MARGEN_X, 35,
                       datetime.now().strftime("Generado el %d/%m/%Y a las %H:%M"))
+
+
+# ---------------------------------------------------------------------------
+# FUNCIÓN AUXILIAR — Dibuja una fila compacta de producto (catálogo continuo)
+# ---------------------------------------------------------------------------
+
+def _dibujar_fila_producto(c, sku: str, nombre: str, marca: str,
+                            compatibilidad: str, precio, ruta_img: str,
+                            ancho: float, y: float, idx: int = 0) -> float:
+    """Dibuja una fila de producto con thumbnail y datos. Retorna la nueva Y."""
+    # Fondo alternado sutil
+    if idx % 2 == 0:
+        c.setFillColorRGB(0.97, 0.98, 1.0)
+    else:
+        c.setFillColorRGB(1, 1, 1)
+    c.rect(MARGEN_X, y - ALTO_FILA, ancho - 2 * MARGEN_X, ALTO_FILA, fill=True, stroke=False)
+
+    # ---- Thumbnail ----
+    thumb_y = y - ALTO_THUMB - 10
+    if ruta_img and os.path.exists(ruta_img):
+        try:
+            c.roundRect(MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB, 4, fill=False, stroke=True)
+            c.drawImage(ruta_img, MARGEN_X, thumb_y,
+                        width=ANCHO_THUMB, height=ALTO_THUMB,
+                        preserveAspectRatio=True, mask="auto")
+        except Exception:
+            _dibujar_placeholder_imagen(c, MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB)
+    else:
+        _dibujar_placeholder_imagen(c, MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB)
+
+    # ---- Información del producto ----
+    x_texto = X_DETALLE
+    precio_str = f"$ {precio}" if precio is not None else "—"
+    labels = ["SKU:", "Producto:", "Marca:", "Compatibilidad:", "Precio:"]
+    valores = [sku, nombre, str(marca), str(compatibilidad), precio_str]
+    ancho_label = 68
+    y_linea = y - 16
+
+    for i, (label, valor) in enumerate(zip(labels, valores)):
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColorRGB(*COLOR_GRIS)
+        c.drawString(x_texto, y_linea, label)
+        c.setFont("Helvetica", 8.5)
+        c.setFillColorRGB(*COLOR_NEGRO)
+
+        texto = str(valor)
+        if i == 4:
+            c.setFillColorRGB(*COLOR_VERDE_PREC)
+            c.setFont("Helvetica-Bold", 9)
+        elif i == 3 and c.stringWidth(texto, "Helvetica", 8.5) > (ancho - x_texto - ancho_label - MARGEN_X):
+            while c.stringWidth(texto + "...", "Helvetica", 8.5) > (ancho - x_texto - ancho_label - MARGEN_X):
+                texto = texto[:-1]
+            texto += "..."
+
+        c.drawString(x_texto + ancho_label, y_linea, texto)
+        y_linea -= 12
+
+    # ---- Línea separadora ----
+    c.setStrokeColorRGB(*COLOR_LINEA)
+    c.setLineWidth(0.5)
+    c.line(MARGEN_X, y - ALTO_FILA, ancho - MARGEN_X, y - ALTO_FILA)
+
+    return y - ALTO_FILA
+
+
+# ---------------------------------------------------------------------------
+# FUNCIÓN AUXILIAR — Encabezado del catálogo
+# ---------------------------------------------------------------------------
+
+def _dibujar_encabezado_catalogo(c, ancho: float, alto: float, primera: bool = False):
+    """Dibuja el encabezado estándar del catálogo."""
+    # Banda azul
+    c.setFillColorRGB(*COLOR_AZUL_EMP)
+    c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
+
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", FUENTE_EMP)
+    c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+    c.setFont("Helvetica", 10)
+    c.setFillColorRGB(0.8, 0.88, 1.0)
+    c.drawString(MARGEN_X, alto - 72, "Catálogo de Productos — Listado General")
+
+    # Subtítulo
+    if primera:
+        c.setFont("Helvetica-Oblique", 8)
+        c.setFillColorRGB(0.85, 0.90, 1.0)
+        c.drawString(MARGEN_X, alto - 82, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    # Sin encabezados de columna (cada fila ya tiene sus etiquetas)
 
 
 # ---------------------------------------------------------------------------
@@ -200,11 +311,9 @@ def generar_ficha_tecnica(sku: str) -> bool:
 
 def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
     """
-    Genera un catálogo PDF con una página por producto para cada SKU indicado.
-
-    El archivo se nombra automáticamente con la fecha y hora de generación
-    para evitar sobreescribir versiones anteriores.
-
+    Genera un catálogo PDF compacto con todos los productos listados.
+    Varios productos por página, con thumbnail opcional de 55x55.
+    
     Args:
         lista_skus (list[str]): Lista de códigos SKU a incluir en el catálogo.
 
@@ -215,7 +324,6 @@ def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
     """
     bd = ConexionBD()
 
-    # Recopilar datos de todos los SKUs válidos
     paginas = []
     for sku in lista_skus:
         datos = bd.obtener_producto_con_imagen(sku.strip().upper())
@@ -228,18 +336,30 @@ def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
         print("🔴 [PDF Catálogo] Ningún SKU válido encontrado. PDF no generado.")
         return False, ""
 
-    # Nombre de archivo con timestamp para evitar colisiones
     timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
     nombre_pdf  = f"Catalogo_Uziel_{timestamp}.pdf"
     ancho, alto = letter
 
     c = canvas.Canvas(nombre_pdf, pagesize=letter)
 
-    for idx, (sku, datos) in enumerate(paginas):
-        if idx > 0:
-            c.showPage()   # Nueva página por cada producto después del primero
-        _dibujar_pagina_producto(c, sku, datos, ancho, alto)
+    # Primera página
+    _dibujar_encabezado_catalogo(c, ancho, alto, primera=True)
+    y = alto - 125
 
+    for idx, (sku, datos) in enumerate(paginas):
+        nombre, marca, compatibilidad, precio, ruta_img = datos
+
+        # ¿Cabe en esta página?
+        if y < ALTO_FILA + 50:
+            _dibujar_pie(c, ancho)
+            c.showPage()
+            _dibujar_encabezado_catalogo(c, ancho, alto)
+            y = alto - 125
+
+        y = _dibujar_fila_producto(c, sku, nombre, marca, compatibilidad,
+                                    precio, ruta_img, ancho, y, idx)
+
+    _dibujar_pie(c, ancho)
     c.save()
 
     print(f"🟢 [PDF Catálogo] {len(paginas)} producto(s) incluidos. Archivo: '{nombre_pdf}'")
