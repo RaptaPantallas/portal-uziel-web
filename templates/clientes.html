@@ -14,7 +14,7 @@
         <p class="subtitulo">Gestión de cartera de clientes</p>
     </div>
     {% if session['rol'] == 'Admin' %}
-        <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary">+ Nuevo Cliente</a>
+        <button class="btn btn-primary" onclick="abrirModalCliente()">+ Nuevo Cliente</button>
     {% endif %}
 </div>
 
@@ -64,33 +64,75 @@
         </tbody>
     </table>
 </div>
+
+<!-- MODAL: NUEVO CLIENTE -->
+<div class="modal-overlay" id="modalNuevoCliente">
+    <div class="modal">
+        <div class="modal-header">
+            <span>👤 Nuevo Cliente</span>
+            <button class="modal-close" onclick="cerrarModalCliente()">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('nuevo_cliente') }}">
+            <div class="form-group">
+                <label>RIF del Cliente</label>
+                <input type="text" name="rif" class="form-control" placeholder="Ej: J-12345678-9" required>
+            </div>
+            <div class="form-group">
+                <label>Nombre de la Empresa</label>
+                <input type="text" name="nombre_empresa" class="form-control" placeholder="Nombre legal de la empresa" required>
+            </div>
+            <div class="form-group">
+                <label>Teléfono</label>
+                <input type="text" name="telefono" class="form-control" placeholder="Ej: 0414-1234567" required>
+            </div>
+            <div class="form-group">
+                <label>Correo Electrónico <span style="font-size:11px;color:var(--text-light);font-weight:400;">(opcional)</span></label>
+                <input type="email" name="correo" class="form-control" placeholder="correo@empresa.com">
+            </div>
+            <div class="form-group">
+                <label>Dirección Física <span style="font-size:11px;color:var(--text-light);font-weight:400;">(opcional)</span></label>
+                <input type="text" name="direccion" class="form-control" placeholder="Dirección completa">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalCliente()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">💾 Guardar Cliente</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-function contarFilasReales(selector) { return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length; }
-function actualizarContadorClientes(visibles, total) {
-    const contador = document.getElementById('contador-clientes');
-    if (total === 0) { contador.innerHTML = ''; return; }
-    if (visibles === total) { contador.innerHTML = `<span>${total}</span> cliente${total === 1 ? '' : 's'} registrado${total === 1 ? '' : 's'}`; }
-    else { contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> clientes`; }
-}
-function filtrarClientes() {
-    const texto = normalizar(document.getElementById('buscador').value);
-    const filas = document.querySelectorAll('#tabla-clientes tbody tr');
-    const btnLimpiar = document.getElementById('btn-limpiar');
-    let visibles = 0, total = 0;
-    filas.forEach(fila => {
-        if (fila.cells.length <= 1) return;
-        total++;
-        const coincide = !texto || normalizar(fila.cells[0].textContent).includes(texto) || normalizar(fila.cells[1].textContent).includes(texto) || normalizar(fila.cells[2].textContent).includes(texto);
-        fila.style.display = coincide ? '' : 'none';
-        if (coincide) visibles++;
+    function abrirModalCliente() { document.getElementById('modalNuevoCliente').classList.add('open'); }
+    function cerrarModalCliente() { document.getElementById('modalNuevoCliente').classList.remove('open'); }
+    document.getElementById('modalNuevoCliente').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalCliente();
     });
-    btnLimpiar.classList.toggle('visible', texto.length > 0);
-    actualizarContadorClientes(visibles, total);
-}
-function limpiarBusqueda() { document.getElementById('buscador').value = ''; filtrarClientes(); document.getElementById('buscador').focus(); }
-document.addEventListener('DOMContentLoaded', () => { const total = contarFilasReales('#tabla-clientes tbody tr'); actualizarContadorClientes(total, total); });
+
+    function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+    function contarFilasReales(selector) { return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length; }
+    function actualizarContadorClientes(visibles, total) {
+        const contador = document.getElementById('contador-clientes');
+        if (total === 0) { contador.innerHTML = ''; return; }
+        if (visibles === total) { contador.innerHTML = `<span>${total}</span> cliente${total === 1 ? '' : 's'} registrado${total === 1 ? '' : 's'}`; }
+        else { contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> clientes`; }
+    }
+    function filtrarClientes() {
+        const texto = normalizar(document.getElementById('buscador').value);
+        const filas = document.querySelectorAll('#tabla-clientes tbody tr');
+        const btnLimpiar = document.getElementById('btn-limpiar');
+        let visibles = 0, total = 0;
+        filas.forEach(fila => {
+            if (fila.cells.length <= 1) return;
+            total++;
+            const coincide = !texto || normalizar(fila.cells[0].textContent).includes(texto) || normalizar(fila.cells[1].textContent).includes(texto) || normalizar(fila.cells[2].textContent).includes(texto);
+            fila.style.display = coincide ? '' : 'none';
+            if (coincide) visibles++;
+        });
+        btnLimpiar.classList.toggle('visible', texto.length > 0);
+        actualizarContadorClientes(visibles, total);
+    }
+    function limpiarBusqueda() { document.getElementById('buscador').value = ''; filtrarClientes(); document.getElementById('buscador').focus(); }
+    document.addEventListener('DOMContentLoaded', () => { const total = contarFilasReales('#tabla-clientes tbody tr'); actualizarContadorClientes(total, total); });
 </script>
 {% endblock %}

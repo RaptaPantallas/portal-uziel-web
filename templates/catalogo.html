@@ -18,7 +18,7 @@
         <p class="subtitulo">Catálogo de partes y repuestos</p>
     </div>
     {% if session['rol'] == 'Admin' %}
-        <a href="{{ url_for('nuevo_producto') }}" class="btn btn-primary">+ Nuevo Producto</a>
+        <button class="btn btn-primary" onclick="abrirModalProducto()">+ Nuevo Producto</button>
     {% endif %}
 </div>
 
@@ -102,136 +102,176 @@
     <span id="info-pagina" style="font-size:14px;color:var(--text-muted);"></span>
     <button class="btn btn-ghost" id="btn-siguiente">Siguiente →</button>
 </div>
+
+<!-- MODAL: NUEVO PRODUCTO -->
+<div class="modal-overlay" id="modalNuevoProducto">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>📦 Nuevo Producto</span>
+            <button class="modal-close" onclick="cerrarModalProducto()">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('nuevo_producto') }}">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label>Código SKU</label>
+                    <input type="text" name="sku" class="form-control" placeholder="Ej: BMB-GAS-CORS-01" required>
+                </div>
+                <div class="form-group">
+                    <label>Marca</label>
+                    <input type="text" name="marca" class="form-control" placeholder="Fabricante o marca" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Nombre de la Pieza</label>
+                    <input type="text" name="nombre" class="form-control" placeholder="Nombre descriptivo del repuesto" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Descripción Técnica</label>
+                    <input type="text" name="descripcion" class="form-control" placeholder="Descripción del componente" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Compatibilidad (Vehículos)</label>
+                    <input type="text" name="compatibilidad" class="form-control" placeholder="Ej: Corsa 2005-2010, Aveo 2008-2012" required>
+                </div>
+                <div class="form-group">
+                    <label>Precio Corporativo ($)</label>
+                    <input type="number" step="0.01" name="precio" class="form-control" placeholder="0.00" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalProducto()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">💾 Guardar Producto</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-const POR_PAGINA = 20;
-let paginaActual = 1;
-let categoriaActiva = 'todas';
-
-function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-
-function contarFilasReales(selector) {
-    return Array.from(document.querySelectorAll(selector)).filter(f => f.cells && f.cells.length > 1).length;
-}
-
-function obtenerCategorias() {
-    const cats = new Set();
-    document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
-        if (!fila.cells || fila.cells.length <= 1) return;
-        const c = fila.getAttribute('data-categoria');
-        if (c) cats.add(c);
+    function abrirModalProducto() { document.getElementById('modalNuevoProducto').classList.add('open'); }
+    function cerrarModalProducto() { document.getElementById('modalNuevoProducto').classList.remove('open'); }
+    document.getElementById('modalNuevoProducto').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalProducto();
     });
-    return Array.from(cats).sort();
-}
 
-function contarPorCategoria(cat) {
-    let n = 0;
-    document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
-        if (fila.cells && fila.cells.length > 1 && fila.getAttribute('data-categoria') === cat) n++;
-    });
-    return n;
-}
+    const POR_PAGINA = 20;
+    let paginaActual = 1;
+    let categoriaActiva = 'todas';
 
-function renderFiltrosCategoria() {
-    const cont = document.getElementById('filtros-categoria');
-    const cats = obtenerCategorias();
-    const total = contarFilasReales('#tabla-productos tbody tr');
-    let html = '<button class="filtro-btn activo" data-cat="todas">Todos (' + total + ')</button>';
-    cats.forEach(function (c) {
-        const n = contarPorCategoria(c);
-        if (n > 0) {
-            html += '<button class="filtro-btn" data-cat="' + c.replace(/"/g, '&quot;') + '">' + c + ' (' + n + ')</button>';
-        }
-    });
-    cont.innerHTML = html;
-}
+    function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
-document.getElementById('filtros-categoria').addEventListener('click', function (e) {
-    const btn = e.target.closest('.filtro-btn');
-    if (!btn) return;
-    const cat = btn.getAttribute('data-cat');
-    document.querySelectorAll('#filtros-categoria .filtro-btn').forEach(function (b) { b.classList.remove('activo'); });
-    btn.classList.add('activo');
-    categoriaActiva = cat;
-    paginaActual = 1;
-    aplicarFiltros();
-});
-
-function obtenerFilasFiltradas() {
-    const texto = normalizar(document.getElementById('buscador').value);
-    const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr')).filter(function (f) { return f.cells && f.cells.length > 1; });
-    return filas.filter(function (fila) {
-        const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
-        const coincideTexto = !texto
-            || normalizar(fila.cells[2].textContent).includes(texto)
-            || normalizar(fila.cells[3].textContent).includes(texto)
-            || normalizar(fila.cells[4].textContent).includes(texto);
-        return coincideCat && coincideTexto;
-    });
-}
-
-function actualizarContador(visibles, total) {
-    const contador = document.getElementById('contador-productos');
-    if (total === 0) { contador.innerHTML = ''; return; }
-    if (visibles === total) {
-        contador.innerHTML = '<span>' + total + '</span> producto' + (total === 1 ? '' : 's') + ' en catálogo';
-    } else {
-        contador.innerHTML = 'Mostrando <span>' + visibles + '</span> de <span>' + total + '</span> productos';
+    function contarFilasReales(selector) {
+        return Array.from(document.querySelectorAll(selector)).filter(f => f.cells && f.cells.length > 1).length;
     }
-}
 
-function actualizarPaginacion(pag, totalPag, totalFiltrados) {
-    document.getElementById('info-pagina').textContent = 'P\u00e1gina ' + pag + ' de ' + totalPag + ' (' + totalFiltrados + ' producto' + (totalFiltrados !== 1 ? 's' : '') + ')';
-    document.getElementById('btn-anterior').disabled = pag <= 1;
-    document.getElementById('btn-siguiente').disabled = pag >= totalPag;
-}
+    function obtenerCategorias() {
+        const cats = new Set();
+        document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
+            if (!fila.cells || fila.cells.length <= 1) return;
+            const c = fila.getAttribute('data-categoria');
+            if (c) cats.add(c);
+        });
+        return Array.from(cats).sort();
+    }
 
-function cambiarPagina(delta) {
-    const filtradas = obtenerFilasFiltradas();
-    const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
-    const nueva = paginaActual + delta;
-    if (nueva < 1 || nueva > totalPag) return;
-    paginaActual = nueva;
-    aplicarFiltros();
-}
+    function contarPorCategoria(cat) {
+        let n = 0;
+        document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
+            if (fila.cells && fila.cells.length > 1 && fila.getAttribute('data-categoria') === cat) n++;
+        });
+        return n;
+    }
 
-function aplicarFiltros() {
-    const totalFilas = contarFilasReales('#tabla-productos tbody tr');
-    const filtradas = obtenerFilasFiltradas();
-    const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
-    if (paginaActual > totalPag) paginaActual = totalPag;
-    const inicio = (paginaActual - 1) * POR_PAGINA;
-    const paginaFilas = filtradas.slice(inicio, inicio + POR_PAGINA);
-    const paginaSet = new Set(paginaFilas);
-    document.querySelectorAll('#tabla-productos tbody tr').forEach(function (fila) {
-        if (fila.cells && fila.cells.length > 1) {
-            fila.style.display = paginaSet.has(fila) ? '' : 'none';
-        }
+    function renderFiltrosCategoria() {
+        const cont = document.getElementById('filtros-categoria');
+        const cats = obtenerCategorias();
+        const total = contarFilasReales('#tabla-productos tbody tr');
+        let html = '<button class="filtro-btn activo" data-cat="todas">Todos (' + total + ')</button>';
+        cats.forEach(function (c) {
+            const n = contarPorCategoria(c);
+            if (n > 0) {
+                html += '<button class="filtro-btn" data-cat="' + c.replace(/"/g, '&quot;') + '">' + c + ' (' + n + ')</button>';
+            }
+        });
+        cont.innerHTML = html;
+    }
+
+    document.getElementById('filtros-categoria').addEventListener('click', function (e) {
+        const btn = e.target.closest('.filtro-btn');
+        if (!btn) return;
+        const cat = btn.getAttribute('data-cat');
+        document.querySelectorAll('#filtros-categoria .filtro-btn').forEach(function (b) { b.classList.remove('activo'); });
+        btn.classList.add('activo');
+        categoriaActiva = cat;
+        paginaActual = 1;
+        aplicarFiltros();
     });
-    document.getElementById('btn-limpiar').classList.toggle('visible', document.getElementById('buscador').value.length > 0);
-    actualizarContador(filtradas.length, totalFilas);
-    actualizarPaginacion(paginaActual, totalPag, filtradas.length);
-}
 
-function filtrarProductos() {
-    paginaActual = 1;
-    aplicarFiltros();
-}
+    function obtenerFilasFiltradas() {
+        const texto = normalizar(document.getElementById('buscador').value);
+        const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr')).filter(function (f) { return f.cells && f.cells.length > 1; });
+        return filas.filter(function (fila) {
+            const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
+            const coincideTexto = !texto
+                || normalizar(fila.cells[2].textContent).includes(texto)
+                || normalizar(fila.cells[3].textContent).includes(texto)
+                || normalizar(fila.cells[4].textContent).includes(texto);
+            return coincideCat && coincideTexto;
+        });
+    }
 
-function limpiarBusqueda() {
-    document.getElementById('buscador').value = '';
-    filtrarProductos();
-    document.getElementById('buscador').focus();
-}
+    function actualizarContador(visibles, total) {
+        const contador = document.getElementById('contador-productos');
+        if (total === 0) { contador.innerHTML = ''; return; }
+        if (visibles === total) {
+            contador.innerHTML = '<span>' + total + '</span> producto' + (total === 1 ? '' : 's') + ' en catálogo';
+        } else {
+            contador.innerHTML = 'Mostrando <span>' + visibles + '</span> de <span>' + total + '</span> productos';
+        }
+    }
 
-document.getElementById('btn-anterior').addEventListener('click', function () { cambiarPagina(-1); });
-document.getElementById('btn-siguiente').addEventListener('click', function () { cambiarPagina(1); });
+    function actualizarPaginacion(pag, totalPag, totalFiltrados) {
+        document.getElementById('info-pagina').textContent = 'P\u00e1gina ' + pag + ' de ' + totalPag + ' (' + totalFiltrados + ' producto' + (totalFiltrados !== 1 ? 's' : '') + ')';
+        document.getElementById('btn-anterior').disabled = pag <= 1;
+        document.getElementById('btn-siguiente').disabled = pag >= totalPag;
+    }
 
-document.addEventListener('DOMContentLoaded', function () {
-    renderFiltrosCategoria();
-    const total = contarFilasReales('#tabla-productos tbody tr');
-    if (total > 0) aplicarFiltros();
-});
+    function cambiarPagina(delta) {
+        const filtradas = obtenerFilasFiltradas();
+        const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+        const nueva = paginaActual + delta;
+        if (nueva < 1 || nueva > totalPag) return;
+        paginaActual = nueva;
+        aplicarFiltros();
+    }
+
+    function aplicarFiltros() {
+        const totalFilas = contarFilasReales('#tabla-productos tbody tr');
+        const filtradas = obtenerFilasFiltradas();
+        const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+        if (paginaActual > totalPag) paginaActual = totalPag;
+        const inicio = (paginaActual - 1) * POR_PAGINA;
+        const paginaFilas = filtradas.slice(inicio, inicio + POR_PAGINA);
+        const paginaSet = new Set(paginaFilas);
+        document.querySelectorAll('#tabla-productos tbody tr').forEach(function (fila) {
+            if (fila.cells && fila.cells.length > 1) {
+                fila.style.display = paginaSet.has(fila) ? '' : 'none';
+            }
+        });
+        document.getElementById('btn-limpiar').classList.toggle('visible', document.getElementById('buscador').value.length > 0);
+        actualizarContador(filtradas.length, totalFilas);
+        actualizarPaginacion(paginaActual, totalPag, filtradas.length);
+    }
+
+    function filtrarProductos() { paginaActual = 1; aplicarFiltros(); }
+    function limpiarBusqueda() { document.getElementById('buscador').value = ''; filtrarProductos(); document.getElementById('buscador').focus(); }
+
+    document.getElementById('btn-anterior').addEventListener('click', function () { cambiarPagina(-1); });
+    document.getElementById('btn-siguiente').addEventListener('click', function () { cambiarPagina(1); });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        renderFiltrosCategoria();
+        const total = contarFilasReales('#tabla-productos tbody tr');
+        if (total > 0) aplicarFiltros();
+    });
 </script>
 {% endblock %}

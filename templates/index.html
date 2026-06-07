@@ -2,16 +2,7 @@
 {% block title %}Dashboard — Importadora Uziel{% endblock %}
 {% block head_extra %}
 <style>
-    .form-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 24px;
-    }
-    .form-grid .full-width { grid-column: 1 / -1; }
-    .form-footer {
-        padding: 16px 24px; border-top: 1px solid var(--border);
-        display: flex; justify-content: flex-end; gap: 12px;
-    }
     .readonly-label { color: #94a3b8; font-size: 12px; }
-    .tarea-row-urgente { background: var(--warning-bg) !important; }
 
     .modal-notif {
         display: none; position: fixed; inset: 0;
@@ -98,63 +89,9 @@
 </div>
 
 {% if session['rol'] == 'Admin' %}
-<div class="card">
-    <div class="card-header">
-        <span class="card-title">📋 Asignar Nueva Tarea</span>
-        <button type="button" class="btn btn-primary" onclick="toggleFormTarea()" id="btn-toggle-form">+ Nueva Tarea</button>
-    </div>
-    <div id="form-tarea" style="display:none;">
-        <form action="{{ url_for('asignar_tarea') }}" method="POST">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="cliente_rif">Cliente <span class="req">*</span></label>
-                    <select name="cliente_rif" id="cliente_rif" class="form-control" required onchange="actualizarNombreCliente(this)">
-                        <option value="">— Seleccionar cliente —</option>
-                        {% for cliente in lista_clientes %}
-                        <option value="{{ cliente[0] }}" data-nombre="{{ cliente[1] }}">{{ cliente[1] }} ({{ cliente[0] }})</option>
-                        {% endfor %}
-                    </select>
-                    <input type="hidden" name="cliente_nombre" id="cliente_nombre">
-                </div>
-                <div class="form-group">
-                    <label for="asignado_a">Asignar a <span class="req">*</span></label>
-                    <select name="asignado_a" id="asignado_a" class="form-control" required>
-                        <option value="">— Seleccionar usuario —</option>
-                        {% for usuario in lista_usuarios %}
-                        {% if usuario[0] != session['usuario'] %}
-                        <option value="{{ usuario[0] }}">{{ usuario[0].capitalize() }} ({{ usuario[1] }})</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="tipo_tarea">Tipo de Trabajo <span class="req">*</span></label>
-                    <select name="tipo_tarea" id="tipo_tarea" class="form-control" required>
-                        <option value="">— Seleccionar tipo —</option>
-                        <option value="Diseño Gráfico">Diseño Gráfico</option>
-                        <option value="Edición de Foto">Edición de Foto</option>
-                        <option value="Edición de Video">Edición de Video</option>
-                        <option value="Fotografía">Fotografía</option>
-                        <option value="Catálogo Digital">Catálogo Digital</option>
-                        <option value="Redes Sociales">Redes Sociales</option>
-                        <option value="Otro">Otro</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="fecha_limite">Fecha Límite <span class="req">*</span></label>
-                    <input type="date" name="fecha_limite" id="fecha_limite" class="form-control" required>
-                </div>
-                <div class="form-group full-width">
-                    <label for="descripcion">Descripción del Trabajo</label>
-                    <textarea name="descripcion" id="descripcion" class="form-control" placeholder="Detalla qué debe hacer el responsable..."></textarea>
-                </div>
-            </div>
-            <div class="form-footer">
-                <button type="button" class="btn btn-ghost" onclick="toggleFormTarea()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
-            </div>
-        </form>
-    </div>
+<div class="card" style="padding:24px;text-align:center;">
+    <p style="color:var(--text-muted);margin-bottom:12px;">Asigna trabajo a tu equipo de forma rápida</p>
+    <button type="button" class="btn btn-primary" onclick="abrirModalTarea()">📋 Asignar Nueva Tarea</button>
 </div>
 {% endif %}
 
@@ -316,28 +253,82 @@
     </div>
 </div>
 {% endif %}
+
+<!-- MODAL: ASIGNAR TAREA -->
+<div class="modal-overlay" id="modalTarea">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>📋 Asignar Nueva Tarea</span>
+            <button class="modal-close" onclick="cerrarModalTarea()">✕</button>
+        </div>
+        <form action="{{ url_for('asignar_tarea') }}" method="POST">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label for="t_cliente_rif">Cliente <span class="req">*</span></label>
+                    <select name="cliente_rif" id="t_cliente_rif" class="form-control" required onchange="actualizarNombreClienteT(this)">
+                        <option value="">— Seleccionar cliente —</option>
+                        {% for cliente in lista_clientes %}
+                        <option value="{{ cliente[0] }}" data-nombre="{{ cliente[1] }}">{{ cliente[1] }} ({{ cliente[0] }})</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="cliente_nombre" id="t_cliente_nombre">
+                </div>
+                <div class="form-group">
+                    <label for="t_asignado_a">Asignar a <span class="req">*</span></label>
+                    <select name="asignado_a" id="t_asignado_a" class="form-control" required>
+                        <option value="">— Seleccionar usuario —</option>
+                        {% for usuario in lista_usuarios %}
+                        {% if usuario[0] != session['usuario'] %}
+                        <option value="{{ usuario[0] }}">{{ usuario[0].capitalize() }} ({{ usuario[1] }})</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="t_tipo_tarea">Tipo de Trabajo <span class="req">*</span></label>
+                    <select name="tipo_tarea" id="t_tipo_tarea" class="form-control" required>
+                        <option value="">— Seleccionar tipo —</option>
+                        <option value="Diseño Gráfico">Diseño Gráfico</option>
+                        <option value="Edición de Foto">Edición de Foto</option>
+                        <option value="Edición de Video">Edición de Video</option>
+                        <option value="Fotografía">Fotografía</option>
+                        <option value="Catálogo Digital">Catálogo Digital</option>
+                        <option value="Redes Sociales">Redes Sociales</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="t_fecha_limite">Fecha Límite <span class="req">*</span></label>
+                    <input type="date" name="fecha_limite" id="t_fecha_limite" class="form-control" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label for="t_descripcion">Descripción del Trabajo</label>
+                    <textarea name="descripcion" id="t_descripcion" class="form-control" placeholder="Detalla qué debe hacer el responsable..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalTarea()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-    function toggleFormTarea() {
-        const form = document.getElementById('form-tarea');
-        const boton = document.getElementById('btn-toggle-form');
-        if (form.style.display === 'none') {
-            form.style.display = 'block';
-            boton.textContent = '✕ Cancelar';
-        } else {
-            form.style.display = 'none';
-            boton.textContent = '+ Nueva Tarea';
-        }
-    }
-    function actualizarNombreCliente(select) {
+    function abrirModalTarea() { document.getElementById('modalTarea').classList.add('open'); }
+    function cerrarModalTarea() { document.getElementById('modalTarea').classList.remove('open'); }
+    function actualizarNombreClienteT(select) {
         const opcion = select.options[select.selectedIndex];
-        document.getElementById('cliente_nombre').value = opcion.getAttribute('data-nombre') || '';
+        document.getElementById('t_cliente_nombre').value = opcion.getAttribute('data-nombre') || '';
     }
     function cerrarModal() {
         const modal = document.getElementById('modal-notif');
         if (modal) modal.remove();
     }
+    document.getElementById('modalTarea').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalTarea();
+    });
     document.addEventListener('DOMContentLoaded', function () {
         const hoy = new Date(); hoy.setHours(0,0,0,0);
         document.querySelectorAll('.dias-badge[data-limite]').forEach(function (badge) {
@@ -359,7 +350,7 @@
                 badge.className = 'dias-badge dias-normal';
             }
         });
-        const campoFecha = document.getElementById('fecha_limite');
+        const campoFecha = document.getElementById('t_fecha_limite');
         if (campoFecha) campoFecha.min = hoy.toISOString().split('T')[0];
         document.querySelectorAll('tr[data-limite]').forEach(function (fila) {
             const fechaLimFila = new Date(fila.getAttribute('data-limite'));
