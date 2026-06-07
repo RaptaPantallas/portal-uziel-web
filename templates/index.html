@@ -124,8 +124,8 @@
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}"></td>
                     <td><span class="sku-badge">{{ producto[0] }}</span></td>
                     <td>{{ producto[1] }}</td>
-                    <td>{{ producto[2] }}</td>
-                    <td class="precio">${{ producto[3] }}</td>
+                    <td>{{ producto[3] }}</td>
+                    <td class="precio">${{ producto[5] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
                             <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary btn-sm">Editar</a>

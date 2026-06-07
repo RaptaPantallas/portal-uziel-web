@@ -1,43 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ producto[1] }} — Importadora Uziel{% endblock %}
-{% block head_extra %}
-<style>
-    .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
-    @media (max-width: 900px) { .detalle-grid { grid-template-columns: 1fr; } }
-    .ficha-nombre { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-    .ficha-precio { font-size: 28px; font-weight: 800; margin-bottom: 20px; }
-    .ficha-campo { margin-bottom: 16px; }
-    .ficha-campo label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .ficha-campo p { font-size: 14px; line-height: 1.5; }
-    .ficha-campo p.vacio { font-style: italic; }
-    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
-    .tab-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 16px 24px 0; }
-    .tab-btn { padding: 7px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); background: none; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
-    .tab-btn:hover { border-color: var(--primary); color: var(--primary); }
-    .tab-btn.activo { background: var(--primary); border-color: var(--primary); color: white; }
-    .tab-panel { display: none; padding: 20px 24px; }
-    .tab-panel.activo { display: block; }
-    .galeria-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-    .galeria-item { border-radius: 10px; overflow: hidden; border: 1.5px solid var(--border); background: var(--bg); transition: box-shadow 0.15s, border-color 0.15s; cursor: pointer; }
-    .galeria-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: var(--primary); }
-    .galeria-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-    .galeria-item .item-nombre { padding: 6px 8px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sin-fotos { text-align: center; padding: 48px 24px; color: var(--text-muted); }
-    .sin-fotos .icono { font-size: 48px; margin-bottom: 12px; }
-    .lightbox { display: none; position: fixed; inset: 0; background: rgba(10,12,20,0.88); z-index: 1000; align-items: center; justify-content: center; }
-    .lightbox.abierto { display: flex; }
-    .lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 10px; object-fit: contain; box-shadow: 0 8px 40px rgba(0,0,0,0.6); }
-    .lightbox-close { position: absolute; top: 20px; right: 28px; font-size: 32px; color: white; cursor: pointer; opacity: 0.7; transition: opacity 0.15s; line-height: 1; background: none; border: none; }
-    .lightbox-close:hover { opacity: 1; }
-    .acciones { display: flex; gap: 10px; margin-top: 24px; }
-</style>
-{% endblock %}
 {% block content %}
-<nav class="breadcrumb" aria-label="Navegación">
-    <a href="{{ url_for('catalogo') }}">📦 Productos</a>
-    <span class="breadcrumb-sep">/</span>
-    <span>{{ producto[0] }}</span>
-</nav>
+<div class="page-header">
+    <div>
+        <h1>{{ producto[1] }}</h1>
+        <p class="subtitulo"><span class="sku-badge">SKU: {{ producto[0] }}</span></p>
+    </div>
+    <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Volver al catálogo</a>
+</div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for category, message in messages %}
@@ -45,85 +15,30 @@
   {% endfor %}{% endif %}
 {% endwith %}
 
-<div class="detalle-grid">
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">Ficha Técnica</span>
-            {% if session['rol'] == 'Admin' %}
-                <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">✏️ Editar</a>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            <div class="ficha-nombre">{{ producto[1] }}</div>
-            <div><span class="sku-badge">SKU: {{ producto[0] }}</span></div>
-            <div class="ficha-precio precio">${{ producto[5] }}</div>
-            <hr class="divider">
-            <div class="ficha-campo">
-                <label>Marca / Fabricante</label>
-                <p>{{ producto[3] or '' }}{% if not producto[3] %}<span class="vacio">Sin especificar</span>{% endif %}</p>
-            </div>
-            <div class="ficha-campo">
-                <label>Compatibilidad</label>
-                <p>{{ producto[4] or '' }}{% if not producto[4] %}<span class="vacio">Sin especificar</span>{% endif %}</p>
-            </div>
-            <div class="ficha-campo">
-                <label>Descripción técnica</label>
-                <p>{{ producto[2] or '' }}{% if not producto[2] %}<span class="vacio">Sin descripción</span>{% endif %}</p>
-            </div>
-            <div class="acciones">
-                <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Volver al catálogo</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">Galería de Fotos</span>
-            <span style="font-size:12px;color:var(--text-muted);">{{ galeria | length }} ángulo{{ 's' if galeria | length != 1 else '' }} • {{ total_fotos }} foto{{ 's' if total_fotos != 1 else '' }}</span>
-        </div>
-        {% if galeria %}
-            <div class="tab-bar" id="tab-bar">
-                {% for angulo in galeria %}
-                    <button class="tab-btn {% if loop.first %}activo{% endif %}" data-tab="tab-{{ loop.index }}" onclick="cambiarTab(this)">{{ angulo }} <span style="font-size:11px;opacity:0.7;">({{ galeria[angulo] | length }})</span></button>
-                {% endfor %}
-            </div>
-            {% for angulo, fotos in galeria.items() %}
-            <div class="tab-panel {% if loop.first %}activo{% endif %}" id="tab-{{ loop.index }}">
-                <div class="galeria-grid">
-                    {% for foto in fotos %}
-                    <div class="galeria-item" onclick="abrirLightbox('{{ url_for('servir_activo', nombre_archivo=foto['nombre']) }}')">
-                        <img src="{{ url_for('servir_activo', nombre_archivo=foto['nombre']) }}" alt="{{ angulo }} — {{ foto['nombre'] }}" onerror="this.parentElement.style.display='none';">
-                        <div class="item-nombre">{{ foto['nombre'] }}</div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="sin-fotos">
-                <div class="icono">📷</div>
-                <p>Este producto no tiene fotos vinculadas aún.</p>
-                <p style="margin-top:6px;font-size:12px;">Usa la app de escritorio DAM para agregar fotografías.</p>
-            </div>
+<div class="card" style="max-width:600px;">
+    <div class="card-header">
+        <span class="card-title">Ficha Técnica</span>
+        {% if session['rol'] == 'Admin' %}
+            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">✏️ Editar</a>
         {% endif %}
     </div>
+    <div class="card-body">
+        <div style="font-size:22px;font-weight:700;margin-bottom:4px;">{{ producto[1] }}</div>
+        <div><span class="sku-badge">SKU: {{ producto[0] }}</span></div>
+        <div class="precio" style="font-size:28px;font-weight:800;margin:16px 0;">${{ producto[5] }}</div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Marca / Fabricante</label>
+            <p style="font-size:14px;">{{ producto[3] or 'Sin especificar' }}</p>
+        </div>
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Compatibilidad</label>
+            <p style="font-size:14px;">{{ producto[4] or 'Sin especificar' }}</p>
+        </div>
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Descripción técnica</label>
+            <p style="font-size:14px;">{{ producto[2] or 'Sin descripción' }}</p>
+        </div>
+    </div>
 </div>
-
-<div class="lightbox" id="lightbox" onclick="cerrarLightbox(event)">
-    <button class="lightbox-close" onclick="cerrarLightbox()" aria-label="Cerrar">✕</button>
-    <img src="" alt="Vista ampliada" id="lightbox-img">
-</div>
-{% endblock %}
-{% block scripts %}
-<script>
-function cambiarTab(btn) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
-    btn.classList.add('activo');
-    document.getElementById(btn.dataset.tab).classList.add('activo');
-}
-function abrirLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('abierto'); }
-function cerrarLightbox(e) { if (!e || e.target !== document.getElementById('lightbox-img')) { document.getElementById('lightbox').classList.remove('abierto'); } }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarLightbox(); });
-</script>
 {% endblock %}

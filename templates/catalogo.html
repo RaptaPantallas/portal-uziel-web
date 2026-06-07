@@ -2,9 +2,13 @@
 {% block title %}Productos — Importadora Uziel{% endblock %}
 {% block head_extra %}
 <style>
-    .link-detalle { font-weight: 600; text-decoration: none; }
-    .link-detalle:hover { color: var(--primary); text-decoration: underline; }
+    .link-detalle { font-weight: 600; text-decoration: none; cursor: pointer; }
+    .link-detalle:hover { color: var(--primary); }
     .btn:disabled { opacity: 0.45; cursor: default; }
+    .ficha-precio { font-size: 28px; font-weight: 800; margin-bottom: 20px; }
+    .ficha-campo { margin-bottom: 16px; }
+    .ficha-campo label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .ficha-campo p { font-size: 14px; line-height: 1.5; }
 </style>
 {% endblock %}
 {% block content %}
@@ -55,20 +59,26 @@
                 {% for producto in productos %}
                 {% set sku = producto[0] %}
                 {% set cat = producto[6] | e %}
-                <tr data-categoria="{{ cat }}">
+                <tr data-categoria="{{ cat }}"
+                    data-sku="{{ sku }}"
+                    data-nombre="{{ producto[1] }}"
+                    data-descripcion="{{ producto[2] }}"
+                    data-marca="{{ producto[3] }}"
+                    data-compatibilidad="{{ producto[4] }}"
+                    data-precio="{{ producto[5] }}">
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
-                        <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">{{ producto[1] }}</a>
+                        <a class="link-detalle" onclick="verDetalle(this)">{{ producto[1] }}</a>
                     </td>
-                    <td>{{ producto[2] }}</td>
-                    <td class="precio">${{ producto[3] }}</td>
+                    <td>{{ producto[3] }}</td>
+                    <td class="precio">${{ producto[5] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
                             <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary">Editar</a>
                             <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
                         {% else %}
-                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Ver ficha</a>
+                            <button class="btn btn-primary" style="padding:6px 10px;font-size:12px;" onclick="verDetalle(this)">Ver ficha</button>
                         {% endif %}
                     </td>
                 </tr>
@@ -129,6 +139,40 @@
         </form>
     </div>
 </div>
+
+<!-- MODAL: DETALLE DEL PRODUCTO -->
+<div class="modal-overlay" id="modalDetalle">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="detalle-titulo">Detalle del Producto</span>
+            <button class="modal-close" onclick="cerrarDetalle()">✕</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+            <div id="detalle-nombre" style="font-size:22px;font-weight:700;margin-bottom:4px;"></div>
+            <div><span class="sku-badge" id="detalle-sku-badge"></span></div>
+            <div class="ficha-precio precio" id="detalle-precio"></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+            <div class="ficha-campo">
+                <label>Marca / Fabricante</label>
+                <p id="detalle-marca"></p>
+            </div>
+            <div class="ficha-campo">
+                <label>Compatibilidad</label>
+                <p id="detalle-compatibilidad"></p>
+            </div>
+            <div class="ficha-campo">
+                <label>Descripción técnica</label>
+                <p id="detalle-descripcion"></p>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:24px;">
+                <button class="btn btn-ghost" onclick="cerrarDetalle()">← Cerrar</button>
+                {% if session['rol'] == 'Admin' %}
+                <a id="detalle-editar-link" href="" class="btn btn-primary">✏️ Editar</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -136,6 +180,26 @@
     function cerrarModalProducto() { document.getElementById('modalNuevoProducto').classList.remove('open'); }
     document.getElementById('modalNuevoProducto').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalProducto();
+    });
+
+    function verDetalle(el) {
+        const tr = el.closest('tr');
+        const sku = tr.dataset.sku;
+        document.getElementById('detalle-titulo').textContent = sku + ' — Detalle';
+        document.getElementById('detalle-nombre').textContent = tr.dataset.nombre;
+        document.getElementById('detalle-sku-badge').textContent = 'SKU: ' + sku;
+        document.getElementById('detalle-precio').textContent = '$' + tr.dataset.precio;
+        document.getElementById('detalle-marca').textContent = tr.dataset.marca || 'Sin especificar';
+        document.getElementById('detalle-compatibilidad').textContent = tr.dataset.compatibilidad || 'Sin especificar';
+        document.getElementById('detalle-descripcion').textContent = tr.dataset.descripcion || 'Sin descripción';
+        const editLink = document.getElementById('detalle-editar-link');
+        if (editLink) editLink.href = '/editar/' + encodeURIComponent(sku);
+        document.getElementById('modalDetalle').classList.add('open');
+    }
+
+    function cerrarDetalle() { document.getElementById('modalDetalle').classList.remove('open'); }
+    document.getElementById('modalDetalle').addEventListener('click', function(e) {
+        if (e.target === this) cerrarDetalle();
     });
 
     const POR_PAGINA = 20;
