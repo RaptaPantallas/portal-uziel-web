@@ -4,9 +4,6 @@
 <style>
     .tarea-vencida { background: #fff5f5 !important; }
     .form-nueva-tarea { padding: 24px; }
-    .form-footer-lateral { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .btn-submit-tarea { width: 100%; padding: 11px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
-    .btn-submit-tarea:hover { opacity: 0.88; }
 </style>
 {% endblock %}
 {% block content %}
@@ -102,7 +99,7 @@
                             {% elif t_estado == 'En Progreso' %}
                             <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
                                 <input type="hidden" name="nuevo_estado" value="Completada">
-                                <button type="submit" class="btn btn-success">✓ Completar</button>
+                                <button type="submit" class="btn btn-primary">✓ Completar</button>
                             </form>
                             {% else %}
                                 <span style="color:var(--text-muted);font-size:12px;">✓ Finalizada</span>
@@ -170,8 +167,8 @@
                     <label for="descripcion_lat">Descripción</label>
                     <textarea name="descripcion" id="descripcion_lat" class="form-control" placeholder="¿Qué debe hacer el responsable?..."></textarea>
                 </div>
-                <div class="form-footer-lateral">
-                    <button type="submit" class="btn-submit-tarea">📋 Asignar Tarea</button>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
                 </div>
             </form>
         </div>

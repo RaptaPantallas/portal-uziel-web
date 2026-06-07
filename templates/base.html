@@ -22,12 +22,8 @@
             --text: #1e293b;
             --text-muted: #64748b;
             --border: #e2e8f0;
-            --success: #16a34a;
-            --success-bg: #f0fdf4;
             --error: #ef4444;
             --error-bg: #fef2f2;
-            --warning: #f59e0b;
-            --warning-bg: #fffbeb;
             --radius: 8px;
             --radius-lg: 12px;
             --sidebar-w: 220px;
@@ -177,7 +173,7 @@
             margin-bottom: 18px; font-size: 14px; font-weight: 500;
             border-left: 4px solid transparent;
         }
-        .flash-exito, .flash-success { background: var(--success-bg); color: #15803d; border-left-color: var(--success); }
+        .flash-exito, .flash-success { background: var(--primary-light); color: var(--primary-dark); border-left-color: var(--primary); }
         .flash-error { background: var(--error-bg); color: #b91c1c; border-left-color: var(--error); }
 
         /* ===== BREADCRUMB ===== */
@@ -234,8 +230,8 @@
 
         .stat-card .stat-label .icon { font-size: 18px; opacity: 0.6; }
         .stat-card .stat-value { font-size: 30px; font-weight: 700; color: var(--text); }
-        .stat-card.tareas-card { border-left: 4px solid var(--warning); }
-        .stat-card.tareas-card .stat-value { color: #b45309; }
+        .stat-card.tareas-card { border-left: 4px solid var(--primary); }
+        .stat-card.tareas-card .stat-value { color: var(--primary); }
 
         /* ===== BUTTONS ===== */
         .btn {
@@ -257,24 +253,14 @@
         .btn-sm { padding: 5px 12px; font-size: 12px; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-hover); }
-        .btn-success { background: var(--success); color: white; }
-        .btn-success:hover { background: #15803d; }
         .btn-danger { background: var(--error); color: white; }
         .btn-danger:hover { background: #dc2626; }
-        .btn-warning { background: var(--warning); color: white; }
-        .btn-warning:hover { background: #d97706; }
         .btn-ghost {
             background: transparent;
             color: var(--text-muted);
             border: 1.5px solid var(--border);
         }
         .btn-ghost:hover { color: var(--text); border-color: #94a3b8; opacity: 1; }
-        .btn-outline-primary {
-            background: transparent;
-            color: var(--primary);
-            border: 1.5px solid var(--primary);
-        }
-        .btn-outline-primary:hover { background: var(--primary-light); }
 
         /* ===== FORMS ===== */
         .form-card {
@@ -387,14 +373,15 @@
             font-weight: 700;
         }
 
-        .badge-pendiente   { background: #fff7ed; color: #c2410c; }
+        .badge-pendiente,
         .badge-en-progreso,
-        .badge-progress    { background: var(--primary-light); color: #1d4ed8; }
+        .badge-progress,
         .badge-completada,
-        .badge-success     { background: var(--success-bg); color: #15803d; }
+        .badge-success,
+        .badge-enviada,
+        .badge-aceptada,
+        .badge-primary     { background: var(--primary-light); color: var(--primary-dark); }
         .badge-borrador    { background: #f1f5f9; color: var(--text-muted); }
-        .badge-enviada     { background: #fffbeb; color: #b45309; }
-        .badge-aceptada    { background: var(--success-bg); color: #15803d; }
         .badge-rechazada   { background: var(--error-bg); color: #b91c1c; }
 
         .estado-badge { .badge; }
@@ -405,8 +392,8 @@
             border-radius: 5px;
             font-size: 11px;
             font-weight: 600;
-            background: #f3f0ff;
-            color: #6d28d9;
+            background: var(--primary-light);
+            color: var(--primary-dark);
         }
 
         .sku-badge {
@@ -421,13 +408,13 @@
         .rif-badge {
             font-family: 'Courier New', monospace;
             font-size: 12px; font-weight: 700;
-            color: #0891b2;
-            background: #ecfeff;
+            color: var(--text-muted);
+            background: #f1f5f9;
             padding: 3px 8px;
             border-radius: 5px;
         }
 
-        .precio { color: var(--success); font-weight: 700; }
+        .precio { color: var(--primary); font-weight: 700; }
 
         /* ===== DIAS BADGE ===== */
         .dias-badge {
@@ -436,8 +423,8 @@
         }
 
         .dias-urgente { background: var(--error-bg); color: #dc2626; }
-        .dias-normal  { background: var(--success-bg); color: #15803d; }
-        .dias-warning { background: var(--warning-bg); color: #b45309; }
+        .dias-normal,
+        .dias-warning { background: var(--primary-light); color: var(--primary-dark); }
 
         /* ===== FILTROS ===== */
         .filtros {

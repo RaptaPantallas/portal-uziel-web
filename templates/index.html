@@ -32,7 +32,7 @@
     }
     .modal-header {
         padding: 20px 24px;
-        background: linear-gradient(135deg, #1e3a8a, var(--primary));
+        background: var(--primary);
         color: white; display: flex; align-items: center; justify-content: space-between;
     }
     .modal-header h2 { font-size: 18px; font-weight: 700; }
@@ -152,7 +152,7 @@
                 </div>
             </div>
             <div class="form-footer">
-                <button type="button" class="btn btn-warning" onclick="toggleFormTarea()">Cancelar</button>
+                <button type="button" class="btn btn-ghost" onclick="toggleFormTarea()">Cancelar</button>
                 <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
             </div>
         </form>
@@ -167,9 +167,9 @@
             <div style="display:flex;gap:10px;align-items:center;">
                 {% if session['rol'] == 'Admin' %}
                     <a href="{{ url_for('nuevo_producto') }}" class="btn btn-primary">+ Nuevo Producto</a>
-                    <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-success">+ Nuevo Cliente</a>
+                    <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary">+ Nuevo Cliente</a>
                 {% endif %}
-                <button type="submit" class="btn btn-danger">📄 Generar PDF</button>
+                <button type="submit" class="btn btn-primary">📄 Generar PDF</button>
             </div>
         </div>
         <table>
@@ -193,7 +193,7 @@
                     <td class="precio">${{ producto[3] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
-                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-warning">Editar</a>
+                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary">Editar</a>
                             <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-danger" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
                         {% else %}
                             <span class="readonly-label">Solo lectura</span>
@@ -247,7 +247,7 @@
                             <button type="submit" class="btn btn-primary">Iniciar</button>
                         {% elif t[6] == 'En Progreso' %}
                             <input type="hidden" name="nuevo_estado" value="Completada">
-                            <button type="submit" class="btn btn-success">Completar</button>
+                            <button type="submit" class="btn btn-primary">Completar</button>
                         {% endif %}
                     </form>
                 </td>
@@ -304,7 +304,7 @@
                     {% elif t[6] == 'En Progreso' %}
                     <form action="{{ url_for('actualizar_tarea', tarea_id=t[0]) }}" method="POST">
                         <input type="hidden" name="nuevo_estado" value="Completada">
-                        <button type="submit" class="btn btn-success">✓ Marcar Completada</button>
+                        <button type="submit" class="btn btn-primary">✓ Marcar Completada</button>
                     </form>
                     {% endif %}
                 </div>
@@ -313,7 +313,7 @@
         </div>
         <div class="modal-footer">
             <a href="{{ url_for('tareas') }}" class="btn btn-primary" style="margin-right:10px;">📋 Ver todas mis tareas</a>
-            <button class="btn btn-warning" onclick="cerrarModal()">Entendido, cerrar</button>
+            <button class="btn btn-ghost" onclick="cerrarModal()">Entendido, cerrar</button>
         </div>
     </div>
 </div>

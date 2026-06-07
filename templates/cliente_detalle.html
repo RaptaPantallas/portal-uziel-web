@@ -19,7 +19,7 @@
     .resumen-lbl { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .link-cotiz { text-decoration: none; font-weight: 600; font-size: 13px; }
     .link-cotiz:hover { text-decoration: underline; }
-    .monto { font-weight: 700; color: var(--success); }
+    .monto { font-weight: 700; color: var(--primary); }
     .empty-row { text-align: center; color: var(--text-muted); padding: 28px 14px !important; }
     /* Modal de edición */
     .modal-overlay { /* override for page-specific modal position */
@@ -59,7 +59,7 @@
     <div class="acciones">
         {% if es_admin %}
         <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary">🧾 Nueva Cotización para este cliente</a>
-        <button class="btn btn-warning" onclick="abrirModal()">✏️ Editar Datos</button>
+        <button class="btn btn-primary" onclick="abrirModal()">✏️ Editar Datos</button>
         {% endif %}
         <a href="{{ url_for('clientes') }}" class="btn btn-ghost">← Volver</a>
     </div>

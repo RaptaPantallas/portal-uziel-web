@@ -65,13 +65,13 @@
                 {% else %}
                     {% for m in upermisos %}
                         {% if m == 'clientes' %}
-                            <span class="badge badge-success">Clientes</span>
+                            <span class="badge badge-primary">Clientes</span>
                         {% elif m == 'productos' %}
-                            <span class="badge badge-success">Productos</span>
+                            <span class="badge badge-primary">Productos</span>
                         {% elif m == 'tareas' %}
-                            <span class="badge badge-pendiente">Tareas</span>
+                            <span class="badge badge-primary">Tareas</span>
                         {% elif m == 'cotizaciones' %}
-                            <span class="badge badge-enviada">Cotizaciones</span>
+                            <span class="badge badge-primary">Cotizaciones</span>
                         {% endif %}
                     {% else %}
                         <span style="color:var(--text-muted);font-size:12px;">Sin acceso</span>
@@ -80,7 +80,7 @@
             </td>
             <td>
                 <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="btn btn-sm btn-warning" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}')">✏️ Editar</button>
+                    <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}')">✏️ Editar</button>
                     <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')">🔑 Contraseña</button>
                     {% if uname != session['usuario'] %}
                     <form method="POST" action="{{ url_for('admin_usuario_borrar', username=uname) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar al usuario {{ uname }}? Esta acción no se puede deshacer.');">

@@ -38,7 +38,7 @@
     <form action="{{ url_for('generar_pdf') }}" method="POST">
         <div class="card-header">
             <span class="card-title">Inventario completo</span>
-            <button type="submit" class="btn btn-danger">📄 Generar PDF Seleccionados</button>
+            <button type="submit" class="btn btn-primary">📄 Generar PDF Seleccionados</button>
         </div>
         <table id="tabla-productos">
             <thead>
@@ -75,7 +75,7 @@
                     <td class="precio">${{ producto[3] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
-                            <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-warning">Editar</a>
+                            <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary">Editar</a>
                             <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
                         {% else %}
                             <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Ver ficha</a>
