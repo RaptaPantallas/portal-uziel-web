@@ -3,7 +3,6 @@
 {% block head_extra %}
 <style>
     .tarea-vencida { background: #fff5f5 !important; }
-    .form-nueva-tarea { padding: 24px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -18,6 +17,9 @@
             {% endif %}
         </p>
     </div>
+    {% if session['rol'] == 'Admin' %}
+        <button class="btn btn-primary" onclick="abrirModalTarea()">+ Nueva Tarea</button>
+    {% endif %}
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -35,96 +37,92 @@
     <button class="filtro-btn" onclick="filtrarEstado('Completada', this)">🟢 Completadas</button>
 </div>
 
-{% if session['rol'] == 'Admin' %}
-<div class="layout-dos-col">
-{% endif %}
-
-    <div>
-        <div class="card" style="overflow-x: auto;">
-            {% if lista_tareas %}
-            <table id="tabla-tareas">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Cliente</th>
-                        <th>Tipo</th>
-                        {% if session['rol'] == 'Admin' %}
-                        <th>Asignado a</th>
-                        {% endif %}
-                        <th>Fecha Límite</th>
-                        <th>Tiempo</th>
-                        <th>Estado</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in lista_tareas %}
-                    {% if session['rol'] == 'Admin' %}
-                        {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = t[3] %}{% set t_tipo = t[4] %}{% set t_desc = t[5] %}{% set t_limite = t[6] %}{% set t_estado = t[7] %}{% set t_creador = t[8] %}
-                    {% else %}
-                        {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = session['usuario'] %}{% set t_tipo = t[3] %}{% set t_desc = t[4] %}{% set t_limite = t[5] %}{% set t_estado = t[6] %}{% set t_creador = t[7] %}
-                    {% endif %}
-                    <tr data-estado="{{ t_estado }}" id="fila-{{ t_id }}">
-                        <td style="color:var(--text-muted);font-weight:600;">#{{ t_id }}</td>
-                        <td>
-                            <strong>{{ t_nombre }}</strong><br>
-                            <small style="color:var(--text-muted);font-size:11px;">{{ t_rif }}</small>
-                            {% if t_desc %}
-                            <details style="margin-top:4px;">
-                                <summary style="font-size:11px;color:var(--primary);cursor:pointer;">Ver descripción</summary>
-                                <p style="font-size:12px;margin-top:4px;padding:6px;background:var(--bg);border-radius:6px;">{{ t_desc }}</p>
-                            </details>
-                            {% endif %}
-                        </td>
-                        <td><span class="tipo-badge">{{ t_tipo }}</span></td>
-                        {% if session['rol'] == 'Admin' %}
-                        <td>{{ t_asig.capitalize() }}</td>
-                        {% endif %}
-                        <td style="font-weight:600;white-space:nowrap;">{{ t_limite }}</td>
-                        <td>
-                            <span class="dias-badge" id="dias-{{ t_id }}" data-limite="{{ t_limite }}">...</span>
-                        </td>
-                        <td>
-                            <span class="estado-badge
-                                {% if t_estado == 'Pendiente' %}badge-pendiente
-                                {% elif t_estado == 'En Progreso' %}badge-en-progreso
-                                {% else %}badge-success{% endif %}">{{ t_estado }}</span>
-                        </td>
-                        <td>
-                            {% if t_estado == 'Pendiente' %}
-                            <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
-                                <input type="hidden" name="nuevo_estado" value="En Progreso">
-                                <button type="submit" class="btn btn-primary">▶ Iniciar</button>
-                            </form>
-                            {% elif t_estado == 'En Progreso' %}
-                            <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
-                                <input type="hidden" name="nuevo_estado" value="Completada">
-                                <button type="submit" class="btn btn-primary">✓ Completar</button>
-                            </form>
-                            {% else %}
-                                <span style="color:var(--text-muted);font-size:12px;">✓ Finalizada</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div class="card" style="overflow-x: auto;">
+    {% if lista_tareas %}
+    <table id="tabla-tareas">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                {% if session['rol'] == 'Admin' %}
+                <th>Asignado a</th>
+                {% endif %}
+                <th>Fecha Límite</th>
+                <th>Tiempo</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in lista_tareas %}
+            {% if session['rol'] == 'Admin' %}
+                {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = t[3] %}{% set t_tipo = t[4] %}{% set t_desc = t[5] %}{% set t_limite = t[6] %}{% set t_estado = t[7] %}{% set t_creador = t[8] %}
             {% else %}
-            <div class="empty-state">
-                <span class="icon">📭</span>
-                <p>{% if session['rol'] == 'Admin' %}No hay tareas registradas aún. ¡Crea la primera desde el formulario!{% else %}No tienes tareas asignadas en este momento.{% endif %}</p>
-            </div>
+                {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = session['usuario'] %}{% set t_tipo = t[3] %}{% set t_desc = t[4] %}{% set t_limite = t[5] %}{% set t_estado = t[6] %}{% set t_creador = t[7] %}
             {% endif %}
-        </div>
+            <tr data-estado="{{ t_estado }}" id="fila-{{ t_id }}">
+                <td style="color:var(--text-muted);font-weight:600;">#{{ t_id }}</td>
+                <td>
+                    <strong>{{ t_nombre }}</strong><br>
+                    <small style="color:var(--text-muted);font-size:11px;">{{ t_rif }}</small>
+                    {% if t_desc %}
+                    <details style="margin-top:4px;">
+                        <summary style="font-size:11px;color:var(--primary);cursor:pointer;">Ver descripción</summary>
+                        <p style="font-size:12px;margin-top:4px;padding:6px;background:var(--bg);border-radius:6px;">{{ t_desc }}</p>
+                    </details>
+                    {% endif %}
+                </td>
+                <td><span class="tipo-badge">{{ t_tipo }}</span></td>
+                {% if session['rol'] == 'Admin' %}
+                <td>{{ t_asig.capitalize() }}</td>
+                {% endif %}
+                <td style="font-weight:600;white-space:nowrap;">{{ t_limite }}</td>
+                <td>
+                    <span class="dias-badge" id="dias-{{ t_id }}" data-limite="{{ t_limite }}">...</span>
+                </td>
+                <td>
+                    <span class="estado-badge
+                        {% if t_estado == 'Pendiente' %}badge-pendiente
+                        {% elif t_estado == 'En Progreso' %}badge-en-progreso
+                        {% else %}badge-success{% endif %}">{{ t_estado }}</span>
+                </td>
+                <td>
+                    {% if t_estado == 'Pendiente' %}
+                    <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
+                        <input type="hidden" name="nuevo_estado" value="En Progreso">
+                        <button type="submit" class="btn btn-primary">▶ Iniciar</button>
+                    </form>
+                    {% elif t_estado == 'En Progreso' %}
+                    <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
+                        <input type="hidden" name="nuevo_estado" value="Completada">
+                        <button type="submit" class="btn btn-primary">✓ Completar</button>
+                    </form>
+                    {% else %}
+                        <span style="color:var(--text-muted);font-size:12px;">✓ Finalizada</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <span class="icon">📭</span>
+        <p>{% if session['rol'] == 'Admin' %}No hay tareas registradas aún. ¡Crea la primera!{% else %}No tienes tareas asignadas en este momento.{% endif %}</p>
     </div>
+    {% endif %}
+</div>
 
-    {% if session['rol'] == 'Admin' %}
-    <div>
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">➕ Nueva Tarea</span>
-            </div>
-            <form action="{{ url_for('asignar_tarea') }}" method="POST" class="form-nueva-tarea">
+<!-- MODAL: NUEVA TAREA -->
+<div class="modal-overlay" id="modalTarea">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>📋 Asignar Nueva Tarea</span>
+            <button class="modal-close" onclick="cerrarModalTarea()">✕</button>
+        </div>
+        <form action="{{ url_for('asignar_tarea') }}" method="POST">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                 <div class="form-group">
                     <label for="cliente_rif">Cliente <span class="req">*</span></label>
                     <select name="cliente_rif" id="cliente_rif" class="form-control" required onchange="actualizarNombre(this)">
@@ -133,11 +131,11 @@
                         <option value="{{ cliente[0] }}" data-nombre="{{ cliente[1] }}">{{ cliente[1] }}</option>
                         {% endfor %}
                     </select>
-                    <input type="hidden" name="cliente_nombre" id="cliente_nombre_lat">
+                    <input type="hidden" name="cliente_nombre" id="cliente_nombre_hid">
                 </div>
                 <div class="form-group">
-                    <label for="asignado_a_lat">Asignar a <span class="req">*</span></label>
-                    <select name="asignado_a" id="asignado_a_lat" class="form-control" required>
+                    <label for="asignado_a">Asignar a <span class="req">*</span></label>
+                    <select name="asignado_a" id="asignado_a" class="form-control" required>
                         <option value="">— Seleccionar usuario —</option>
                         {% for usuario in lista_usuarios %}
                         {% if usuario[0] != session['usuario'] %}
@@ -147,8 +145,8 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="tipo_tarea_lat">Tipo de Trabajo <span class="req">*</span></label>
-                    <select name="tipo_tarea" id="tipo_tarea_lat" class="form-control" required>
+                    <label for="tipo_tarea">Tipo de Trabajo <span class="req">*</span></label>
+                    <select name="tipo_tarea" id="tipo_tarea" class="form-control" required>
                         <option value="">— Seleccionar —</option>
                         <option value="Diseño Gráfico">Diseño Gráfico</option>
                         <option value="Edición de Foto">Edición de Foto</option>
@@ -160,30 +158,32 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="fecha_limite_lat">Fecha Límite <span class="req">*</span></label>
-                    <input type="date" name="fecha_limite" id="fecha_limite_lat" class="form-control" required>
+                    <label for="fecha_limite">Fecha Límite <span class="req">*</span></label>
+                    <input type="date" name="fecha_limite" id="fecha_limite" class="form-control" required>
                 </div>
-                <div class="form-group">
-                    <label for="descripcion_lat">Descripción</label>
-                    <textarea name="descripcion" id="descripcion_lat" class="form-control" placeholder="¿Qué debe hacer el responsable?..."></textarea>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label for="descripcion">Descripción</label>
+                    <textarea name="descripcion" id="descripcion" class="form-control" placeholder="¿Qué debe hacer el responsable?..."></textarea>
                 </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalTarea()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
+            </div>
+        </form>
     </div>
-    {% endif %}
-
-{% if session['rol'] == 'Admin' %}
-</div><!-- fin layout-dos-col -->
-{% endif %}
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
+    function abrirModalTarea() { document.getElementById('modalTarea').classList.add('open'); }
+    function cerrarModalTarea() { document.getElementById('modalTarea').classList.remove('open'); }
+    document.getElementById('modalTarea').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalTarea();
+    });
     function actualizarNombre(select) {
         const opcion = select.options[select.selectedIndex];
-        document.getElementById('cliente_nombre_lat').value = opcion.getAttribute('data-nombre') || '';
+        document.getElementById('cliente_nombre_hid').value = opcion.getAttribute('data-nombre') || '';
     }
     function filtrarEstado(estado, btn) {
         document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('activo'));
@@ -204,7 +204,7 @@
             else if (diasRest <= 3) { badge.textContent = diasRest + ' día(s)'; badge.className = 'dias-badge dias-warning'; }
             else { badge.textContent = diasRest + ' días'; badge.className = 'dias-badge dias-normal'; }
         });
-        const campoFecha = document.getElementById('fecha_limite_lat');
+        const campoFecha = document.getElementById('fecha_limite');
         if (campoFecha) campoFecha.min = hoy.toISOString().split('T')[0];
     });
 </script>
