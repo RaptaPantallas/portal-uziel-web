@@ -8,6 +8,7 @@
     .thumb-sin-foto { width: 48px; height: 48px; border-radius: 8px; background: #f0f2f5; border: 1px dashed #d0d5e0; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #c0c8d8; margin: 0 auto; }
     .link-detalle { font-weight: 600; text-decoration: none; }
     .link-detalle:hover { color: var(--primary); text-decoration: underline; }
+    .btn:disabled { opacity: 0.45; cursor: default; }
 </style>
 {% endblock %}
 {% block content %}
@@ -32,6 +33,9 @@
     <input type="text" id="buscador" placeholder="Buscar por SKU, nombre o marca..." oninput="filtrarProductos()" autocomplete="off">
     <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
+
+<div class="filtros" id="filtros-categoria"></div>
+
 <p class="search-contador" id="contador-productos"></p>
 
 <div class="card">
@@ -55,7 +59,8 @@
             <tbody>
                 {% for producto in productos %}
                 {% set sku = producto[0] %}
-                <tr>
+                {% set cat = producto[6] | e %}
+                <tr data-categoria="{{ cat }}">
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
                     <td class="thumb-cell">
                         <a href="{{ url_for('detalle_producto', sku=sku) }}">
@@ -91,36 +96,142 @@
         </table>
     </form>
 </div>
+
+<div class="paginacion" style="display:flex;justify-content:center;align-items:center;gap:16px;margin:16px 0 4px;">
+    <button class="btn btn-ghost" id="btn-anterior">← Anterior</button>
+    <span id="info-pagina" style="font-size:14px;color:var(--text-muted);"></span>
+    <button class="btn btn-ghost" id="btn-siguiente">Siguiente →</button>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
+const POR_PAGINA = 20;
+let paginaActual = 1;
+let categoriaActiva = 'todas';
+
 function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-function contarFilasReales(selector) { return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length; }
-function actualizarContadorProductos(visibles, total) {
+
+function contarFilasReales(selector) {
+    return Array.from(document.querySelectorAll(selector)).filter(f => f.cells && f.cells.length > 1).length;
+}
+
+function obtenerCategorias() {
+    const cats = new Set();
+    document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
+        if (!fila.cells || fila.cells.length <= 1) return;
+        const c = fila.getAttribute('data-categoria');
+        if (c) cats.add(c);
+    });
+    return Array.from(cats).sort();
+}
+
+function contarPorCategoria(cat) {
+    let n = 0;
+    document.querySelectorAll('#tabla-productos tbody tr[data-categoria]').forEach(fila => {
+        if (fila.cells && fila.cells.length > 1 && fila.getAttribute('data-categoria') === cat) n++;
+    });
+    return n;
+}
+
+function renderFiltrosCategoria() {
+    const cont = document.getElementById('filtros-categoria');
+    const cats = obtenerCategorias();
+    const total = contarFilasReales('#tabla-productos tbody tr');
+    let html = '<button class="filtro-btn activo" data-cat="todas">Todos (' + total + ')</button>';
+    cats.forEach(function (c) {
+        const n = contarPorCategoria(c);
+        if (n > 0) {
+            html += '<button class="filtro-btn" data-cat="' + c.replace(/"/g, '&quot;') + '">' + c + ' (' + n + ')</button>';
+        }
+    });
+    cont.innerHTML = html;
+}
+
+document.getElementById('filtros-categoria').addEventListener('click', function (e) {
+    const btn = e.target.closest('.filtro-btn');
+    if (!btn) return;
+    const cat = btn.getAttribute('data-cat');
+    document.querySelectorAll('#filtros-categoria .filtro-btn').forEach(function (b) { b.classList.remove('activo'); });
+    btn.classList.add('activo');
+    categoriaActiva = cat;
+    paginaActual = 1;
+    aplicarFiltros();
+});
+
+function obtenerFilasFiltradas() {
+    const texto = normalizar(document.getElementById('buscador').value);
+    const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr')).filter(function (f) { return f.cells && f.cells.length > 1; });
+    return filas.filter(function (fila) {
+        const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
+        const coincideTexto = !texto
+            || normalizar(fila.cells[2].textContent).includes(texto)
+            || normalizar(fila.cells[3].textContent).includes(texto)
+            || normalizar(fila.cells[4].textContent).includes(texto);
+        return coincideCat && coincideTexto;
+    });
+}
+
+function actualizarContador(visibles, total) {
     const contador = document.getElementById('contador-productos');
     if (total === 0) { contador.innerHTML = ''; return; }
     if (visibles === total) {
-        contador.innerHTML = `<span>${total}</span> producto${total === 1 ? '' : 's'} en catálogo`;
+        contador.innerHTML = '<span>' + total + '</span> producto' + (total === 1 ? '' : 's') + ' en catálogo';
     } else {
-        contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> productos`;
+        contador.innerHTML = 'Mostrando <span>' + visibles + '</span> de <span>' + total + '</span> productos';
     }
 }
-function filtrarProductos() {
-    const texto = normalizar(document.getElementById('buscador').value);
-    const filas = document.querySelectorAll('#tabla-productos tbody tr');
-    const btnLimpiar = document.getElementById('btn-limpiar');
-    let visibles = 0, total = 0;
-    filas.forEach(fila => {
-        if (fila.cells.length <= 1) return;
-        total++;
-        const coincide = !texto || normalizar(fila.cells[2].textContent).includes(texto) || normalizar(fila.cells[3].textContent).includes(texto) || normalizar(fila.cells[4].textContent).includes(texto);
-        fila.style.display = coincide ? '' : 'none';
-        if (coincide) visibles++;
-    });
-    btnLimpiar.classList.toggle('visible', texto.length > 0);
-    actualizarContadorProductos(visibles, total);
+
+function actualizarPaginacion(pag, totalPag, totalFiltrados) {
+    document.getElementById('info-pagina').textContent = 'P\u00e1gina ' + pag + ' de ' + totalPag + ' (' + totalFiltrados + ' producto' + (totalFiltrados !== 1 ? 's' : '') + ')';
+    document.getElementById('btn-anterior').disabled = pag <= 1;
+    document.getElementById('btn-siguiente').disabled = pag >= totalPag;
 }
-function limpiarBusqueda() { document.getElementById('buscador').value = ''; filtrarProductos(); document.getElementById('buscador').focus(); }
-document.addEventListener('DOMContentLoaded', () => { const total = contarFilasReales('#tabla-productos tbody tr'); actualizarContadorProductos(total, total); });
+
+function cambiarPagina(delta) {
+    const filtradas = obtenerFilasFiltradas();
+    const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+    const nueva = paginaActual + delta;
+    if (nueva < 1 || nueva > totalPag) return;
+    paginaActual = nueva;
+    aplicarFiltros();
+}
+
+function aplicarFiltros() {
+    const totalFilas = contarFilasReales('#tabla-productos tbody tr');
+    const filtradas = obtenerFilasFiltradas();
+    const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+    if (paginaActual > totalPag) paginaActual = totalPag;
+    const inicio = (paginaActual - 1) * POR_PAGINA;
+    const paginaFilas = filtradas.slice(inicio, inicio + POR_PAGINA);
+    const paginaSet = new Set(paginaFilas);
+    document.querySelectorAll('#tabla-productos tbody tr').forEach(function (fila) {
+        if (fila.cells && fila.cells.length > 1) {
+            fila.style.display = paginaSet.has(fila) ? '' : 'none';
+        }
+    });
+    document.getElementById('btn-limpiar').classList.toggle('visible', document.getElementById('buscador').value.length > 0);
+    actualizarContador(filtradas.length, totalFilas);
+    actualizarPaginacion(paginaActual, totalPag, filtradas.length);
+}
+
+function filtrarProductos() {
+    paginaActual = 1;
+    aplicarFiltros();
+}
+
+function limpiarBusqueda() {
+    document.getElementById('buscador').value = '';
+    filtrarProductos();
+    document.getElementById('buscador').focus();
+}
+
+document.getElementById('btn-anterior').addEventListener('click', function () { cambiarPagina(-1); });
+document.getElementById('btn-siguiente').addEventListener('click', function () { cambiarPagina(1); });
+
+document.addEventListener('DOMContentLoaded', function () {
+    renderFiltrosCategoria();
+    const total = contarFilasReales('#tabla-productos tbody tr');
+    if (total > 0) aplicarFiltros();
+});
 </script>
 {% endblock %}
