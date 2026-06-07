@@ -2,10 +2,6 @@
 {% block title %}Productos — Importadora Uziel{% endblock %}
 {% block head_extra %}
 <style>
-    .thumb-cell { width: 60px; text-align: center; padding: 8px 10px !important; }
-    .thumb-img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); transition: transform 0.15s; }
-    .thumb-img:hover { transform: scale(1.08); }
-    .thumb-sin-foto { width: 48px; height: 48px; border-radius: 8px; background: #f0f2f5; border: 1px dashed #d0d5e0; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #c0c8d8; margin: 0 auto; }
     .link-detalle { font-weight: 600; text-decoration: none; }
     .link-detalle:hover { color: var(--primary); text-decoration: underline; }
     .btn:disabled { opacity: 0.45; cursor: default; }
@@ -48,7 +44,6 @@
             <thead>
                 <tr>
                     <th style="width:40px;">PDF</th>
-                    <th style="width:68px;">Foto</th>
                     <th>SKU</th>
                     <th>Nombre</th>
                     <th>Marca</th>
@@ -62,16 +57,6 @@
                 {% set cat = producto[6] | e %}
                 <tr data-categoria="{{ cat }}">
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
-                    <td class="thumb-cell">
-                        <a href="{{ url_for('detalle_producto', sku=sku) }}">
-                            {% if sku in fotos_por_sku %}
-                                <img class="thumb-img" src="{{ url_for('servir_activo', nombre_archivo=fotos_por_sku[sku]) }}" alt="Foto de {{ producto[1] }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                <div class="thumb-sin-foto" style="display:none;">📷</div>
-                            {% else %}
-                                <div class="thumb-sin-foto">📷</div>
-                            {% endif %}
-                        </a>
-                    </td>
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
                         <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">{{ producto[1] }}</a>
@@ -89,7 +74,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px;">No hay productos registrados aún.</td>
+                    <td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">No hay productos registrados aún.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -212,9 +197,9 @@
         return filas.filter(function (fila) {
             const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
             const coincideTexto = !texto
+                || normalizar(fila.cells[1].textContent).includes(texto)
                 || normalizar(fila.cells[2].textContent).includes(texto)
-                || normalizar(fila.cells[3].textContent).includes(texto)
-                || normalizar(fila.cells[4].textContent).includes(texto);
+                || normalizar(fila.cells[3].textContent).includes(texto);
             return coincideCat && coincideTexto;
         });
     }
