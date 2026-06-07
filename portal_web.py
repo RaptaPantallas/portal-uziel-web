@@ -254,14 +254,11 @@ def catalogo():
     para mostrar miniaturas en la tabla.
     """
     inventario = bd.obtener_productos()
-    # Extraer solo el nombre de archivo para construir URLs en el template.
-    # Se normalizan las barras antes de basename para manejar rutas Windows (\)
-    # guardadas por la app de escritorio en sistemas Linux/Mac.
-    fotos_por_sku = {
-        sku: os.path.basename(ruta.replace('\\', '/'))
-        for sku, ruta in bd.obtener_fotos_principales().items()
-    }
-    return render_template('catalogo.html', productos=inventario, fotos_por_sku=fotos_por_sku)
+    # DEBUG: verificar datos del primer producto
+    if inventario:
+        p = inventario[0]
+        print(f"[DEBUG catalogo] sku={p[0]}, nombre={p[1]}, marca[3]={repr(p[3])}, precio[5]={repr(p[5])}")
+    return render_template('catalogo.html', productos=inventario)
 
 
 @app.route('/producto/<sku>')
@@ -631,80 +628,96 @@ def actualizar_tarea(tarea_id):
 @app.route('/generar_pdf', methods=['POST'])
 @login_requerido
 def generar_pdf():
-    """
-    Genera un archivo PDF en memoria con los productos seleccionados
-    mediante checkboxes y lo envía al navegador como descarga.
-
-    Recibe por POST:
-        skus_seleccionados (list[str]): Lista de SKUs marcados en la tabla.
-
-    Retorna:
-        Archivo PDF adjunto para descargar, o redirige con error si no
-        se seleccionó ningún producto.
-    """
     skus_seleccionados = request.form.getlist('skus_seleccionados')
 
-    # Validar que se haya seleccionado al menos un producto
     if not skus_seleccionados:
         flash('⚠️ Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
         return redirect(url_for('catalogo'))
 
-    # --- Configuración visual del PDF ---
-    MARGEN_IZQUIERDO = 50
-    MARGEN_DERECHO = 550
-    Y_INICIO = 730          # Coordenada Y donde empieza el primer producto
-    ESPACIO_POR_PRODUCTO = 55  # Espacio vertical entre productos
-    Y_MINIMO = 80           # Si queda menos espacio, se crea una nueva página
+    # Colores corporativos (RGB 0.0-1.0) — idénticos al generador de escritorio
+    AZUL_EMP   = (0.18, 0.27, 0.86)
+    NEGRO      = (0.17, 0.22, 0.31)
+    VERDE_PREC = (0.15, 0.68, 0.37)
+    GRIS       = (0.55, 0.60, 0.68)
+    LINEA      = (0.87, 0.88, 0.93)
 
-    # Colores en formato RGB (0.0 a 1.0)
-    COLOR_VERDE_PRECIO = (0.15, 0.68, 0.37)
-    COLOR_NEGRO = (0, 0, 0)
+    MARGEN_X = 50
+    ANCHO_PAG, ALTO_PAG = letter
+    ALTO_FILA = 72
 
-    # ---- Crear el archivo PDF en memoria (sin tocar el disco duro) ----
     buffer = io.BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=letter)
+    from datetime import datetime
 
-    # ---- Dibujar encabezado ----
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(MARGEN_IZQUIERDO, 750, NOMBRE_EMPRESA_PDF)
-    c.setFont("Helvetica", 10)
-    c.drawString(MARGEN_IZQUIERDO, 735, SUBTITULO_PDF)
-    c.line(MARGEN_IZQUIERDO, 725, MARGEN_DERECHO, 725)  # Línea separadora
+    def encabezado():
+        c.setFillColorRGB(*AZUL_EMP)
+        c.rect(0, ALTO_PAG - 80, ANCHO_PAG, 80, fill=True, stroke=False)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(MARGEN_X, ALTO_PAG - 48, "IMPORTADORA UZIEL C.A.")
+        c.setFont("Helvetica", 9)
+        c.setFillColorRGB(0.8, 0.88, 1.0)
+        c.drawString(MARGEN_X, ALTO_PAG - 65, "Catálogo de Productos — Listado General")
+        c.drawString(MARGEN_X, ALTO_PAG - 75, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
-    y = Y_INICIO
+    def pie():
+        c.setFont("Helvetica", 8)
+        c.setFillColorRGB(*GRIS)
+        c.drawString(MARGEN_X, 35, "Documento generado automáticamente por el Sistema de Información Uziel.")
+        c.drawRightString(ANCHO_PAG - MARGEN_X, 35, datetime.now().strftime("Generado el %d/%m/%Y a las %H:%M"))
 
-    # ---- Iterar sobre cada SKU seleccionado y dibujarlo en el PDF ----
+    def dibujar_fila(sku, nombre, marca, compatibilidad, precio, y, idx):
+        # Fondo alternado
+        c.setFillColorRGB(0.97, 0.98, 1.0) if idx % 2 == 0 else c.setFillColorRGB(1, 1, 1)
+        c.rect(MARGEN_X, y - ALTO_FILA, ANCHO_PAG - 2 * MARGEN_X, ALTO_FILA, fill=True, stroke=False)
+
+        labels = ["SKU:", "Producto:", "Marca:", "Compatibilidad:", "Precio:"]
+        valores = [str(sku), str(nombre), str(marca), str(compatibilidad), f"$ {precio}" if precio is not None else "—"]
+        ancho_label = 68
+        y_linea = y - 16
+
+        for i, (label, valor) in enumerate(zip(labels, valores)):
+            c.setFont("Helvetica-Bold", 8)
+            c.setFillColorRGB(*GRIS)
+            c.drawString(MARGEN_X + 10, y_linea, label)
+            c.setFont("Helvetica", 8.5)
+            if i == 4:
+                c.setFillColorRGB(*VERDE_PREC)
+                c.setFont("Helvetica-Bold", 9)
+            else:
+                c.setFillColorRGB(*NEGRO)
+
+            texto = str(valor)
+            if i == 3 and c.stringWidth(texto, "Helvetica", 8.5) > (ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 10):
+                while c.stringWidth(texto + "...", "Helvetica", 8.5) > (ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 10):
+                    texto = texto[:-1]
+                texto += "..."
+
+            c.drawString(MARGEN_X + 10 + ancho_label, y_linea, texto)
+            y_linea -= 12
+
+        c.setStrokeColorRGB(*LINEA)
+        c.setLineWidth(0.5)
+        c.line(MARGEN_X, y - ALTO_FILA, ANCHO_PAG - MARGEN_X, y - ALTO_FILA)
+
+    encabezado()
+    y = ALTO_PAG - 115
+    idx = 0
+
     for sku in skus_seleccionados:
-        # Obtener datos completos del producto desde la BD
-        prod = bd.obtener_producto(sku)  # (sku, nombre, descripcion, marca, compatibilidad, precio)
-
+        prod = bd.obtener_producto(sku)
         if not prod:
-            continue  # Si el SKU no existe, saltar al siguiente
-
-        # Línea 1: Nombre del producto y marca
-        c.setFont("Helvetica-Bold", 12)
-        c.setFillColorRGB(*COLOR_NEGRO)
-        c.drawString(MARGEN_IZQUIERDO, y, f"{prod[1]}  —  Marca: {prod[3]}")
-
-        # Línea 2: SKU y compatibilidades
-        c.setFont("Helvetica", 11)
-        c.drawString(MARGEN_IZQUIERDO, y - 17, f"SKU: {prod[0]}  |  Compatibilidad: {prod[4]}")
-
-        # Precio (alineado a la derecha, en color verde)
-        c.setFont("Helvetica-Bold", 13)
-        c.setFillColorRGB(*COLOR_VERDE_PRECIO)
-        c.drawString(420, y, f"${prod[5]}")
-
-        c.setFillColorRGB(*COLOR_NEGRO)  # Restablecer color a negro
-
-        y -= ESPACIO_POR_PRODUCTO  # Bajar el cursor para el siguiente producto
-
-        # Si nos quedamos sin espacio vertical, crear nueva página
-        if y < Y_MINIMO:
+            continue
+        if y < ALTO_FILA + 50:
+            pie()
             c.showPage()
-            y = Y_INICIO
+            encabezado()
+            y = ALTO_PAG - 115
+        dibujar_fila(prod[0], prod[1], prod[3], prod[4], prod[5], y, idx)
+        y -= ALTO_FILA
+        idx += 1
 
-    # ---- Guardar y enviar el PDF ----
+    pie()
     c.save()
     buffer.seek(0)
 
@@ -1022,6 +1035,36 @@ def admin_usuario_borrar(username):
               'Asegúrate de que no sea el único administrador.', 'error')
 
     return redirect(url_for('admin_usuarios'))
+
+
+# =============================================================================
+# DIAGNÓSTICO — Ver datos crudos desde el navegador
+# =============================================================================
+
+@app.route('/diagnostico')
+@login_requerido
+def diagnostico():
+    """Muestra los datos crudos de los primeros 10 productos para depuración."""
+    if session.get('rol') != 'Admin':
+        flash('⛌ Solo administradores.', 'error')
+        return redirect(url_for('inicio'))
+    from src.database import ConexionBD as BD
+    bd_local = BD()
+    prods = bd_local.obtener_productos()
+    html = '<h2>Diagnostico de datos (primeros 10 productos)</h2>'
+    html += '<table border="1" cellpadding="6" style="border-collapse:collapse;font-family:monospace;font-size:13px;">'
+    html += '<tr><th>#</th><th>sku [0]</th><th>nombre [1]</th><th>desc [2]</th><th>MARCA [3]</th><th>compat [4]</th><th>PRECIO [5]</th><th>cat [6]</th><th>exist [7]</th></tr>'
+    for i, p in enumerate(prods[:10]):
+        html += f'<tr><td>{i+1}</td>'
+        for idx in range(min(8, len(p))):
+            val = p[idx] if idx < len(p) else '—'
+            clase = ' style="background:#fff3cd;"' if idx in (3, 5) else ''
+            html += f'<td{clase}>{repr(val)}</td>'
+        html += '</tr>'
+    html += '</table>'
+    html += f'<p>Total productos en BD: {len(prods)}</p>'
+    html += '<p style="color:#666;">Las columnas MARCA [3] y PRECIO [5] estan resaltadas.</p>'
+    return html
 
 
 # =============================================================================
