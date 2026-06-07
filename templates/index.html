@@ -2,7 +2,6 @@
 {% block title %}Dashboard — Importadora Uziel{% endblock %}
 {% block head_extra %}
 <style>
-    /* Formulario de asignación */
     .form-grid {
         display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 24px;
     }
@@ -12,16 +11,15 @@
         display: flex; justify-content: flex-end; gap: 12px;
     }
     .readonly-label { color: #94a3b8; font-size: 12px; }
-    .tarea-row-urgente { background: #fff9f0 !important; }
+    .tarea-row-urgente { background: var(--warning-bg) !important; }
 
-    /* Modal de notificación */
-    .modal-overlay { /* override base modal-overlay for this specific modal */
+    .modal-notif {
         display: none; position: fixed; inset: 0;
         background: rgba(15,23,42,0.55); z-index: 1000;
         align-items: center; justify-content: center; padding: 20px;
     }
-    .modal-overlay.open { display: flex; }
-    .modal-box {
+    .modal-notif.open { display: flex; }
+    .modal-notif-box {
         background: white; border-radius: 16px; width: 100%; max-width: 560px;
         box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden;
         animation: modal-in 0.25s ease;
@@ -30,20 +28,20 @@
         from { transform: translateY(-20px); opacity: 0; }
         to   { transform: translateY(0); opacity: 1; }
     }
-    .modal-header {
+    .modal-notif-header {
         padding: 20px 24px;
         background: var(--primary);
         color: white; display: flex; align-items: center; justify-content: space-between;
     }
-    .modal-header h2 { font-size: 18px; font-weight: 700; }
-    .modal-header .campana { font-size: 22px; margin-right: 10px; }
-    .modal-close {
+    .modal-notif-header h2 { font-size: 18px; font-weight: 700; }
+    .modal-notif-header .campana { font-size: 22px; margin-right: 10px; }
+    .modal-notif-close {
         background: rgba(255,255,255,0.18); border: none; color: white;
         width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
         font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center;
     }
-    .modal-close:hover { background: rgba(255,255,255,0.3); }
-    .modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
+    .modal-notif-close:hover { background: rgba(255,255,255,0.3); }
+    .modal-notif-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
     .tarea-card {
         border: 1.5px solid var(--border); border-radius: 12px;
         padding: 16px 20px; margin-bottom: 16px;
@@ -61,7 +59,7 @@
         padding: 10px 12px; border-left: 3px solid var(--primary); margin-bottom: 14px;
     }
     .modal-tarea-actions { display: flex; gap: 10px; }
-    .modal-footer {
+    .modal-notif-footer {
         padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end;
     }
 </style>
@@ -83,11 +81,11 @@
 {% endwith %}
 
 <div class="stats-grid">
-    <div class="stat-card">
+    <div class="stat-card clientes-card">
         <div class="stat-label">Total Clientes <span class="icon">👤</span></div>
         <div class="stat-value">{{ total_cli }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card productos-card">
         <div class="stat-label">Total Productos <span class="icon">📦</span></div>
         <div class="stat-value">{{ total_prod }}</div>
     </div>
@@ -164,7 +162,7 @@
     <form action="{{ url_for('generar_pdf') }}" method="POST">
         <div class="card-header">
             <span class="card-title">Últimos Productos</span>
-            <div style="display:flex;gap:10px;align-items:center;">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 {% if session['rol'] == 'Admin' %}
                     <a href="{{ url_for('nuevo_producto') }}" class="btn btn-primary">+ Nuevo Producto</a>
                     <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary">+ Nuevo Cliente</a>
@@ -193,8 +191,8 @@
                     <td class="precio">${{ producto[3] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
-                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary">Editar</a>
-                            <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-danger" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
+                            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary btn-sm">Editar</a>
+                            <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
                         {% else %}
                             <span class="readonly-label">Solo lectura</span>
                         {% endif %}
@@ -244,10 +242,10 @@
                     <form action="{{ url_for('actualizar_tarea', tarea_id=t[0]) }}" method="POST" style="display:inline;">
                         {% if t[6] == 'Pendiente' %}
                             <input type="hidden" name="nuevo_estado" value="En Progreso">
-                            <button type="submit" class="btn btn-primary">Iniciar</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Iniciar</button>
                         {% elif t[6] == 'En Progreso' %}
                             <input type="hidden" name="nuevo_estado" value="Completada">
-                            <button type="submit" class="btn btn-primary">Completar</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Completar</button>
                         {% endif %}
                     </form>
                 </td>
@@ -259,16 +257,16 @@
 {% endif %}
 
 {% if mis_tareas and session['rol'] != 'Admin' %}
-<div class="modal-overlay" id="modal-notif">
-    <div class="modal-box">
-        <div class="modal-header">
+<div class="modal-notif" id="modal-notif">
+    <div class="modal-notif-box">
+        <div class="modal-notif-header">
             <div style="display:flex;align-items:center;">
                 <span class="campana">🔔</span>
                 <h2>Tienes {{ mis_tareas | length }} tarea(s) pendiente(s)</h2>
             </div>
-            <button class="modal-close" onclick="cerrarModal()">✕</button>
+            <button class="modal-notif-close" onclick="cerrarModal()">✕</button>
         </div>
-        <div class="modal-body">
+        <div class="modal-notif-body">
             {% for t in mis_tareas %}
             <div class="tarea-card">
                 <div class="tarea-card-header">
@@ -311,7 +309,7 @@
             </div>
             {% endfor %}
         </div>
-        <div class="modal-footer">
+        <div class="modal-notif-footer">
             <a href="{{ url_for('tareas') }}" class="btn btn-primary" style="margin-right:10px;">📋 Ver todas mis tareas</a>
             <button class="btn btn-ghost" onclick="cerrarModal()">Entendido, cerrar</button>
         </div>
