@@ -71,9 +71,9 @@
         </div>
         <div id="lista-productos">
             {% for p in productos %}
-            <div class="prod-item" data-sku="{{ p[0] }}" data-nombre="{{ p[1] }}" data-precio="{{ p[3] }}" onclick="agregarProducto(this)">
+            <div class="prod-item" data-sku="{{ p[0] }}" data-nombre="{{ p[1] }}" data-precio="{{ p[5] }}" onclick="agregarProducto(this)">
                 <span>{{ p[1] }} <span class="prod-sku">{{ p[0] }}</span></span>
-                <span class="prod-precio">$ {{ p[3] }}</span>
+                <span class="prod-precio">$ {{ p[5] }}</span>
             </div>
             {% endfor %}
             <div id="sin-resultados">Sin resultados para tu búsqueda.</div>
