@@ -5,37 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acceso — Importadora Uziel</title>
     <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-gradient: linear-gradient(145deg, #dce8f5 0%, #eaf0f8 40%, #f0f4fb 100%);
+        }
+
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(145deg, #dce8f5 0%, #eaf0f8 40%, #f0f4fb 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 0;
         }
 
-        /* Ícono flotante sobre la tarjeta */
         .logo-container {
-            width: 56px;
-            height: 56px;
-            background: #3b5bdb;
+            width: 56px; height: 56px;
+            background: var(--primary);
             border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 26px;
-            font-weight: 800;
-            letter-spacing: -1px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 26px; font-weight: 800;
             margin-bottom: 20px;
-            box-shadow: 0 8px 24px rgba(59, 91, 219, 0.35);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
         }
 
-        /* Tarjeta central */
         .login-card {
             background: #ffffff;
             padding: 40px 36px 36px;
@@ -46,164 +43,75 @@
             text-align: center;
         }
 
-        .login-card h1 {
-            color: #1a1d27;
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
+        .login-card h1 { color: #1e293b; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .login-card .subtitulo { color: #64748b; font-size: 14px; margin-bottom: 32px; }
 
-        .login-card .subtitulo {
-            color: #8a93a8;
-            font-size: 14px;
-            margin-bottom: 32px;
-        }
-
-        /* Campos del formulario */
-        .campo {
-            text-align: left;
-            margin-bottom: 18px;
-        }
+        .campo { text-align: left; margin-bottom: 18px; }
 
         .campo label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #2c3347;
-            margin-bottom: 7px;
+            display: block; font-size: 14px; font-weight: 500;
+            color: #334155; margin-bottom: 7px;
         }
 
         .campo input {
-            width: 100%;
-            padding: 12px 14px;
-            border: 1.5px solid #e0e5f0;
-            border-radius: 8px;
-            font-size: 15px;
-            color: #1a1d27;
-            background-color: #fff;
-            transition: border-color 0.18s, box-shadow 0.18s;
-            outline: none;
+            width: 100%; padding: 12px 14px;
+            border: 1.5px solid #e2e8f0; border-radius: 8px;
+            font-size: 15px; color: #1e293b; background: #fff;
+            transition: border-color 0.18s, box-shadow 0.18s; outline: none;
         }
 
-        .campo input::placeholder {
-            color: #b0b8cc;
-        }
+        .campo input::placeholder { color: #94a3b8; }
+        .campo input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13); }
 
-        .campo input:focus {
-            border-color: #3b5bdb;
-            box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.13);
-        }
-
-        /* Botón principal */
         .btn-ingresar {
-            width: 100%;
-            background: #3b5bdb;
-            color: white;
-            border: none;
-            padding: 13px;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            letter-spacing: 0.2px;
-            transition: background 0.18s, transform 0.12s;
-            margin-top: 8px;
+            width: 100%; background: var(--primary); color: white;
+            border: none; padding: 13px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: background 0.18s, transform 0.12s; margin-top: 8px;
         }
 
-        .btn-ingresar:hover {
-            background: #3451c7;
-        }
+        .btn-ingresar:hover { background: var(--primary-hover); }
+        .btn-ingresar:active { transform: scale(0.99); }
 
-        .btn-ingresar:active {
-            transform: scale(0.99);
-        }
-
-        /* Mensajes flash */
         .mensaje {
-            padding: 11px 14px;
-            border-radius: 8px;
-            margin-bottom: 18px;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 11px 14px; border-radius: 8px;
+            margin-bottom: 18px; font-size: 14px; font-weight: 500;
             text-align: left;
         }
 
-        .mensaje-error {
-            background-color: #fff0f0;
-            color: #c0392b;
-            border-left: 4px solid #e74c3c;
-        }
+        .mensaje-error { background-color: #fef2f2; color: #dc2626; border-left: 4px solid #ef4444; }
+        .mensaje-exito { background-color: #f0fdf4; color: #16a34a; border-left: 4px solid #22c55e; }
 
-        .mensaje-exito {
-            background-color: #f0fdf4;
-            color: #1a7a47;
-            border-left: 4px solid #27ae60;
-        }
-
-        /* Texto de pie */
         .pie-seguridad {
-            margin-top: 24px;
-            font-size: 13px;
-            color: #9aa3b8;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            margin-top: 24px; font-size: 13px; color: #94a3b8;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
         }
     </style>
 </head>
 <body>
-
-    <!-- Ícono U flotante -->
     <div class="logo-container">U</div>
-
-    <!-- Tarjeta de login -->
     <div class="login-card">
         <h1>Importadora Uziel</h1>
         <p class="subtitulo">Sistema de Gestión Empresarial</p>
-
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="mensaje {% if category == 'exito' %}mensaje-exito{% else %}mensaje-error{% endif %}">
-                {{ message }}
-              </div>
+              <div class="mensaje {% if category == 'exito' %}mensaje-exito{% else %}mensaje-error{% endif %}">{{ message }}</div>
             {% endfor %}
           {% endif %}
         {% endwith %}
-
         <form method="POST" autocomplete="on">
             <div class="campo">
                 <label for="username">Usuario</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    placeholder="admin"
-                    autocomplete="username"
-                    required
-                    autofocus
-                >
+                <input type="text" id="username" name="username" placeholder="admin" autocomplete="username" required autofocus>
             </div>
             <div class="campo">
                 <label for="password">Contraseña</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    placeholder="••••••••"
-                    autocomplete="current-password"
-                    required
-                >
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
             </div>
             <button type="submit" class="btn-ingresar">Ingresar al Sistema</button>
         </form>
     </div>
-
-    <!-- Pie de seguridad -->
-    <p class="pie-seguridad">
-        🛡️ Acceso restringido a personal autorizado
-    </p>
-
+    <p class="pie-seguridad">🛡️ Acceso restringido a personal autorizado</p>
 </body>
 </html>

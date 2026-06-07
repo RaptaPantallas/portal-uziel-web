@@ -1,303 +1,96 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clientes — Importadora Uziel</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f5f7fa;
-            color: #1a1d27;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* SIDEBAR */
-        .sidebar {
-            width: 200px; min-height: 100vh; background: #1a1d27;
-            display: flex; flex-direction: column; padding: 20px 0;
-            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
-        }
-        .sidebar-brand {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 18px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
-        }
-        .brand-icon {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
-        }
-        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
-        .sidebar nav { flex: 1; padding: 0 10px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 12px; border-radius: 8px;
-            text-decoration: none; color: #8a93a8;
-            font-size: 14px; font-weight: 500; margin-bottom: 2px;
-            transition: background 0.15s, color 0.15s;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
-        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
-        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-        .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .user-avatar {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
-        }
-        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
-        .user-rol  { color: #8a93a8; font-size: 12px; }
-        .btn-logout {
-            display: flex; align-items: center; gap: 8px;
-            color: #8a93a8; text-decoration: none;
-            font-size: 13px; font-weight: 500; transition: color 0.15s;
-        }
-        .btn-logout:hover { color: #e8ecf5; }
-
-        /* CONTENIDO */
-        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
-        .page-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; }
-        .page-header-left h1 { font-size: 28px; font-weight: 700; }
-        .page-header-left .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
-
-        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
-        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
-        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
-
-        .search-bar {
-            background: white; border-radius: 10px;
-            padding: 10px 16px; display: flex; align-items: center; gap: 10px;
-            margin-bottom: 8px; border: 1.5px solid #eaedf3;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-            transition: border-color 0.15s;
-        }
-        .search-bar:focus-within { border-color: #7b9fff; box-shadow: 0 0 0 3px rgba(123,159,255,0.12); }
-        .search-bar input { border: none; outline: none; font-size: 14px; color: #1a1d27; width: 100%; background: transparent; }
-        .search-bar input::placeholder { color: #b0b8cc; }
-
-        .btn-limpiar {
-            background: none; border: none; cursor: pointer;
-            color: #b0b8cc; font-size: 16px; padding: 0 2px;
-            line-height: 1; transition: color 0.15s; display: none;
-        }
-        .btn-limpiar:hover { color: #e74c3c; }
-        .btn-limpiar.visible { display: block; }
-
-        .search-contador {
-            font-size: 13px; color: #8a93a8;
-            margin-bottom: 12px; padding-left: 4px;
-        }
-        .search-contador span { color: #7b9fff; font-weight: 700; }
-
-        .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #eaedf3; overflow: hidden; }
-
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            padding: 11px 20px; text-align: left;
-            font-size: 12px; font-weight: 600; color: #8a93a8;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            border-bottom: 1px solid #eaedf3; background: #fafbfc;
-        }
-        td { padding: 14px 20px; font-size: 14px; color: #2c3347; border-bottom: 1px solid #f0f2f5; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #fafbfc; }
-
-        .rif-badge {
-            font-family: 'Courier New', monospace;
-            font-size: 12px; font-weight: 700;
-            color: #0ea5e9; background: #e0f2fe;
-            padding: 3px 8px; border-radius: 5px;
-        }
-
-        .contacto-linea { display: flex; flex-direction: column; gap: 2px; }
-        .contacto-linea .correo { font-size: 13px; color: #3b5bdb; }
-        .contacto-linea .tel   { font-size: 13px; color: #8a93a8; }
-
-        .btn { display: inline-block; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.15s; }
-        .btn:hover { opacity: 0.82; }
-        .btn-blue { background: #3b5bdb; color: white; }
-    </style>
-</head>
-<body>
-
-<!-- SIDEBAR -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Imp. Uziel</span>
+{% extends "base.html" %}
+{% block title %}Clientes — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .contacto-linea { display: flex; flex-direction: column; gap: 2px; }
+    .contacto-linea .correo { font-size: 13px; color: var(--primary); }
+    .contacto-linea .tel { font-size: 13px; color: var(--text-muted); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Clientes</h1>
+        <p class="subtitulo">Gestión de cartera de clientes</p>
     </div>
-    <nav>
-        <a href="{{ url_for('inicio') }}" class="nav-item">
-            <span class="nav-icon">⊞</span> Dashboard
-        </a>
-        {% if puede_ver('clientes') %}
-        <a href="{{ url_for('clientes') }}" class="nav-item active">
-            <span class="nav-icon">👤</span> Clientes
-        </a>
-        {% endif %}
-        {% if puede_ver('productos') %}
-        <a href="{{ url_for('catalogo') }}" class="nav-item">
-            <span class="nav-icon">📦</span> Productos
-        </a>
-        {% endif %}
-        {% if puede_ver('tareas') %}
-        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
-            <span class="nav-icon">📋</span> Tareas
-            {% if total_notif > 0 %}
-                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
-                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
-                    {{ total_notif }}
-                </span>
-            {% endif %}
-        </a>
-        {% endif %}
-        {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
-            <span class="nav-icon">🧾</span> Cotizaciones
-        </a>
-        {% endif %}
-        {% if session.get('rol') == 'Admin' %}
-        <hr class="nav-divider">
-        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
-            <span class="nav-icon">⚙️</span> Usuarios
-        </a>
-        {% endif %}
-    </nav>
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
-            <div>
-                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
-                <div class="user-rol">{{ session['rol'] }}</div>
-            </div>
-        </div>
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
-    </div>
-</aside>
+    {% if session['rol'] == 'Admin' %}
+        <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-primary">+ Nuevo Cliente</a>
+    {% endif %}
+</div>
 
-<!-- CONTENIDO -->
-<main class="main-content">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for category, message in messages %}
+    <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
 
-    <div class="page-header">
-        <div class="page-header-left">
-            <h1>Clientes</h1>
-            <p class="subtitulo">Gestión de cartera de clientes</p>
-        </div>
-        {% if session['rol'] == 'Admin' %}
-            <a href="{{ url_for('nuevo_cliente') }}" class="btn btn-blue">+ Nuevo Cliente</a>
-        {% endif %}
-    </div>
+<div class="search-bar">
+    <span style="color:var(--text-muted);font-size:16px;">🔍</span>
+    <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarClientes()" autocomplete="off">
+    <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
+</div>
+<p class="search-contador" id="contador-clientes"></p>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}{% for category, message in messages %}
-        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
-      {% endfor %}{% endif %}
-    {% endwith %}
-
-    <div class="search-bar">
-        <span style="color:#b0b8cc;font-size:16px;">🔍</span>
-        <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarClientes()" autocomplete="off">
-        <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
-    </div>
-    <p class="search-contador" id="contador-clientes"></p>
-
-    <div class="card">
-        <table id="tabla-clientes">
-            <thead>
-                <tr>
-                    <th>RIF</th>
-                    <th>Empresa</th>
-                    <th>Contacto</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cliente in clientes %}
-                <tr>
-                    <td><span class="rif-badge">{{ cliente[0] }}</span></td>
-                    <td><strong>{{ cliente[1] }}</strong></td>
-                    <td>
-                        <div class="contacto-linea">
-                            <span class="correo">{{ cliente[3] or '—' }}</span>
-                            <span class="tel">{{ cliente[2] or '—' }}</span>
-                        </div>
-                    </td>
-                    <td>
-                        <a href="{{ url_for('cliente_detalle', rif=cliente[0]) }}"
-                           class="btn btn-blue" style="padding:6px 14px;font-size:12px;">
-                            Ver Ficha →
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" style="text-align:center; color:#b0b8cc; padding:40px;">
-                        No hay clientes registrados aún.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-</main>
-
+<div class="card">
+    <table id="tabla-clientes">
+        <thead>
+            <tr>
+                <th>RIF</th>
+                <th>Empresa</th>
+                <th>Contacto</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr>
+                <td><span class="rif-badge">{{ cliente[0] }}</span></td>
+                <td><strong>{{ cliente[1] }}</strong></td>
+                <td>
+                    <div class="contacto-linea">
+                        <span class="correo">{{ cliente[3] or '—' }}</span>
+                        <span class="tel">{{ cliente[2] or '—' }}</span>
+                    </div>
+                </td>
+                <td>
+                    <a href="{{ url_for('cliente_detalle', rif=cliente[0]) }}" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">Ver Ficha →</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:40px;">No hay clientes registrados aún.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+{% block scripts %}
 <script>
-function normalizar(str) {
-    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
-
-function contarFilasReales(selector) {
-    return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length;
-}
-
+function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function contarFilasReales(selector) { return Array.from(document.querySelectorAll(selector)).filter(f => f.cells.length > 1).length; }
 function actualizarContadorClientes(visibles, total) {
     const contador = document.getElementById('contador-clientes');
     if (total === 0) { contador.innerHTML = ''; return; }
-    if (visibles === total) {
-        contador.innerHTML = `<span>${total}</span> cliente${total === 1 ? '' : 's'} registrado${total === 1 ? '' : 's'}`;
-    } else {
-        contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> clientes`;
-    }
+    if (visibles === total) { contador.innerHTML = `<span>${total}</span> cliente${total === 1 ? '' : 's'} registrado${total === 1 ? '' : 's'}`; }
+    else { contador.innerHTML = `Mostrando <span>${visibles}</span> de <span>${total}</span> clientes`; }
 }
-
 function filtrarClientes() {
     const texto = normalizar(document.getElementById('buscador').value);
     const filas = document.querySelectorAll('#tabla-clientes tbody tr');
     const btnLimpiar = document.getElementById('btn-limpiar');
-    let visibles = 0;
-    let total = 0;
-
+    let visibles = 0, total = 0;
     filas.forEach(fila => {
         if (fila.cells.length <= 1) return;
         total++;
-        const rif    = normalizar(fila.cells[0].textContent);
-        const nombre = normalizar(fila.cells[1].textContent);
-        const contacto = normalizar(fila.cells[2].textContent);
-        const coincide = !texto || rif.includes(texto) || nombre.includes(texto) || contacto.includes(texto);
+        const coincide = !texto || normalizar(fila.cells[0].textContent).includes(texto) || normalizar(fila.cells[1].textContent).includes(texto) || normalizar(fila.cells[2].textContent).includes(texto);
         fila.style.display = coincide ? '' : 'none';
         if (coincide) visibles++;
     });
-
     btnLimpiar.classList.toggle('visible', texto.length > 0);
     actualizarContadorClientes(visibles, total);
 }
-
-function limpiarBusqueda() {
-    document.getElementById('buscador').value = '';
-    filtrarClientes();
-    document.getElementById('buscador').focus();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const total = contarFilasReales('#tabla-clientes tbody tr');
-    actualizarContadorClientes(total, total);
-});
+function limpiarBusqueda() { document.getElementById('buscador').value = ''; filtrarClientes(); document.getElementById('buscador').focus(); }
+document.addEventListener('DOMContentLoaded', () => { const total = contarFilasReales('#tabla-clientes tbody tr'); actualizarContadorClientes(total, total); });
 </script>
-</body>
-</html>
+{% endblock %}

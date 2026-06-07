@@ -1,352 +1,112 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ cab[1] }} — Importadora Uziel</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f5f7fa; color: #1a1d27;
-            display: flex; min-height: 100vh;
-        }
-
-        /* ===================== SIDEBAR ===================== */
-        .sidebar {
-            width: 210px; min-height: 100vh; background: #1a1d27;
-            display: flex; flex-direction: column; padding: 20px 0;
-            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
-        }
-        .sidebar-brand {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 18px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
-        }
-        .brand-icon {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
-        }
-        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
-        .sidebar nav { flex: 1; padding: 0 10px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 12px; border-radius: 8px;
-            text-decoration: none; color: #8a93a8;
-            font-size: 14px; font-weight: 500; margin-bottom: 2px;
-            transition: background 0.15s, color 0.15s; position: relative;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
-        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
-        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-        .sidebar-footer { padding: 16px 14px 0; border-top: 1px solid rgba(255,255,255,0.07); }
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .user-avatar {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 13px; font-weight: 700;
-        }
-        .user-name { font-size: 13px; font-weight: 600; color: #e8ecf5; }
-        .user-rol  { font-size: 11px; color: #6b7a99; }
-        .btn-logout {
-            display: block; text-align: center; padding: 8px;
-            background: rgba(231,76,60,0.12); color: #e74c3c;
-            border-radius: 7px; text-decoration: none; font-size: 13px;
-            font-weight: 600; transition: background 0.15s;
-        }
-        .btn-logout:hover { background: rgba(231,76,60,0.22); }
-
-        /* ===================== CONTENIDO ===================== */
-        .main { margin-left: 210px; flex: 1; padding: 32px 36px; }
-
-        .page-header {
-            display: flex; align-items: flex-start;
-            justify-content: space-between; margin-bottom: 24px;
-        }
-        .page-title { font-size: 22px; font-weight: 700; }
-        .breadcrumb { font-size: 13px; color: #7b8499; margin-bottom: 6px; }
-        .breadcrumb a { color: #3b5bdb; text-decoration: none; }
-        .breadcrumb a:hover { text-decoration: underline; }
-
-        .acciones { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        .btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 9px 18px; border-radius: 8px; font-size: 14px;
-            font-weight: 600; text-decoration: none; cursor: pointer;
-            border: none; transition: opacity 0.15s;
-        }
-        .btn:hover { opacity: 0.88; }
-        .btn-blue   { background: #3b5bdb; color: white; }
-        .btn-green  { background: #27ae5f; color: white; }
-        .btn-ghost  { background: #f0f2f8; color: #5a6280; }
-
-        /* Badge de estado */
-        .badge {
-            display: inline-block; padding: 4px 14px; border-radius: 20px;
-            font-size: 13px; font-weight: 700;
-        }
-        .badge-borrador  { background: #f0f2f8; color: #6b7a99; }
-        .badge-enviada   { background: #fff3cd; color: #b08000; }
-        .badge-aceptada  { background: #d1fae5; color: #065f46; }
-        .badge-rechazada { background: #fee2e2; color: #991b1b; }
-
-        /* Cards */
-        .card {
-            background: white; border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            padding: 24px; margin-bottom: 20px;
-        }
-        .card-title {
-            font-size: 15px; font-weight: 700; color: #2c3650;
-            margin-bottom: 16px; padding-bottom: 10px;
-            border-bottom: 1px solid #edf0f7;
-        }
-
-        /* Grid de datos del cliente */
-        .info-grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
-        }
-        .info-item label {
-            display: block; font-size: 11px; font-weight: 700;
-            color: #7b8499; text-transform: uppercase; margin-bottom: 4px;
-        }
-        .info-item .valor {
-            font-size: 14px; font-weight: 500; color: #2c3650;
-        }
-
-        /* Tabla de ítems */
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            background: #f8f9fc; font-size: 11px; font-weight: 700;
-            color: #7b8499; text-transform: uppercase; letter-spacing: 0.5px;
-            padding: 11px 14px; text-align: left;
-            border-bottom: 1px solid #edf0f7;
-        }
-        th.right { text-align: right; }
-        td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid #f0f2f8; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f8f9fc; }
-
-        .td-num  { color: #7b8499; font-size: 12px; }
-        .td-sku  { font-size: 12px; color: #7b8499; font-style: italic; }
-        .td-right { text-align: right; }
-        .td-total { font-weight: 800; color: #1a7a45; text-align: right; }
-
-        /* Fila de total global */
-        .total-row {
-            display: flex; justify-content: flex-end; align-items: center;
-            gap: 16px; padding-top: 14px; border-top: 2px solid #edf0f7; margin-top: 4px;
-        }
-        .total-label { font-size: 16px; font-weight: 600; color: #7b8499; }
-        .total-valor { font-size: 26px; font-weight: 800; color: #1a7a45; }
-
-        /* Notas */
-        .notas-box {
-            background: #f8f9fc; border-radius: 8px;
-            padding: 14px 16px; font-size: 14px; color: #4a5568;
-            white-space: pre-wrap; line-height: 1.6;
-        }
-
-        /* Cambio de estado */
-        .estado-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        .estado-form select {
-            padding: 8px 12px; border: 1.5px solid #dde1ec; border-radius: 8px;
-            font-size: 14px; font-family: inherit; color: #1a1d27;
-        }
-        .estado-form select:focus { outline: none; border-color: #3b5bdb; }
-
-        /* Flash messages */
-        .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
-        .flash.success { background: #d1fae5; color: #065f46; }
-        .flash.error   { background: #fee2e2; color: #991b1b; }
-    </style>
-</head>
-<body>
-
+{% extends "base.html" %}
+{% block title %}{{ cab[1] }} — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .info-item label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+    .info-item .valor { font-size: 14px; font-weight: 500; }
+    .td-num { color: var(--text-muted); font-size: 12px; }
+    .td-sku { font-size: 12px; color: var(--text-muted); font-style: italic; }
+    .td-right { text-align: right; }
+    .td-total { font-weight: 800; color: var(--success); text-align: right; }
+    .total-row { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding-top: 14px; border-top: 2px solid var(--border); margin-top: 4px; }
+    .total-label { font-size: 16px; font-weight: 600; color: var(--text-muted); }
+    .total-valor { font-size: 26px; font-weight: 800; color: var(--success); }
+    .notas-box { background: var(--bg); border-radius: 8px; padding: 14px 16px; font-size: 14px; white-space: pre-wrap; line-height: 1.6; }
+    .estado-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .estado-form select { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; }
+    .estado-form select:focus { outline: none; border-color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
 {# cab = (id, numero, cliente_rif, cliente_nombre, estado, notas, total_usd, creado_por, fecha_creacion) #}
 {# items = (id, sku, nombre_producto, cantidad, precio_unitario, subtotal) #}
 
-<!-- ===================== SIDEBAR ===================== -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Importadora Uziel</span>
+<div class="page-header">
+    <div>
+        <nav class="breadcrumb">
+            <a href="{{ url_for('cotizaciones') }}">🧾 Cotizaciones</a>
+            <span class="breadcrumb-sep">›</span>
+            <span>{{ cab[1] }}</span>
+        </nav>
+        <h1>
+            Cotización {{ cab[1] }}
+            <span class="badge badge-{{ cab[4] | lower }}" style="font-size:13px;margin-left:8px;">{{ cab[4] }}</span>
+        </h1>
     </div>
-    <nav>
-        <a href="{{ url_for('inicio') }}" class="nav-item">
-            <span class="nav-icon">⊞</span> Dashboard
-        </a>
-        {% if puede_ver('clientes') %}
-        <a href="{{ url_for('clientes') }}" class="nav-item">
-            <span class="nav-icon">👤</span> Clientes
-        </a>
-        {% endif %}
-        {% if puede_ver('productos') %}
-        <a href="{{ url_for('catalogo') }}" class="nav-item">
-            <span class="nav-icon">📦</span> Productos
-        </a>
-        {% endif %}
-        {% if puede_ver('tareas') %}
-        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
-            <span class="nav-icon">📋</span> Tareas
-            {% if total_notif > 0 %}
-                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
-                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
-                    {{ total_notif }}
-                </span>
-            {% endif %}
-        </a>
-        {% endif %}
-        {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item active">
-            <span class="nav-icon">🧾</span> Cotizaciones
-        </a>
-        {% endif %}
-        {% if session.get('rol') == 'Admin' %}
-        <hr class="nav-divider">
-        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
-            <span class="nav-icon">⚙️</span> Usuarios
-        </a>
-        {% endif %}
-    </nav>
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
-            <div>
-                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
-                <div class="user-rol">{{ session['rol'] }}</div>
-            </div>
-        </div>
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+    <div class="acciones" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="{{ url_for('cotizacion_pdf', cotizacion_id=cab[0]) }}" class="btn btn-success">⬇ Descargar PDF</a>
+        <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">← Volver</a>
     </div>
-</aside>
+</div>
 
-<!-- ===================== CONTENIDO ===================== -->
-<main class="main">
-    <!-- Encabezado -->
-    <div class="page-header">
-        <div>
-            <div class="breadcrumb">
-                <a href="{{ url_for('cotizaciones') }}">🧾 Cotizaciones</a>
-                › {{ cab[1] }}
-            </div>
-            <div class="page-title">
-                Cotización {{ cab[1] }}
-                &nbsp;
-                {% set est = cab[4] | lower %}
-                <span class="badge badge-{{ est }}">{{ cab[4] }}</span>
-            </div>
-        </div>
-        <div class="acciones">
-            <a href="{{ url_for('cotizacion_pdf', cotizacion_id=cab[0]) }}"
-               class="btn btn-green">⬇ Descargar PDF</a>
-            <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">← Volver</a>
-        </div>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}
+        <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endwith %}
+
+<div class="card">
+    <div class="card-title">👤 Datos del Cliente</div>
+    <div class="info-grid">
+        <div class="info-item"><label>Empresa</label><div class="valor">{{ cab[3] }}</div></div>
+        <div class="info-item"><label>RIF</label><div class="valor">{{ cab[2] }}</div></div>
+        <div class="info-item"><label>Fecha de Emisión</label><div class="valor">{{ cab[8].strftime('%d/%m/%Y %H:%M') if cab[8] else '—' }}</div></div>
+        <div class="info-item"><label>Creado por</label><div class="valor">{{ cab[7] }}</div></div>
+        <div class="info-item"><label>Estado actual</label><div class="valor"><span class="badge badge-{{ cab[4] | lower }}">{{ cab[4] }}</span></div></div>
     </div>
+</div>
 
-    <!-- Mensajes flash -->
-    {% with msgs = get_flashed_messages(with_categories=true) %}
-        {% for cat, msg in msgs %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-        {% endfor %}
-    {% endwith %}
-
-    <!-- Datos del cliente -->
-    <div class="card">
-        <div class="card-title">👤 Datos del Cliente</div>
-        <div class="info-grid">
-            <div class="info-item">
-                <label>Empresa</label>
-                <div class="valor">{{ cab[3] }}</div>
-            </div>
-            <div class="info-item">
-                <label>RIF</label>
-                <div class="valor">{{ cab[2] }}</div>
-            </div>
-            <div class="info-item">
-                <label>Fecha de Emisión</label>
-                <div class="valor">
-                    {{ cab[8].strftime('%d/%m/%Y %H:%M') if cab[8] else '—' }}
-                </div>
-            </div>
-            <div class="info-item">
-                <label>Creado por</label>
-                <div class="valor">{{ cab[7] }}</div>
-            </div>
-            <div class="info-item">
-                <label>Estado actual</label>
-                <div class="valor">
-                    {% set est = cab[4] | lower %}
-                    <span class="badge badge-{{ est }}">{{ cab[4] }}</span>
-                </div>
-            </div>
-        </div>
+<div class="card">
+    <div class="card-title">📦 Productos Cotizados</div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Producto</th>
+                <th>SKU</th>
+                <th class="td-right">Cantidad</th>
+                <th class="td-right">Precio Unit.</th>
+                <th class="td-right">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for it in items %}
+            <tr>
+                <td class="td-num">{{ loop.index }}</td>
+                <td>{{ it[2] }}</td>
+                <td class="td-sku">{{ it[1] }}</td>
+                <td class="td-right">{{ it[3] }}</td>
+                <td class="td-right">$ {{ "%.2f"|format(it[4]|float) }}</td>
+                <td class="td-total">$ {{ "%.2f"|format(it[5]|float) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="total-row">
+        <span class="total-label">TOTAL USD:</span>
+        <span class="total-valor">$ {{ "%.2f"|format(cab[6]|float) }}</span>
     </div>
+</div>
 
-    <!-- Ítems -->
-    <div class="card">
-        <div class="card-title">📦 Productos Cotizados</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Producto</th>
-                    <th>SKU</th>
-                    <th class="right">Cantidad</th>
-                    <th class="right">Precio Unit.</th>
-                    <th class="right">Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for it in items %}
-                {# it = (id, sku, nombre_producto, cantidad, precio_unitario, subtotal) #}
-                <tr>
-                    <td class="td-num">{{ loop.index }}</td>
-                    <td>{{ it[2] }}</td>
-                    <td class="td-sku">{{ it[1] }}</td>
-                    <td class="td-right">{{ it[3] }}</td>
-                    <td class="td-right">$ {{ "%.2f"|format(it[4]|float) }}</td>
-                    <td class="td-total">$ {{ "%.2f"|format(it[5]|float) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="total-row">
-            <span class="total-label">TOTAL USD:</span>
-            <span class="total-valor">$ {{ "%.2f"|format(cab[6]|float) }}</span>
-        </div>
-    </div>
+{% if cab[5] %}
+<div class="card">
+    <div class="card-title">📝 Notas / Observaciones</div>
+    <div class="notas-box">{{ cab[5] }}</div>
+</div>
+{% endif %}
 
-    <!-- Notas -->
-    {% if cab[5] %}
-    <div class="card">
-        <div class="card-title">📝 Notas / Observaciones</div>
-        <div class="notas-box">{{ cab[5] }}</div>
-    </div>
-    {% endif %}
-
-    <!-- Cambio de estado (solo Admin) -->
-    {% if session['rol'] == 'Admin' %}
-    <div class="card">
-        <div class="card-title">🔄 Cambiar Estado</div>
-        <form method="POST"
-              action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}"
-              class="estado-form">
-            <select name="nuevo_estado">
-                {% for est in estados %}
-                <option value="{{ est }}" {% if est == cab[4] %}selected{% endif %}>
-                    {{ est }}
-                </option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-blue">Actualizar Estado</button>
-        </form>
-    </div>
-    {% endif %}
-</main>
-
-</body>
-</html>
+{% if session['rol'] == 'Admin' %}
+<div class="card">
+    <div class="card-title">🔄 Cambiar Estado</div>
+    <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" class="estado-form">
+        <select name="nuevo_estado">
+            {% for est in estados %}
+            <option value="{{ est }}" {% if est == cab[4] %}selected{% endif %}>{{ est }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Actualizar Estado</button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

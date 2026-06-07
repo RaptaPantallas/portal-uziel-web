@@ -1,217 +1,50 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nuevo Cliente — Importadora Uziel</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f5f7fa; color: #1a1d27;
-            display: flex; min-height: 100vh;
-        }
-
-        /* SIDEBAR */
-        .sidebar {
-            width: 200px; min-height: 100vh; background: #1a1d27;
-            display: flex; flex-direction: column; padding: 20px 0;
-            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
-        }
-        .sidebar-brand {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 18px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
-        }
-        .brand-icon {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 15px; font-weight: 800;
-        }
-        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
-        .sidebar nav { flex: 1; padding: 0 10px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-            border-radius: 8px; text-decoration: none; color: #8a93a8;
-            font-size: 14px; font-weight: 500; margin-bottom: 2px;
-            transition: background 0.15s, color 0.15s;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
-        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
-        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-        .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07); }
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .user-avatar {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 13px; font-weight: 700;
-        }
-        .user-name { color: #e8ecf5; font-size: 13px; font-weight: 600; }
-        .user-rol  { color: #8a93a8; font-size: 12px; }
-        .btn-logout {
-            display: flex; align-items: center; gap: 8px;
-            color: #8a93a8; text-decoration: none; font-size: 13px; font-weight: 500;
-        }
-        .btn-logout:hover { color: #e8ecf5; }
-
-        /* CONTENIDO */
-        .main-content { margin-left: 200px; flex: 1; padding: 36px 40px; }
-        .page-header { margin-bottom: 28px; }
-        .page-header h1 { font-size: 28px; font-weight: 700; }
-        .page-header .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
-
-        .flash-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; }
-        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
-        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
-
-        .form-card {
-            background: white; border-radius: 14px;
-            border: 1px solid #eaedf3; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-            padding: 32px 36px; max-width: 620px;
-        }
-
-        .campo { margin-bottom: 20px; }
-        .campo label {
-            display: block; font-size: 13px; font-weight: 600;
-            color: #5a6a88; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 7px;
-        }
-        .campo input {
-            width: 100%; padding: 11px 14px;
-            border: 1.5px solid #e0e5f0; border-radius: 8px;
-            font-size: 15px; color: #1a1d27; background: #fff; outline: none;
-            transition: border-color 0.18s, box-shadow 0.18s;
-        }
-        .campo input::placeholder { color: #b0b8cc; }
-        .campo input:focus {
-            border-color: #3b5bdb;
-            box-shadow: 0 0 0 3px rgba(59,91,219,0.12);
-        }
-
-        .campo .opcional {
-            font-size: 11px; color: #b0b8cc;
-            font-weight: 400; text-transform: none;
-            letter-spacing: 0; margin-left: 4px;
-        }
-
-        .form-actions { display: flex; gap: 12px; margin-top: 28px; }
-        .btn-guardar {
-            background: #0ea5e9; color: white; border: none;
-            padding: 12px 28px; border-radius: 8px;
-            font-size: 15px; font-weight: 600; cursor: pointer;
-            transition: background 0.18s;
-        }
-        .btn-guardar:hover { background: #0891d4; }
-        .btn-cancelar {
-            display: inline-block; background: #f0f2f5; color: #5a6a88;
-            padding: 12px 24px; border-radius: 8px;
-            font-size: 15px; font-weight: 600; text-decoration: none;
-            transition: background 0.18s;
-        }
-        .btn-cancelar:hover { background: #e2e6ec; }
-    </style>
-</head>
-<body>
-
-<!-- SIDEBAR -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Imp. Uziel</span>
-    </div>
-    <nav>
-        <a href="{{ url_for('inicio') }}" class="nav-item">
-            <span class="nav-icon">⊞</span> Dashboard
-        </a>
-        {% if puede_ver('clientes') %}
-        <a href="{{ url_for('clientes') }}" class="nav-item active">
-            <span class="nav-icon">👤</span> Clientes
-        </a>
-        {% endif %}
-        {% if puede_ver('productos') %}
-        <a href="{{ url_for('catalogo') }}" class="nav-item">
-            <span class="nav-icon">📦</span> Productos
-        </a>
-        {% endif %}
-        {% if puede_ver('tareas') %}
-        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
-            <span class="nav-icon">📋</span> Tareas
-            {% if total_notif > 0 %}
-                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
-                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
-                    {{ total_notif }}
-                </span>
-            {% endif %}
-        </a>
-        {% endif %}
-        {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
-            <span class="nav-icon">🧾</span> Cotizaciones
-        </a>
-        {% endif %}
-        {% if session.get('rol') == 'Admin' %}
-        <hr class="nav-divider">
-        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
-            <span class="nav-icon">⚙️</span> Usuarios
-        </a>
-        {% endif %}
-    </nav>
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
-            <div>
-                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
-                <div class="user-rol">{{ session['rol'] }}</div>
-            </div>
-        </div>
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
-    </div>
-</aside>
-
-<!-- CONTENIDO -->
-<main class="main-content">
-
-    <div class="page-header">
+{% extends "base.html" %}
+{% block title %}Nuevo Cliente — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .form-group .opcional { font-size: 11px; color: var(--text-muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 4px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
         <h1>Nuevo Cliente</h1>
         <p class="subtitulo">Registrar empresa en la cartera de clientes</p>
     </div>
+</div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}{% for category, message in messages %}
-        <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
-      {% endfor %}{% endif %}
-    {% endwith %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for category, message in messages %}
+    <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
 
-    <div class="form-card">
-        <form method="POST">
-            <div class="campo">
-                <label>RIF del Cliente</label>
-                <input type="text" name="rif" placeholder="Ej: J-12345678-9" required>
-            </div>
-            <div class="campo">
-                <label>Nombre de la Empresa</label>
-                <input type="text" name="nombre_empresa" placeholder="Nombre legal de la empresa" required>
-            </div>
-            <div class="campo">
-                <label>Teléfono</label>
-                <input type="text" name="telefono" placeholder="Ej: 0414-1234567" required>
-            </div>
-            <div class="campo">
-                <label>Correo Electrónico <span class="opcional">(opcional)</span></label>
-                <input type="email" name="correo" placeholder="correo@empresa.com">
-            </div>
-            <div class="campo">
-                <label>Dirección Física <span class="opcional">(opcional)</span></label>
-                <input type="text" name="direccion" placeholder="Dirección completa">
-            </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn-guardar">💾 Guardar Cliente</button>
-                <a href="{{ url_for('clientes') }}" class="btn-cancelar">Cancelar</a>
-            </div>
-        </form>
-    </div>
-
-</main>
-</body>
-</html>
+<div class="form-card">
+    <form method="POST">
+        <div class="form-group">
+            <label>RIF del Cliente</label>
+            <input type="text" name="rif" class="form-control" placeholder="Ej: J-12345678-9" required>
+        </div>
+        <div class="form-group">
+            <label>Nombre de la Empresa</label>
+            <input type="text" name="nombre_empresa" class="form-control" placeholder="Nombre legal de la empresa" required>
+        </div>
+        <div class="form-group">
+            <label>Teléfono</label>
+            <input type="text" name="telefono" class="form-control" placeholder="Ej: 0414-1234567" required>
+        </div>
+        <div class="form-group">
+            <label>Correo Electrónico <span class="opcional">(opcional)</span></label>
+            <input type="email" name="correo" class="form-control" placeholder="correo@empresa.com">
+        </div>
+        <div class="form-group">
+            <label>Dirección Física <span class="opcional">(opcional)</span></label>
+            <input type="text" name="direccion" class="form-control" placeholder="Dirección completa">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">💾 Guardar Cliente</button>
+            <a href="{{ url_for('clientes') }}" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

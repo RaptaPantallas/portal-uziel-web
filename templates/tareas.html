@@ -1,699 +1,214 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tareas — Importadora Uziel</title>
-    <style>
-        /* ===================== RESET Y BASE ===================== */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f5f7fa;
-            color: #1a1d27;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* ===================== SIDEBAR (mismo diseño que el resto) ===================== */
-        .sidebar {
-            width: 210px; min-height: 100vh; background: #1a1d27;
-            display: flex; flex-direction: column; padding: 20px 0;
-            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
-        }
-
-        .sidebar-brand {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 18px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
-        }
-
-        .brand-icon {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
-        }
-
-        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
-
-        .sidebar nav { flex: 1; padding: 0 10px; }
-
-        .nav-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 12px; border-radius: 8px;
-            text-decoration: none; color: #8a93a8;
-            font-size: 14px; font-weight: 500; margin-bottom: 2px;
-            transition: background 0.15s, color 0.15s;
-            position: relative;
-        }
-
-        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
-
-        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
-
-        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-
-        /* Badge numérico sobre el ícono de tareas */
-        .nav-badge {
-            background: #e74c3c; color: white;
-            font-size: 10px; font-weight: 700;
-            padding: 1px 6px; border-radius: 10px;
-            margin-left: auto; line-height: 16px;
-        }
-
-        .sidebar-footer {
-            padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.07);
-        }
-
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-
-        .user-avatar {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
-        }
-
-        .user-details { overflow: hidden; }
-
-        .user-name {
-            color: #e8ecf5; font-size: 13px; font-weight: 600;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-
-        .user-rol { color: #8a93a8; font-size: 12px; }
-
-        .btn-logout {
-            display: flex; align-items: center; gap: 8px;
-            color: #8a93a8; text-decoration: none;
-            font-size: 13px; font-weight: 500; padding: 6px 0;
-            transition: color 0.15s;
-        }
-
-        .btn-logout:hover { color: #e8ecf5; }
-
-        /* ===================== CONTENIDO PRINCIPAL ===================== */
-        .main-content { margin-left: 210px; flex: 1; padding: 36px 40px; }
-
-        .page-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 28px;
-        }
-
-        .page-header-left h1 { font-size: 28px; font-weight: 700; color: #1a1d27; }
-
-        .page-header-left .subtitulo { color: #8a93a8; font-size: 14px; margin-top: 4px; }
-
-        /* ===================== MENSAJES FLASH ===================== */
-        .flash-msg {
-            padding: 12px 16px; border-radius: 8px;
-            margin-bottom: 20px; font-size: 14px; font-weight: 500;
-        }
-
-        .flash-exito { background: #f0fdf4; color: #1a7a47; border-left: 4px solid #27ae60; }
-        .flash-error { background: #fff0f0; color: #c0392b; border-left: 4px solid #e74c3c; }
-
-        /* ===================== FILTROS DE ESTADO ===================== */
-        .filtros {
-            display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;
-        }
-
-        /* Botón de filtro de estado */
-        .filtro-btn {
-            padding: 7px 16px; border-radius: 20px; font-size: 13px;
-            font-weight: 600; cursor: pointer; border: 2px solid #e5e7eb;
-            background: white; color: #6b7280;
-            transition: all 0.15s;
-        }
-
-        .filtro-btn:hover { border-color: #3b5bdb; color: #3b5bdb; }
-
-        /* Botón activo del filtro */
-        .filtro-btn.activo { background: #3b5bdb; color: white; border-color: #3b5bdb; }
-
-        /* ===================== LAYOUT DE DOS COLUMNAS (solo Admin) ===================== */
-        .layout-dos-col {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 24px;
-            align-items: start;
-        }
-
-        /* ===================== TARJETA GENÉRICA ===================== */
-        .card {
-            background: white; border-radius: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-            border: 1px solid #eaedf3;
-            overflow: hidden; margin-bottom: 24px;
-        }
-
-        .card-header {
-            padding: 20px 24px;
-            display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 1px solid #eaedf3;
-        }
-
-        .card-title { font-size: 16px; font-weight: 600; color: #1a1d27; }
-
-        /* ===================== TABLA DE TAREAS ===================== */
-        table { width: 100%; border-collapse: collapse; }
-
-        th {
-            padding: 12px 18px; text-align: left;
-            font-size: 12px; font-weight: 600; color: #8a93a8;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            border-bottom: 1px solid #eaedf3; background: #fafbfc;
-        }
-
-        td {
-            padding: 14px 18px; font-size: 14px;
-            color: #2c3347; border-bottom: 1px solid #f0f2f5;
-            vertical-align: middle;
-        }
-
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #fafbfc; }
-
-        /* Fila con tarea vencida */
-        .tarea-vencida { background: #fff5f5 !important; }
-
-        /* ===================== BADGES ===================== */
-        .estado-badge {
-            display: inline-block; padding: 3px 10px;
-            border-radius: 20px; font-size: 12px; font-weight: 600;
-            white-space: nowrap;
-        }
-
-        .estado-pendiente  { background: #fff7ed; color: #c2410c; }
-        .estado-progreso   { background: #eff6ff; color: #1d4ed8; }
-        .estado-completada { background: #f0fdf4; color: #15803d; }
-
-        .tipo-badge {
-            display: inline-block; padding: 2px 9px;
-            border-radius: 5px; font-size: 11px; font-weight: 600;
-            background: #f3f0ff; color: #6d28d9;
-        }
-
-        /* Badge de días restantes */
-        .dias-badge {
-            padding: 3px 9px; border-radius: 20px;
-            font-size: 11px; font-weight: 700; white-space: nowrap;
-        }
-
-        .dias-urgente { background: #fef2f2; color: #dc2626; }
-        .dias-normal  { background: #f0fdf4; color: #15803d; }
-        .dias-warning { background: #fffbeb; color: #b45309; }
-
-        /* ===================== BOTONES ===================== */
-        .btn {
-            display: inline-block; padding: 6px 12px; border-radius: 6px;
-            font-size: 12px; font-weight: 600; text-decoration: none;
-            cursor: pointer; border: none; transition: opacity 0.15s;
-        }
-
-        .btn:hover { opacity: 0.82; }
-        .btn-blue   { background: #3b5bdb; color: white; }
-        .btn-green  { background: #16a34a; color: white; }
-        .btn-amber  { background: #f59e0b; color: white; }
-        .btn-purple { background: #7c3aed; color: white; }
-
-        /* ===================== FORMULARIO DE ASIGNACIÓN ===================== */
-        .form-nueva-tarea { padding: 24px; }
-
-        .form-group { margin-bottom: 16px; }
-
-        .form-group label {
-            display: block; font-size: 13px; font-weight: 600;
-            color: #374151; margin-bottom: 6px;
-        }
-
-        .form-group label .req { color: #e74c3c; }
-
-        .form-control {
-            width: 100%; padding: 9px 12px;
-            border: 1.5px solid #d1d5db; border-radius: 8px;
-            font-size: 14px; color: #1a1d27; background: #fff;
-            outline: none; transition: border-color 0.15s, box-shadow 0.15s;
-        }
-
-        .form-control:focus {
-            border-color: #3b5bdb;
-            box-shadow: 0 0 0 3px rgba(59,91,219,0.1);
-        }
-
-        textarea.form-control { resize: vertical; min-height: 90px; }
-
-        .form-footer-lateral {
-            margin-top: 20px;
-            display: flex; flex-direction: column; gap: 10px;
-        }
-
-        /* Botón de envío grande */
-        .btn-submit-tarea {
-            width: 100%; padding: 11px;
-            background: #7c3aed; color: white;
-            border: none; border-radius: 8px;
-            font-size: 14px; font-weight: 700; cursor: pointer;
-            transition: opacity 0.15s;
-        }
-
-        .btn-submit-tarea:hover { opacity: 0.88; }
-
-        /* ===================== VACÍO ===================== */
-        .empty-state {
-            text-align: center; padding: 60px 20px; color: #8a93a8;
-        }
-
-        .empty-state .icon { font-size: 48px; margin-bottom: 12px; display: block; }
-        .empty-state p { font-size: 15px; }
-    </style>
-</head>
-<body>
-
-<!-- ==================== SIDEBAR ==================== -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Imp. Uziel</span>
-    </div>
-
-    <nav>
-        <a href="{{ url_for('inicio') }}" class="nav-item">
-            <span class="nav-icon">⊞</span> Dashboard
-        </a>
-        {% if puede_ver('clientes') %}
-        <a href="{{ url_for('clientes') }}" class="nav-item">
-            <span class="nav-icon">👤</span> Clientes
-        </a>
-        {% endif %}
-        {% if puede_ver('productos') %}
-        <a href="{{ url_for('catalogo') }}" class="nav-item">
-            <span class="nav-icon">📦</span> Productos
-        </a>
-        {% endif %}
-        <!-- Tareas es la página activa -->
-        {% if puede_ver('tareas') %}
-        <a href="{{ url_for('tareas') }}" class="nav-item active">
-            <span class="nav-icon">📋</span> Tareas
-            {% if total_notif > 0 %}
-                <span class="nav-badge">{{ total_notif }}</span>
+{% extends "base.html" %}
+{% block title %}Tareas — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .tarea-vencida { background: #fff5f5 !important; }
+    .form-nueva-tarea { padding: 24px; }
+    .form-footer-lateral { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .btn-submit-tarea { width: 100%; padding: 11px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+    .btn-submit-tarea:hover { opacity: 0.88; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📋 Gestión de Tareas</h1>
+        <p class="subtitulo">
+            {% if session['rol'] == 'Admin' %}
+                Asigna trabajo al equipo y monitorea el avance de cada tarea.
+            {% else %}
+                Tus tareas asignadas — mantén el estado actualizado.
             {% endif %}
-        </a>
-        {% endif %}
-        {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item">
-            <span class="nav-icon">🧾</span> Cotizaciones
-        </a>
-        {% endif %}
-        {% if session.get('rol') == 'Admin' %}
-        <hr class="nav-divider">
-        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
-            <span class="nav-icon">⚙️</span> Usuarios
-        </a>
-        {% endif %}
-    </nav>
-
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
-            <div class="user-details">
-                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
-                <div class="user-rol">{{ session['rol'] }}</div>
-            </div>
-        </div>
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
+        </p>
     </div>
-</aside>
+</div>
 
-<!-- ==================== CONTENIDO PRINCIPAL ==================== -->
-<main class="main-content">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
 
-    <div class="page-header">
-        <div class="page-header-left">
-            <h1>📋 Gestión de Tareas</h1>
-            <p class="subtitulo">
-                {% if session['rol'] == 'Admin' %}
-                    Asigna trabajo al equipo y monitorea el avance de cada tarea.
-                {% else %}
-                    Tus tareas asignadas — mantén el estado actualizado.
-                {% endif %}
-            </p>
-        </div>
-    </div>
+<div class="filtros">
+    <button class="filtro-btn activo" onclick="filtrarEstado('todos', this)">Todas ({{ lista_tareas | length }})</button>
+    <button class="filtro-btn" onclick="filtrarEstado('Pendiente', this)">🟡 Pendientes</button>
+    <button class="filtro-btn" onclick="filtrarEstado('En Progreso', this)">🔵 En Progreso</button>
+    <button class="filtro-btn" onclick="filtrarEstado('Completada', this)">🟢 Completadas</button>
+</div>
 
-    <!-- Mensajes flash (éxito / error) -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+{% if session['rol'] == 'Admin' %}
+<div class="layout-dos-col">
+{% endif %}
 
-    <!-- Botones de filtro por estado -->
-    <div class="filtros">
-        <button class="filtro-btn activo" onclick="filtrarEstado('todos', this)">
-            Todas ({{ lista_tareas | length }})
-        </button>
-        <button class="filtro-btn" onclick="filtrarEstado('Pendiente', this)">
-            🟡 Pendientes
-        </button>
-        <button class="filtro-btn" onclick="filtrarEstado('En Progreso', this)">
-            🔵 En Progreso
-        </button>
-        <button class="filtro-btn" onclick="filtrarEstado('Completada', this)">
-            🟢 Completadas
-        </button>
-    </div>
-
-    <!--
-        Layout de dos columnas para el Admin:
-          - Columna izquierda: tabla de todas las tareas
-          - Columna derecha: formulario de asignación rápida
-        Para el resto de usuarios: solo la tabla (una columna)
-    -->
-    {% if session['rol'] == 'Admin' %}
-    <div class="layout-dos-col">
-    {% endif %}
-
-        <!-- ==================== TABLA DE TAREAS ==================== -->
-        <div>
-            <div class="card" style="overflow-x: auto;">
-
-                {% if lista_tareas %}
-                <table id="tabla-tareas">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Cliente</th>
-                            <th>Tipo</th>
-                            {% if session['rol'] == 'Admin' %}
-                            <th>Asignado a</th>
-                            {% endif %}
-                            <th>Fecha Límite</th>
-                            <th>Tiempo</th>
-                            <th>Estado</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for t in lista_tareas %}
-                        {#
-                            Índices del tuple de tarea (Admin vs usuario normal son distintos):
-                            Admin   : (id, rif, nombre, asignado_a, tipo, desc, fecha_l, estado, creado_por, fecha_c)
-                                        0    1    2        3          4     5     6         7        8           9
-                            Normal  : (id, rif, nombre, tipo, desc, fecha_l, estado, creado_por, fecha_c)
-                                        0    1    2       3     4     5        6        7            8
-                            Como la vista Admin usa obtener_todas_tareas() y el usuario normal usa
-                            obtener_tareas_asignadas(), los índices son diferentes.
-                        #}
+    <div>
+        <div class="card" style="overflow-x: auto;">
+            {% if lista_tareas %}
+            <table id="tabla-tareas">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Cliente</th>
+                        <th>Tipo</th>
                         {% if session['rol'] == 'Admin' %}
-                            {# Vista de supervisor: usa obtener_todas_tareas() #}
-                            {% set t_id       = t[0] %}
-                            {% set t_nombre   = t[2] %}
-                            {% set t_rif      = t[1] %}
-                            {% set t_asig     = t[3] %}
-                            {% set t_tipo     = t[4] %}
-                            {% set t_desc     = t[5] %}
-                            {% set t_limite   = t[6] %}
-                            {% set t_estado   = t[7] %}
-                            {% set t_creador  = t[8] %}
-                        {% else %}
-                            {# Vista de empleado: usa obtener_tareas_asignadas() #}
-                            {% set t_id       = t[0] %}
-                            {% set t_nombre   = t[2] %}
-                            {% set t_rif      = t[1] %}
-                            {% set t_asig     = session['usuario'] %}
-                            {% set t_tipo     = t[3] %}
-                            {% set t_desc     = t[4] %}
-                            {% set t_limite   = t[5] %}
-                            {% set t_estado   = t[6] %}
-                            {% set t_creador  = t[7] %}
+                        <th>Asignado a</th>
                         {% endif %}
-
-                        <!-- data-estado: usado por el filtro JavaScript -->
-                        <tr data-estado="{{ t_estado }}" id="fila-{{ t_id }}">
-                            <td style="color:#8a93a8; font-weight:600;">#{{ t_id }}</td>
-                            <td>
-                                <strong>{{ t_nombre }}</strong><br>
-                                <small style="color:#8a93a8; font-size:11px;">{{ t_rif }}</small>
-                                {% if t_desc %}
-                                <details style="margin-top:4px;">
-                                    <summary style="font-size:11px; color:#3b5bdb; cursor:pointer;">
-                                        Ver descripción
-                                    </summary>
-                                    <p style="font-size:12px; color:#4b5563; margin-top:4px; padding:6px;
-                                              background:#f8fafc; border-radius:6px;">
-                                        {{ t_desc }}
-                                    </p>
-                                </details>
-                                {% endif %}
-                            </td>
-                            <td><span class="tipo-badge">{{ t_tipo }}</span></td>
-                            {% if session['rol'] == 'Admin' %}
-                            <td>{{ t_asig.capitalize() }}</td>
+                        <th>Fecha Límite</th>
+                        <th>Tiempo</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in lista_tareas %}
+                    {% if session['rol'] == 'Admin' %}
+                        {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = t[3] %}{% set t_tipo = t[4] %}{% set t_desc = t[5] %}{% set t_limite = t[6] %}{% set t_estado = t[7] %}{% set t_creador = t[8] %}
+                    {% else %}
+                        {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = session['usuario'] %}{% set t_tipo = t[3] %}{% set t_desc = t[4] %}{% set t_limite = t[5] %}{% set t_estado = t[6] %}{% set t_creador = t[7] %}
+                    {% endif %}
+                    <tr data-estado="{{ t_estado }}" id="fila-{{ t_id }}">
+                        <td style="color:var(--text-muted);font-weight:600;">#{{ t_id }}</td>
+                        <td>
+                            <strong>{{ t_nombre }}</strong><br>
+                            <small style="color:var(--text-muted);font-size:11px;">{{ t_rif }}</small>
+                            {% if t_desc %}
+                            <details style="margin-top:4px;">
+                                <summary style="font-size:11px;color:var(--primary);cursor:pointer;">Ver descripción</summary>
+                                <p style="font-size:12px;margin-top:4px;padding:6px;background:var(--bg);border-radius:6px;">{{ t_desc }}</p>
+                            </details>
                             {% endif %}
-                            <td style="font-weight:600; white-space:nowrap;">{{ t_limite }}</td>
-                            <td>
-                                <!-- Badge de días restantes calculado por JavaScript -->
-                                <span class="dias-badge"
-                                      id="dias-{{ t_id }}"
-                                      data-limite="{{ t_limite }}">
-                                    ...
-                                </span>
-                            </td>
-                            <td>
-                                <span class="estado-badge
-                                    {% if t_estado == 'Pendiente' %}estado-pendiente
-                                    {% elif t_estado == 'En Progreso' %}estado-progreso
-                                    {% else %}estado-completada{% endif %}">
-                                    {{ t_estado }}
-                                </span>
-                            </td>
-                            <td>
-                                <!-- Botón para avanzar el estado de la tarea -->
-                                {% if t_estado == 'Pendiente' %}
-                                <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}"
-                                      method="POST" style="display:inline;">
-                                    <input type="hidden" name="nuevo_estado" value="En Progreso">
-                                    <button type="submit" class="btn btn-blue">▶ Iniciar</button>
-                                </form>
+                        </td>
+                        <td><span class="tipo-badge">{{ t_tipo }}</span></td>
+                        {% if session['rol'] == 'Admin' %}
+                        <td>{{ t_asig.capitalize() }}</td>
+                        {% endif %}
+                        <td style="font-weight:600;white-space:nowrap;">{{ t_limite }}</td>
+                        <td>
+                            <span class="dias-badge" id="dias-{{ t_id }}" data-limite="{{ t_limite }}">...</span>
+                        </td>
+                        <td>
+                            <span class="estado-badge
+                                {% if t_estado == 'Pendiente' %}badge-pendiente
+                                {% elif t_estado == 'En Progreso' %}badge-en-progreso
+                                {% else %}badge-success{% endif %}">{{ t_estado }}</span>
+                        </td>
+                        <td>
+                            {% if t_estado == 'Pendiente' %}
+                            <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
+                                <input type="hidden" name="nuevo_estado" value="En Progreso">
+                                <button type="submit" class="btn btn-primary">▶ Iniciar</button>
+                            </form>
+                            {% elif t_estado == 'En Progreso' %}
+                            <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}" method="POST" style="display:inline;">
+                                <input type="hidden" name="nuevo_estado" value="Completada">
+                                <button type="submit" class="btn btn-success">✓ Completar</button>
+                            </form>
+                            {% else %}
+                                <span style="color:var(--text-muted);font-size:12px;">✓ Finalizada</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <span class="icon">📭</span>
+                <p>{% if session['rol'] == 'Admin' %}No hay tareas registradas aún. ¡Crea la primera desde el formulario!{% else %}No tienes tareas asignadas en este momento.{% endif %}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
-                                {% elif t_estado == 'En Progreso' %}
-                                <form action="{{ url_for('actualizar_tarea', tarea_id=t_id) }}"
-                                      method="POST" style="display:inline;">
-                                    <input type="hidden" name="nuevo_estado" value="Completada">
-                                    <button type="submit" class="btn btn-green">✓ Completar</button>
-                                </form>
-
-                                {% else %}
-                                    <span style="color:#8a93a8; font-size:12px;">✓ Finalizada</span>
-                                {% endif %}
-                            </td>
-                        </tr>
+    {% if session['rol'] == 'Admin' %}
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">➕ Nueva Tarea</span>
+            </div>
+            <form action="{{ url_for('asignar_tarea') }}" method="POST" class="form-nueva-tarea">
+                <div class="form-group">
+                    <label for="cliente_rif">Cliente <span class="req">*</span></label>
+                    <select name="cliente_rif" id="cliente_rif" class="form-control" required onchange="actualizarNombre(this)">
+                        <option value="">— Seleccionar —</option>
+                        {% for cliente in lista_clientes %}
+                        <option value="{{ cliente[0] }}" data-nombre="{{ cliente[1] }}">{{ cliente[1] }}</option>
                         {% endfor %}
-                    </tbody>
-                </table>
-
-                {% else %}
-                <!-- Estado vacío cuando no hay tareas -->
-                <div class="empty-state">
-                    <span class="icon">📭</span>
-                    <p>
-                        {% if session['rol'] == 'Admin' %}
-                            No hay tareas registradas aún. ¡Crea la primera desde el formulario!
-                        {% else %}
-                            No tienes tareas asignadas en este momento.
+                    </select>
+                    <input type="hidden" name="cliente_nombre" id="cliente_nombre_lat">
+                </div>
+                <div class="form-group">
+                    <label for="asignado_a_lat">Asignar a <span class="req">*</span></label>
+                    <select name="asignado_a" id="asignado_a_lat" class="form-control" required>
+                        <option value="">— Seleccionar usuario —</option>
+                        {% for usuario in lista_usuarios %}
+                        {% if usuario[0] != session['usuario'] %}
+                        <option value="{{ usuario[0] }}">{{ usuario[0].capitalize() }} — {{ usuario[1] }}</option>
                         {% endif %}
-                    </p>
+                        {% endfor %}
+                    </select>
                 </div>
-                {% endif %}
-
-            </div>
-        </div>
-
-        <!-- ==================== FORMULARIO LATERAL (solo Admin) ==================== -->
-        {% if session['rol'] == 'Admin' %}
-        <div>
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">➕ Nueva Tarea</span>
+                <div class="form-group">
+                    <label for="tipo_tarea_lat">Tipo de Trabajo <span class="req">*</span></label>
+                    <select name="tipo_tarea" id="tipo_tarea_lat" class="form-control" required>
+                        <option value="">— Seleccionar —</option>
+                        <option value="Diseño Gráfico">Diseño Gráfico</option>
+                        <option value="Edición de Foto">Edición de Foto</option>
+                        <option value="Edición de Video">Edición de Video</option>
+                        <option value="Fotografía">Fotografía</option>
+                        <option value="Catálogo Digital">Catálogo Digital</option>
+                        <option value="Redes Sociales">Redes Sociales</option>
+                        <option value="Otro">Otro</option>
+                    </select>
                 </div>
-
-                <form action="{{ url_for('asignar_tarea') }}" method="POST"
-                      class="form-nueva-tarea">
-
-                    <!-- Selección de cliente -->
-                    <div class="form-group">
-                        <label for="cliente_rif">
-                            Cliente <span class="req">*</span>
-                        </label>
-                        <select name="cliente_rif" id="cliente_rif"
-                                class="form-control" required
-                                onchange="actualizarNombre(this)">
-                            <option value="">— Seleccionar —</option>
-                            {% for cliente in lista_clientes %}
-                            <option value="{{ cliente[0] }}"
-                                    data-nombre="{{ cliente[1] }}">
-                                {{ cliente[1] }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <!-- Campo oculto para el nombre de la empresa -->
-                        <input type="hidden" name="cliente_nombre" id="cliente_nombre_lat">
-                    </div>
-
-                    <!-- Selección del responsable -->
-                    <div class="form-group">
-                        <label for="asignado_a_lat">
-                            Asignar a <span class="req">*</span>
-                        </label>
-                        <select name="asignado_a" id="asignado_a_lat"
-                                class="form-control" required>
-                            <option value="">— Seleccionar usuario —</option>
-                            {% for usuario in lista_usuarios %}
-                            {% if usuario[0] != session['usuario'] %}
-                            <option value="{{ usuario[0] }}">
-                                {{ usuario[0].capitalize() }} — {{ usuario[1] }}
-                            </option>
-                            {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Tipo de trabajo -->
-                    <div class="form-group">
-                        <label for="tipo_tarea_lat">
-                            Tipo de Trabajo <span class="req">*</span>
-                        </label>
-                        <select name="tipo_tarea" id="tipo_tarea_lat"
-                                class="form-control" required>
-                            <option value="">— Seleccionar —</option>
-                            <option value="Diseño Gráfico">Diseño Gráfico</option>
-                            <option value="Edición de Foto">Edición de Foto</option>
-                            <option value="Edición de Video">Edición de Video</option>
-                            <option value="Fotografía">Fotografía</option>
-                            <option value="Catálogo Digital">Catálogo Digital</option>
-                            <option value="Redes Sociales">Redes Sociales</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                    </div>
-
-                    <!-- Fecha límite -->
-                    <div class="form-group">
-                        <label for="fecha_limite_lat">
-                            Fecha Límite <span class="req">*</span>
-                        </label>
-                        <input type="date" name="fecha_limite" id="fecha_limite_lat"
-                               class="form-control" required>
-                    </div>
-
-                    <!-- Descripción del trabajo -->
-                    <div class="form-group">
-                        <label for="descripcion_lat">Descripción</label>
-                        <textarea name="descripcion" id="descripcion_lat"
-                                  class="form-control"
-                                  placeholder="¿Qué debe hacer el responsable?...">
-                        </textarea>
-                    </div>
-
-                    <div class="form-footer-lateral">
-                        <button type="submit" class="btn-submit-tarea">
-                            📋 Asignar Tarea
-                        </button>
-                    </div>
-                </form>
-            </div>
+                <div class="form-group">
+                    <label for="fecha_limite_lat">Fecha Límite <span class="req">*</span></label>
+                    <input type="date" name="fecha_limite" id="fecha_limite_lat" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="descripcion_lat">Descripción</label>
+                    <textarea name="descripcion" id="descripcion_lat" class="form-control" placeholder="¿Qué debe hacer el responsable?..."></textarea>
+                </div>
+                <div class="form-footer-lateral">
+                    <button type="submit" class="btn-submit-tarea">📋 Asignar Tarea</button>
+                </div>
+            </form>
         </div>
-        {% endif %}
-
-    {% if session['rol'] == 'Admin' %}
-    </div><!-- fin layout-dos-col -->
+    </div>
     {% endif %}
 
-</main>
-
-
-<!-- ==================== JAVASCRIPT ==================== -->
+{% if session['rol'] == 'Admin' %}
+</div><!-- fin layout-dos-col -->
+{% endif %}
+{% endblock %}
+{% block scripts %}
 <script>
-    /**
-     * Copia el nombre del cliente del atributo data-nombre al campo oculto
-     * del formulario lateral de nueva tarea.
-     *
-     * @param {HTMLSelectElement} select - Dropdown de clientes.
-     */
     function actualizarNombre(select) {
-        const opcion   = select.options[select.selectedIndex];
-        const campo    = document.getElementById('cliente_nombre_lat');
-        campo.value    = opcion.getAttribute('data-nombre') || '';
+        const opcion = select.options[select.selectedIndex];
+        document.getElementById('cliente_nombre_lat').value = opcion.getAttribute('data-nombre') || '';
     }
-
-    /**
-     * Filtra las filas de la tabla por estado.
-     * Al hacer clic en un botón de filtro, oculta las filas que no coincidan.
-     *
-     * @param {string}          estado - Estado a mostrar ('todos' para mostrar todo).
-     * @param {HTMLButtonElement} btn  - El botón que se pulsó (para marcarlo activo).
-     */
     function filtrarEstado(estado, btn) {
-        // Resaltar el botón activo y desactivar los demás
         document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('activo'));
         btn.classList.add('activo');
-
-        // Mostrar u ocultar filas según el estado seleccionado
         document.querySelectorAll('#tabla-tareas tbody tr').forEach(function (fila) {
-            if (estado === 'todos' || fila.getAttribute('data-estado') === estado) {
-                fila.style.display = '';        // Mostrar la fila
-            } else {
-                fila.style.display = 'none';    // Ocultar la fila
-            }
+            fila.style.display = (estado === 'todos' || fila.getAttribute('data-estado') === estado) ? '' : 'none';
         });
     }
-
-    /**
-     * Calcula los días restantes entre hoy y la fecha límite de cada tarea.
-     * Actualiza los badges de color dinámicamente al cargar la página.
-     */
     document.addEventListener('DOMContentLoaded', function () {
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-
-        // Recorrer todos los badges de días (uno por tarea)
+        const hoy = new Date(); hoy.setHours(0,0,0,0);
         document.querySelectorAll('.dias-badge[data-limite]').forEach(function (badge) {
             const fechaLimite = new Date(badge.getAttribute('data-limite'));
-            fechaLimite.setHours(0, 0, 0, 0);
-
-            const diffMs   = fechaLimite - hoy;
-            const diasRest = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-            // Texto y color del badge según urgencia
-            if (diasRest < 0) {
-                badge.textContent = `Venció hace ${Math.abs(diasRest)}d`;
-                badge.className   = 'dias-badge dias-urgente';
-                // Colorear la fila completa si la tarea está vencida
-                const fila = badge.closest('tr');
-                if (fila) fila.classList.add('tarea-vencida');
-            } else if (diasRest === 0) {
-                badge.textContent = 'Vence HOY';
-                badge.className   = 'dias-badge dias-urgente';
-            } else if (diasRest <= 3) {
-                badge.textContent = `${diasRest} día(s)`;
-                badge.className   = 'dias-badge dias-warning';
-            } else {
-                badge.textContent = `${diasRest} días`;
-                badge.className   = 'dias-badge dias-normal';
-            }
+            fechaLimite.setHours(0,0,0,0);
+            const diffMs = fechaLimite - hoy;
+            const diasRest = Math.ceil(diffMs / (1000*60*60*24));
+            if (diasRest < 0) { badge.textContent = 'Venció hace ' + Math.abs(diasRest) + 'd'; badge.className = 'dias-badge dias-urgente'; const fila = badge.closest('tr'); if (fila) fila.classList.add('tarea-vencida'); }
+            else if (diasRest === 0) { badge.textContent = 'Vence HOY'; badge.className = 'dias-badge dias-urgente'; }
+            else if (diasRest <= 3) { badge.textContent = diasRest + ' día(s)'; badge.className = 'dias-badge dias-warning'; }
+            else { badge.textContent = diasRest + ' días'; badge.className = 'dias-badge dias-normal'; }
         });
-
-        // Establecer fecha mínima en el campo de fecha límite del formulario
         const campoFecha = document.getElementById('fecha_limite_lat');
-        if (campoFecha) {
-            campoFecha.min = hoy.toISOString().split('T')[0];
-        }
+        if (campoFecha) campoFecha.min = hoy.toISOString().split('T')[0];
     });
 </script>
-
-</body>
-</html>
+{% endblock %}

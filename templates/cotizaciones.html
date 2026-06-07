@@ -1,301 +1,77 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cotizaciones — Importadora Uziel</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f5f7fa;
-            color: #1a1d27;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* ===================== SIDEBAR ===================== */
-        .sidebar {
-            width: 210px; min-height: 100vh; background: #1a1d27;
-            display: flex; flex-direction: column; padding: 20px 0;
-            flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0;
-        }
-        .sidebar-brand {
-            display: flex; align-items: center; gap: 10px;
-            padding: 0 18px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 12px;
-        }
-        .brand-icon {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 15px; font-weight: 800; flex-shrink: 0;
-        }
-        .brand-name { color: #e8ecf5; font-size: 14px; font-weight: 600; }
-        .sidebar nav { flex: 1; padding: 0 10px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 12px; border-radius: 8px;
-            text-decoration: none; color: #8a93a8;
-            font-size: 14px; font-weight: 500; margin-bottom: 2px;
-            transition: background 0.15s, color 0.15s; position: relative;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.06); color: #c8d0e0; }
-        .nav-item.active { background: rgba(59,91,219,0.18); color: #7b9fff; }
-        .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-        .nav-badge {
-            background: #e74c3c; color: white;
-            font-size: 10px; font-weight: 700;
-            padding: 1px 6px; border-radius: 10px;
-            margin-left: auto; line-height: 16px;
-        }
-        .sidebar-footer { padding: 16px 14px 0; border-top: 1px solid rgba(255,255,255,0.07); }
-        .user-info { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .user-avatar {
-            width: 32px; height: 32px; background: #3b5bdb; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 13px; font-weight: 700;
-        }
-        .user-name { font-size: 13px; font-weight: 600; color: #e8ecf5; }
-        .user-rol  { font-size: 11px; color: #6b7a99; }
-        .btn-logout {
-            display: block; text-align: center; padding: 8px;
-            background: rgba(231,76,60,0.12); color: #e74c3c;
-            border-radius: 7px; text-decoration: none; font-size: 13px;
-            font-weight: 600; transition: background 0.15s;
-        }
-        .btn-logout:hover { background: rgba(231,76,60,0.22); }
-
-        /* ===================== CONTENIDO ===================== */
-        .main { margin-left: 210px; flex: 1; padding: 32px 36px; }
-
-        .page-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 24px;
-        }
-        .page-title { font-size: 22px; font-weight: 700; color: #1a1d27; }
-        .page-subtitle { font-size: 13px; color: #7b8499; margin-top: 3px; }
-
-        /* Botón primario */
-        .btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 9px 18px; border-radius: 8px; font-size: 14px;
-            font-weight: 600; text-decoration: none; cursor: pointer;
-            border: none; transition: opacity 0.15s;
-        }
-        .btn:hover { opacity: 0.88; }
-        .btn-blue { background: #3b5bdb; color: white; }
-
-        /* Filtros de estado */
-        .filtros {
-            display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
-        }
-        .filtro-btn {
-            padding: 6px 14px; border-radius: 20px; font-size: 13px;
-            font-weight: 500; text-decoration: none;
-            border: 1.5px solid #dde1ec; color: #6b7a99;
-            background: white; transition: all 0.15s;
-        }
-        .filtro-btn:hover { border-color: #3b5bdb; color: #3b5bdb; }
-        .filtro-btn.activo { background: #3b5bdb; color: white; border-color: #3b5bdb; }
-
-        /* Tabla */
-        .card {
-            background: white; border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            background: #f8f9fc; font-size: 11px; font-weight: 700;
-            color: #7b8499; text-transform: uppercase; letter-spacing: 0.5px;
-            padding: 12px 16px; text-align: left;
-            border-bottom: 1px solid #edf0f7;
-        }
-        td {
-            padding: 13px 16px; font-size: 14px;
-            border-bottom: 1px solid #f0f2f8;
-            color: #2c3650;
-        }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f8f9fc; }
-
-        .badge {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 700;
-        }
-        .badge-borrador  { background: #f0f2f8; color: #6b7a99; }
-        .badge-enviada   { background: #fff3cd; color: #b08000; }
-        .badge-aceptada  { background: #d1fae5; color: #065f46; }
-        .badge-rechazada { background: #fee2e2; color: #991b1b; }
-
-        .empty-state {
-            text-align: center; padding: 60px 20px; color: #a0aab8;
-        }
-        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-        .empty-state p { font-size: 15px; }
-
-        /* Flash messages */
-        .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
-        .flash.success { background: #d1fae5; color: #065f46; }
-        .flash.error   { background: #fee2e2; color: #991b1b; }
-
-        .link-detalle {
-            color: #3b5bdb; text-decoration: none; font-weight: 600;
-        }
-        .link-detalle:hover { text-decoration: underline; }
-
-        .monto { font-weight: 700; color: #1a7a45; }
-    </style>
-</head>
-<body>
-
-<!-- ===================== SIDEBAR ===================== -->
-<aside class="sidebar">
-    <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Importadora Uziel</span>
+{% extends "base.html" %}
+{% block title %}Cotizaciones — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .link-detalle { text-decoration: none; font-weight: 600; }
+    .link-detalle:hover { text-decoration: underline; }
+    .monto { font-weight: 700; color: var(--success); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🧾 Cotizaciones</h1>
+        <p class="subtitulo">
+            {{ cotizaciones|length }} cotizacion{{ 'es' if cotizaciones|length != 1 else '' }} encontrada{{ 's' if cotizaciones|length != 1 else '' }}
+            {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
+        </p>
     </div>
-    <nav>
-        <a href="{{ url_for('inicio') }}" class="nav-item">
-            <span class="nav-icon">⊞</span> Dashboard
-        </a>
-        {% if puede_ver('clientes') %}
-        <a href="{{ url_for('clientes') }}" class="nav-item">
-            <span class="nav-icon">👤</span> Clientes
-        </a>
-        {% endif %}
-        {% if puede_ver('productos') %}
-        <a href="{{ url_for('catalogo') }}" class="nav-item">
-            <span class="nav-icon">📦</span> Productos
-        </a>
-        {% endif %}
-        {% if puede_ver('tareas') %}
-        <a href="{{ url_for('tareas') }}" class="nav-item" style="position:relative;">
-            <span class="nav-icon">📋</span> Tareas
-            {% if total_notif > 0 %}
-                <span style="background:#e74c3c;color:white;font-size:10px;font-weight:700;
-                             padding:1px 6px;border-radius:10px;margin-left:auto;line-height:16px;">
-                    {{ total_notif }}
-                </span>
-            {% endif %}
-        </a>
-        {% endif %}
-        {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item active">
-            <span class="nav-icon">🧾</span> Cotizaciones
-        </a>
-        {% endif %}
-        {% if session.get('rol') == 'Admin' %}
-        <hr class="nav-divider">
-        <a href="{{ url_for('admin_usuarios') }}" class="nav-item">
-            <span class="nav-icon">⚙️</span> Usuarios
-        </a>
-        {% endif %}
-    </nav>
-    <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">{{ session['usuario'][0].upper() }}</div>
-            <div>
-                <div class="user-name">{{ session['usuario'].capitalize() }}</div>
-                <div class="user-rol">{{ session['rol'] }}</div>
-            </div>
-        </div>
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ Cerrar Sesión</a>
-    </div>
-</aside>
+    {% if session['rol'] == 'Admin' %}
+    <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Nueva Cotización</a>
+    {% endif %}
+</div>
 
-<!-- ===================== CONTENIDO ===================== -->
-<main class="main">
-    <div class="page-header">
-        <div>
-            <div class="page-title">🧾 Cotizaciones</div>
-            <div class="page-subtitle">
-                {{ cotizaciones|length }} cotizacion{{ 'es' if cotizaciones|length != 1 else '' }} encontrada{{ 's' if cotizaciones|length != 1 else '' }}
-                {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
-            </div>
-        </div>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}
+        <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endwith %}
+
+<div class="filtros">
+    <a href="{{ url_for('cotizaciones') }}" class="filtro-btn {% if not estado_activo %}activo{% endif %}">Todos</a>
+    {% for estado in estados %}
+    <a href="{{ url_for('cotizaciones', estado=estado) }}" class="filtro-btn {% if estado_activo == estado %}activo{% endif %}">{{ estado }}</a>
+    {% endfor %}
+</div>
+
+<div class="card">
+    {% if cotizaciones %}
+    <table>
+        <thead>
+            <tr>
+                <th>Número</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Total USD</th>
+                <th>Creado por</th>
+                <th>Fecha</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotizaciones %}
+            {# c = (id, numero, cliente_nombre, estado, total_usd, creado_por, fecha_creacion) #}
+            <tr>
+                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="link-detalle">{{ c[1] }}</a></td>
+                <td>{{ c[2] }}</td>
+                <td><span class="badge badge-{{ c[3] | lower }}">{{ c[3] }}</span></td>
+                <td class="monto">$ {{ "%.2f"|format(c[4]|float) }}</td>
+                <td>{{ c[5] }}</td>
+                <td>{{ c[6].strftime('%d/%m/%Y') if c[6] else '—' }}</td>
+                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <span class="icon">🧾</span>
+        <p>No hay cotizaciones{% if estado_activo %} con estado <strong>{{ estado_activo }}</strong>{% endif %} registradas.</p>
         {% if session['rol'] == 'Admin' %}
-        <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-blue">+ Nueva Cotización</a>
+        <br>
+        <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Crear primera cotización</a>
         {% endif %}
     </div>
-
-    <!-- Mensajes flash -->
-    {% with msgs = get_flashed_messages(with_categories=true) %}
-        {% for cat, msg in msgs %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-        {% endfor %}
-    {% endwith %}
-
-    <!-- Filtros por estado -->
-    <div class="filtros">
-        <a href="{{ url_for('cotizaciones') }}"
-           class="filtro-btn {% if not estado_activo %}activo{% endif %}">Todos</a>
-        {% for estado in estados %}
-        <a href="{{ url_for('cotizaciones', estado=estado) }}"
-           class="filtro-btn {% if estado_activo == estado %}activo{% endif %}">
-            {{ estado }}
-        </a>
-        {% endfor %}
-    </div>
-
-    <!-- Tabla de cotizaciones -->
-    <div class="card">
-        {% if cotizaciones %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Número</th>
-                    <th>Cliente</th>
-                    <th>Estado</th>
-                    <th>Total USD</th>
-                    <th>Creado por</th>
-                    <th>Fecha</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in cotizaciones %}
-                {# c = (id, numero, cliente_nombre, estado, total_usd, creado_por, fecha_creacion) #}
-                <tr>
-                    <td>
-                        <a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}"
-                           class="link-detalle">{{ c[1] }}</a>
-                    </td>
-                    <td>{{ c[2] }}</td>
-                    <td>
-                        {% set est = c[3] | lower %}
-                        <span class="badge badge-{{ est }}">{{ c[3] }}</span>
-                    </td>
-                    <td class="monto">$ {{ "%.2f"|format(c[4]|float) }}</td>
-                    <td>{{ c[5] }}</td>
-                    <td>{{ c[6].strftime('%d/%m/%Y') if c[6] else '—' }}</td>
-                    <td>
-                        <a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}"
-                           class="btn btn-blue" style="padding:5px 12px;font-size:12px;">
-                           Ver
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-            <div class="icon">🧾</div>
-            <p>No hay cotizaciones
-                {% if estado_activo %}con estado <strong>{{ estado_activo }}</strong>{% endif %}
-                registradas.
-            </p>
-            {% if session['rol'] == 'Admin' %}
-            <br>
-            <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-blue">
-                + Crear primera cotización
-            </a>
-            {% endif %}
-        </div>
-        {% endif %}
-    </div>
-</main>
-
-</body>
-</html>
+    {% endif %}
+</div>
+{% endblock %}
