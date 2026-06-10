@@ -559,6 +559,226 @@ def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
 
 
 # =============================================================================
+# GENERADOR DE REPORTES SEMANALES / MENSUALES
+# =============================================================================
+
+def generar_reporte_pdf(datos: dict, tipo: str = "Semanal") -> io.BytesIO:
+    """
+    Genera un PDF de reporte de actividad (semanal o mensual).
+
+    Args:
+        datos: Dict devuelto por ConexionBD.obtener_datos_reporte()
+        tipo: "Semanal" o "Mensual"
+
+    Returns:
+        io.BytesIO: Buffer con el PDF listo para enviar/guardar.
+    """
+    ancho, alto = letter
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+
+    MARGEN = 50
+    ANCHO_UTIL = ancho - 2 * MARGEN
+
+    def encabezado(titulo_extra=""):
+        c.setFillColorRGB(*COLOR_AZUL_EMP)
+        c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(MARGEN, alto - 48, NOMBRE_EMPRESA)
+        c.setFont("Helvetica", 10)
+        c.setFillColorRGB(0.8, 0.88, 1.0)
+        titulo = f"Reporte {tipo} de Actividad"
+        if titulo_extra:
+            titulo += f" — {titulo_extra}"
+        c.drawString(MARGEN, alto - 68, titulo)
+        c.setFont("Helvetica", 8)
+        c.drawString(MARGEN, alto - 80, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    def pie():
+        c.setFont("Helvetica", 8)
+        c.setFillColorRGB(*COLOR_GRIS)
+        c.drawString(MARGEN, 35, PIE_DE_PAGINA)
+        c.drawRightString(ancho - MARGEN, 35, datetime.now().strftime("Generado el %d/%m/%Y a las %H:%M"))
+
+    def seccion(titulo, y):
+        c.setFillColorRGB(*COLOR_AZUL_EMP)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(MARGEN, y, titulo.upper())
+        c.setStrokeColorRGB(*COLOR_LINEA)
+        c.setLineWidth(1)
+        c.line(MARGEN, y - 4, ancho - MARGEN, y - 4)
+        return y - 20
+
+    def texto_linea(texto, y, bold=False, color=None, size=10):
+        if y < 60:
+            pie()
+            c.showPage()
+            encabezado()
+            return alto - 100
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        if color:
+            c.setFillColorRGB(*color)
+        else:
+            c.setFillColorRGB(*COLOR_NEGRO)
+        c.drawString(MARGEN + 10, y, texto)
+        return y - 14
+
+    # --- Portada ---
+    encabezado()
+    y = alto - 130
+
+    # Periodo
+    fi = datos["fecha_inicio"]
+    ff = datos["fecha_fin"]
+    if hasattr(fi, 'strftime'):
+        fi_str = fi.strftime("%d/%m/%Y")
+    else:
+        fi_str = str(fi)[:10]
+    if hasattr(ff, 'strftime'):
+        ff_str = ff.strftime("%d/%m/%Y")
+    else:
+        ff_str = str(ff)[:10]
+
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColorRGB(*COLOR_NEGRO)
+    c.drawString(MARGEN, y, f"Periodo: {fi_str} — {ff_str}")
+
+    y -= 30
+    c.setFont("Helvetica", 11)
+    c.setFillColorRGB(*COLOR_GRIS)
+    c.drawString(MARGEN, y, "Resumen general de actividad en el periodo seleccionado.")
+
+    # Tarjetas de resumen
+    y -= 40
+    tarjetas = [
+        ("👥 Clientes Nuevos", len(datos["clientes_nuevos"]), "#2563eb"),
+        ("📦 Productos Nuevos", len(datos["productos_nuevos"]), "#27ae5f"),
+        ("🖼️ Fotos Vinculadas", len(datos["activos_nuevos"]), "#e67e22"),
+        ("📋 Tareas Creadas", len(datos["tareas_creadas"]), "#8e44ad"),
+        ("✅ Tareas Completadas", len(datos["tareas_completadas"]), "#27ae5f"),
+        ("🧾 Cotizaciones", len(datos["cotizaciones_creadas"]), "#e74c3c"),
+    ]
+
+    c.setStrokeColorRGB(*COLOR_LINEA)
+    c.setLineWidth(0.5)
+    for i, (label, valor, color_hex) in enumerate(tarjetas):
+        col = i % 3
+        row = i // 3
+        x = MARGEN + col * (ANCHO_UTIL // 3)
+        cy = y - row * 55
+
+        c.setFillColorRGB(0.97, 0.98, 1.0)
+        c.roundRect(x, cy - 40, ANCHO_UTIL // 3 - 10, 48, 6, fill=True, stroke=False)
+        c.setFillColorRGB(*COLOR_NEGRO)
+        c.setFont("Helvetica", 9)
+        c.drawCentredString(x + (ANCHO_UTIL // 3 - 10) // 2, cy - 14, label)
+        c.setFont("Helvetica-Bold", 22)
+        c.setFillColorRGB(*eval(color_hex.replace("#", "0x")) if False else (0.15, 0.68, 0.37))
+        # Simplificar: usar color del nombre
+        c.setFillColorRGB(*{
+            "#2563eb": (0.15, 0.39, 0.92),
+            "#27ae5f": (0.15, 0.68, 0.37),
+            "#e67e22": (0.90, 0.49, 0.13),
+            "#8e44ad": (0.56, 0.27, 0.68),
+            "#e74c3c": (0.91, 0.30, 0.24),
+        }.get(color_hex, (0.15, 0.68, 0.37)))
+        c.drawCentredString(x + (ANCHO_UTIL // 3 - 10) // 2, cy - 4, str(valor))
+
+    y -= row * 55 + 55
+
+    # --- Detalle por sección ---
+    pie()
+    c.showPage()
+    encabezado("Detalle")
+    y = alto - 120
+
+    # 1. Clientes nuevos
+    y = seccion(f"👥 Clientes Nuevos ({len(datos['clientes_nuevos'])})", y)
+    if datos["clientes_nuevos"]:
+        for cli in datos["clientes_nuevos"]:
+            texto = f"• {cli[1]} — RIF: {cli[0]} — Tlf: {cli[2]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se registraron nuevos clientes en este periodo.", y, color=COLOR_GRIS)
+
+    # 2. Productos nuevos
+    if y < 120:
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+    y = seccion(f"📦 Productos Nuevos ({len(datos['productos_nuevos'])})", y)
+    if datos["productos_nuevos"]:
+        for prod in datos["productos_nuevos"]:
+            texto = f"• {prod[0]} — {prod[1]} — {prod[3]} — ${float(prod[4]):.2f}" if prod[4] else f"• {prod[0]} — {prod[1]} — {prod[3]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se registraron nuevos productos en este periodo.", y, color=COLOR_GRIS)
+
+    # 3. Fotos vinculadas
+    if y < 120:
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+    y = seccion(f"🖼️ Fotos Vinculadas ({len(datos['activos_nuevos'])})", y)
+    if datos["activos_nuevos"]:
+        for act in datos["activos_nuevos"]:
+            texto = f"• SKU: {act[2]} ({act[3]}) — Ángulo: {act[1]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se vincularon fotografías en este periodo.", y, color=COLOR_GRIS)
+
+    # 4. Tareas creadas
+    if y < 120:
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+    y = seccion(f"📋 Tareas Creadas ({len(datos['tareas_creadas'])})", y)
+    if datos["tareas_creadas"]:
+        for t in datos["tareas_creadas"]:
+            texto = f"• [{t[3]}] {t[2]} — Cliente: {t[1]} — Estado: {t[4]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se crearon tareas en este periodo.", y, color=COLOR_GRIS)
+
+    # 5. Tareas completadas
+    if y < 120:
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+    y = seccion(f"✅ Tareas Completadas ({len(datos['tareas_completadas'])})", y)
+    if datos["tareas_completadas"]:
+        for t in datos["tareas_completadas"]:
+            texto = f"• {t[2]} — Asignado a: {t[3]} — Límite: {t[4]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se completaron tareas en este periodo.", y, color=COLOR_GRIS)
+
+    # 6. Cotizaciones
+    if y < 120:
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+    y = seccion(f"🧾 Cotizaciones ({len(datos['cotizaciones_creadas'])})", y)
+    if datos["cotizaciones_creadas"]:
+        for cot in datos["cotizaciones_creadas"]:
+            texto = f"• {cot[1]} — {cot[2]} — ${float(cot[3]):,.2f} — {cot[4]}"
+            y = texto_linea(texto, y, size=9)
+    else:
+        y = texto_linea("No se crearon cotizaciones en este periodo.", y, color=COLOR_GRIS)
+
+    # --- Totales generales ---
+    if y < 120:
+        pie(); c.showPage(); encabezado("Totales Generales"); y = alto - 120
+    else:
+        y -= 20
+    y = seccion("📊 Totales Generales del Sistema", y)
+    totales = [
+        f"Total de clientes registrados:  {datos['total_clientes']}",
+        f"Total de productos en catálogo: {datos['total_productos']}",
+        f"Tareas pendientes actualmente:  {datos['total_tareas_pendientes']}",
+        f"Total de cotizaciones emitidas: {datos['total_cotizaciones']}",
+    ]
+    for t in totales:
+        y = texto_linea(t, y, bold=True, size=10)
+
+    pie()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+# =============================================================================
 # ZONA DE PRUEBA — Ejecutar directamente para probar
 # =============================================================================
 

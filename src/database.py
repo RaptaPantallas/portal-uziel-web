@@ -52,6 +52,7 @@ class ConexionBD:
         self._asegurar_columna_es_principal()
         self._descubrir_pk_activos()
         self._sembrar_usuario_supervisor()
+        self._asegurar_columna_fecha_creacion_activos()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL."""
@@ -159,6 +160,131 @@ class ConexionBD:
             if cursor:
                 cursor.close()
             conexion.close()
+
+    def _asegurar_columna_fecha_creacion_activos(self):
+        """Agrega columna fecha_creacion a activos_digitales si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "ALTER TABLE activos_digitales "
+                "ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP DEFAULT NOW()"
+            )
+            conexion.commit()
+        except Error as e:
+            print(f"⚠️ [BD] Nota: columna fecha_creacion en activos no agregada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    # =========================================================================
+    # MÓDULO REPORTES — Datos para generación de informes
+    # =========================================================================
+
+    def obtener_datos_reporte(self, fecha_inicio, fecha_fin) -> dict:
+        """
+        Obtiene todos los datos de actividad en un rango de fechas.
+        Retorna un dict con listas de: clientes, productos, activos, tareas, cotizaciones.
+        """
+        from datetime import datetime as dt_mod
+        resultado = {
+            "clientes_nuevos": [],
+            "productos_nuevos": [],
+            "activos_nuevos": [],
+            "tareas_creadas": [],
+            "tareas_completadas": [],
+            "cotizaciones_creadas": [],
+            "total_clientes": 0,
+            "total_productos": 0,
+            "total_tareas_pendientes": 0,
+            "total_cotizaciones": 0,
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin
+        }
+        conexion = self.conectar()
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+
+            # Clientes nuevos en el rango
+            cursor.execute("""
+                SELECT rif, nombre_empresa, telefono, correo, fecha_registro
+                FROM clientes
+                WHERE fecha_registro::date BETWEEN %s AND %s
+                ORDER BY fecha_registro DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["clientes_nuevos"] = cursor.fetchall()
+
+            # Productos nuevos en el rango
+            cursor.execute("""
+                SELECT sku, nombre, categoria, marca, precio, fecha_creacion
+                FROM productos
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+                ORDER BY fecha_creacion DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["productos_nuevos"] = cursor.fetchall()
+
+            # Activos (fotos) vinculados en el rango
+            cursor.execute("""
+                SELECT a.ruta_archivo, a.angulo, p.sku, p.nombre, a.fecha_creacion
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE a.fecha_creacion::date BETWEEN %s AND %s
+                ORDER BY a.fecha_creacion DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["activos_nuevos"] = cursor.fetchall()
+
+            # Tareas creadas en el rango
+            cursor.execute("""
+                SELECT id, cliente_nombre, tipo_tarea, asignado_a, estado, fecha_creacion
+                FROM tareas
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+                ORDER BY fecha_creacion DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["tareas_creadas"] = cursor.fetchall()
+
+            # Tareas completadas en el rango (por fecha_limite como aproximación)
+            cursor.execute("""
+                SELECT id, cliente_nombre, tipo_tarea, asignado_a, fecha_limite
+                FROM tareas
+                WHERE estado = 'Completada'
+                  AND fecha_limite BETWEEN %s AND %s
+                ORDER BY fecha_limite DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["tareas_completadas"] = cursor.fetchall()
+
+            # Cotizaciones creadas en el rango
+            cursor.execute("""
+                SELECT id, numero, cliente_nombre, total_usd, estado, fecha_creacion
+                FROM cotizaciones
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+                ORDER BY fecha_creacion DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["cotizaciones_creadas"] = cursor.fetchall()
+
+            # Totales generales
+            cursor.execute("SELECT COUNT(*) FROM clientes")
+            resultado["total_clientes"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM productos")
+            resultado["total_productos"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM tareas WHERE estado != 'Completada'")
+            resultado["total_tareas_pendientes"] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM cotizaciones")
+            resultado["total_cotizaciones"] = cursor.fetchone()[0]
+
+        except Error as e:
+            print(f"🔴 [Reportes] Error al obtener datos del reporte: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
 
     # =========================================================================
     # MÓDULO CRM — Gestión de Clientes
