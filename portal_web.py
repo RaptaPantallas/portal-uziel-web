@@ -50,7 +50,7 @@ import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
-from src.generador_pdf import generar_pdf_cotizacion
+from src.generador_pdf import generar_pdf_cotizacion, generar_reporte_pdf
 
 # =============================================================================
 # ██████████████ CONFIGURACIÓN - EDITAR AQUÍ ██████████████
@@ -725,6 +725,92 @@ def generar_pdf():
         buffer,
         as_attachment=True,
         download_name=NOMBRE_ARCHIVO_PDF,
+        mimetype='application/pdf'
+    )
+
+
+# =============================================================================
+# MÓDULO DE REPORTES
+# =============================================================================
+
+@app.route('/reportes')
+@login_requerido
+def reportes():
+    """Página de reportes semanales/mensuales."""
+    from datetime import datetime, timedelta
+
+    hoy = datetime.now()
+
+    # Semana: domingo a domingo
+    diasem = hoy.weekday()
+    domingo_pasado = hoy - timedelta(days=(diasem + 1) % 7)
+    domingo_siguiente = domingo_pasado + timedelta(days=7)
+
+    # Mes actual
+    inicio_mes = hoy.replace(day=1)
+    if hoy.month == 12:
+        fin_mes = hoy.replace(year=hoy.year + 1, month=1, day=1)
+    else:
+        fin_mes = hoy.replace(month=hoy.month + 1, day=1)
+
+    # Obtener datos semanales
+    datos_semanales = bd.obtener_datos_reporte(
+        domingo_pasado.strftime("%Y-%m-%d"),
+        domingo_siguiente.strftime("%Y-%m-%d")
+    )
+
+    # Obtener datos mensuales
+    datos_mensuales = bd.obtener_datos_reporte(
+        inicio_mes.strftime("%Y-%m-%d"),
+        fin_mes.strftime("%Y-%m-%d")
+    )
+
+    return render_template(
+        'reportes.html',
+        semana_inicio=domingo_pasado.strftime("%d/%m/%Y"),
+        semana_fin=domingo_siguiente.strftime("%d/%m/%Y"),
+        mes_inicio=inicio_mes.strftime("%d/%m/%Y"),
+        mes_fin=fin_mes.strftime("%d/%m/%Y"),
+        ds=datos_semanales,
+        dm=datos_mensuales
+    )
+
+
+@app.route('/reporte_pdf/<tipo>')
+@login_requerido
+def reporte_pdf(tipo):
+    """Descarga el PDF de reporte semanal o mensual."""
+    from datetime import datetime, timedelta
+
+    hoy = datetime.now()
+
+    if tipo == "semanal":
+        diasem = hoy.weekday()
+        fecha_inicio = hoy - timedelta(days=(diasem + 1) % 7)
+        fecha_fin = fecha_inicio + timedelta(days=7)
+        tipo_reporte = "Semanal"
+    elif tipo == "mensual":
+        fecha_inicio = hoy.replace(day=1)
+        if hoy.month == 12:
+            fecha_fin = hoy.replace(year=hoy.year + 1, month=1, day=1)
+        else:
+            fecha_fin = hoy.replace(month=hoy.month + 1, day=1)
+        tipo_reporte = "Mensual"
+    else:
+        flash("Tipo de reporte no válido.", "error")
+        return redirect(url_for('reportes'))
+
+    datos = bd.obtener_datos_reporte(
+        fecha_inicio.strftime("%Y-%m-%d"),
+        fecha_fin.strftime("%Y-%m-%d")
+    )
+
+    buffer = generar_reporte_pdf(datos, tipo_reporte)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"Reporte_{tipo_reporte}_{hoy.strftime('%Y%m%d')}.pdf",
         mimetype='application/pdf'
     )
 

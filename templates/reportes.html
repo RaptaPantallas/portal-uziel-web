@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Reportes — Importadora Uziel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📊 Reportes de Actividad</h1>
+        <p class="subtitulo">Resumen semanal y mensual del trabajo realizado. Descarga el PDF para tu respaldo.</p>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Reporte Semanal -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e2e8f0;">
+        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📅 Reporte Semanal</h2>
+        <span style="font-size:13px; color:#64748b;">{{ semana_inicio }} → {{ semana_fin }}</span>
+    </div>
+    <div style="padding:20px;">
+        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:20px;">
+            <div class="stat-card" style="background:#eff6ff; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#2563eb;">{{ ds.clientes_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">👥 Clientes Nuevos</div>
+            </div>
+            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ ds.productos_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">📦 Productos Nuevos</div>
+            </div>
+            <div class="stat-card" style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#d97706;">{{ ds.activos_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">🖼️ Fotos Vinculadas</div>
+            </div>
+            <div class="stat-card" style="background:#faf5ff; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#9333ea;">{{ ds.tareas_creadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">📋 Tareas Creadas</div>
+            </div>
+            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ ds.tareas_completadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">✅ Tareas Completadas</div>
+            </div>
+            <div class="stat-card" style="background:#fef2f2; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#dc2626;">{{ ds.cotizaciones_creadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">🧾 Cotizaciones</div>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Clientes Nuevos</h3>
+                {% if ds.clientes_nuevos %}
+                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
+                    {% for c in ds.clientes_nuevos %}
+                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• {{ c[1] }} <span style="color:#94a3b8;">({{ c[0] }})</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
+            <div style="flex:1; min-width:200px;">
+                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Productos Nuevos</h3>
+                {% if ds.productos_nuevos %}
+                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
+                    {% for p in ds.productos_nuevos %}
+                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• {{ p[0] }} — {{ p[1] }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
+            <div style="flex:1; min-width:200px;">
+                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Tareas Creadas</h3>
+                {% if ds.tareas_creadas %}
+                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
+                    {% for t in ds.tareas_creadas %}
+                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• [{{ t[3] }}] {{ t[2] }} — {{ t[1] }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
+        </div>
+
+        <div style="margin-top:20px; text-align:right;">
+            <a href="{{ url_for('reporte_pdf', tipo='semanal') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                📄 Descargar PDF Semanal
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Reporte Mensual -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e2e8f0;">
+        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📅 Reporte Mensual</h2>
+        <span style="font-size:13px; color:#64748b;">{{ mes_inicio }} → {{ mes_fin }}</span>
+    </div>
+    <div style="padding:20px;">
+        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:20px;">
+            <div class="stat-card" style="background:#eff6ff; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#2563eb;">{{ dm.clientes_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">👥 Clientes Nuevos</div>
+            </div>
+            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ dm.productos_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">📦 Productos Nuevos</div>
+            </div>
+            <div class="stat-card" style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#d97706;">{{ dm.activos_nuevos|length }}</div>
+                <div style="font-size:12px; color:#64748b;">🖼️ Fotos Vinculadas</div>
+            </div>
+            <div class="stat-card" style="background:#faf5ff; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#9333ea;">{{ dm.tareas_creadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">📋 Tareas Creadas</div>
+            </div>
+            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ dm.tareas_completadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">✅ Tareas Completadas</div>
+            </div>
+            <div class="stat-card" style="background:#fef2f2; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:28px; font-weight:700; color:#dc2626;">{{ dm.cotizaciones_creadas|length }}</div>
+                <div style="font-size:12px; color:#64748b;">🧾 Cotizaciones</div>
+            </div>
+        </div>
+
+        <div style="margin-top:20px; text-align:right;">
+            <a href="{{ url_for('reporte_pdf', tipo='mensual') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                📄 Descargar PDF Mensual
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Totales del Sistema -->
+<div class="card">
+    <div class="card-header" style="padding:16px 20px; border-bottom:1px solid #e2e8f0;">
+        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📊 Totales del Sistema</h2>
+    </div>
+    <div style="padding:20px;">
+        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
+            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_clientes }}</div>
+                <div style="font-size:13px; color:#64748b;">👥 Total Clientes</div>
+            </div>
+            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_productos }}</div>
+                <div style="font-size:13px; color:#64748b;">📦 Total Productos</div>
+            </div>
+            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_tareas_pendientes }}</div>
+                <div style="font-size:13px; color:#64748b;">📋 Tareas Pendientes</div>
+            </div>
+            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
+                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_cotizaciones }}</div>
+                <div style="font-size:13px; color:#64748b;">🧾 Total Cotizaciones</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
