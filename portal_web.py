@@ -254,8 +254,7 @@ def catalogo():
     para mostrar miniaturas en la tabla.
     """
     inventario = bd.obtener_productos()
-    fotos_principales = bd.obtener_fotos_principales()
-    return render_template('catalogo.html', productos=inventario, fotos_principales=fotos_principales)
+    return render_template('catalogo.html', productos=inventario)
 
 
 @app.route('/producto/<sku>')
@@ -278,29 +277,19 @@ def detalle_producto(sku):
 
     activos = bd.obtener_activos_por_sku(sku)
 
-    # Obtener ruta principal
-    ruta_principal = bd.obtener_activo_principal(sku)
-
     # Agrupar activos por ángulo para los tabs de la galería
     galeria = {}
     for activo in activos:
         angulo = activo[3]
         if angulo not in galeria:
             galeria[angulo] = []
-        # Extraer ruta relativa a almacen_activos/ para servirla por web
-        ruta_completa = activo[1].replace('\\', '/')
-        if 'almacen_activos/' in ruta_completa:
-            ruta_rel = ruta_completa.split('almacen_activos/')[1]
-        else:
-            ruta_rel = os.path.basename(ruta_completa)
-        # Verificar si es la imagen principal
-        es_principal = (ruta_principal and activo[1] == ruta_principal)
+        # Normalizar separadores antes de basename para rutas Windows guardadas por el desktop app
+        nombre_archivo = os.path.basename(activo[1].replace('\\', '/'))
         galeria[angulo].append({
             'id': activo[0],
-            'ruta': ruta_rel,
+            'ruta': activo[1],
             'tipo': activo[2],
-            'nombre': os.path.basename(ruta_completa),
-            'es_principal': es_principal
+            'nombre': nombre_archivo
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
@@ -313,48 +302,20 @@ def detalle_producto(sku):
     )
 
 
-@app.route('/galeria')
+@app.route('/activos/<path:nombre_archivo>')
 @login_requerido
-def galeria_fotos():
-    """
-    Galería / Banco de Fotos — Muestra todos los productos con fotos
-    en una cuadrícula con buscador inteligente incluido.
-    """
-    busqueda = request.args.get('q', '').strip()
-    pagina = request.args.get('pagina', 1, type=int)
-    por_pagina = 60
-
-    datos = bd.buscar_galeria_web(query=busqueda, pagina=pagina, por_pagina=por_pagina)
-
-    return render_template(
-        'galeria_fotos.html',
-        items=datos['items'],
-        total=datos['total'],
-        paginas=datos['paginas'],
-        pagina_actual=datos['pagina'],
-        busqueda=busqueda
-    )
-
-
-@app.route('/activos/<path:ruta_relativa>')
-@login_requerido
-def servir_activo(ruta_relativa):
+def servir_activo(nombre_archivo):
     """
     Sirve archivos estáticos desde la carpeta 'almacen_activos/'.
 
-    Soporta rutas relativas con subdirectorios (SKU/nombre.webp).
-    La ruta almacenada en BD puede ser absoluta (Windows) o relativa;
-    esta función extrae la porción relativa a almacen_activos/.
+    Esta ruta permite que el portal web acceda a las fotografías copiadas
+    por la app de escritorio DAM. Solo accesible para usuarios autenticados.
+
+    Args:
+        nombre_archivo (str): Nombre del archivo (con extensión) dentro de almacen_activos/.
     """
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-    # Si la ruta contiene la carpeta almacen_activos, extraer la porción relativa
-    if 'almacen_activos' in ruta_relativa.replace('\\', '/'):
-        idx = ruta_relativa.replace('\\', '/').find('almacen_activos/')
-        if idx >= 0:
-            ruta_relativa = ruta_relativa.replace('\\', '/')[idx + len('almacen_activos/'):]
-    # Normalizar separadores
-    ruta_relativa = ruta_relativa.replace('\\', '/')
-    return send_from_directory(carpeta_activos, ruta_relativa)
+    return send_from_directory(carpeta_activos, nombre_archivo)
 
 
 @app.route('/clientes')
