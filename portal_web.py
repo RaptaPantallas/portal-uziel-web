@@ -736,55 +736,99 @@ def generar_pdf():
 @app.route('/reportes')
 @login_requerido
 def reportes():
-    """Página de reportes semanales/mensuales."""
+    """Página de reportes con selector de fechas personalizado."""
     from datetime import datetime, timedelta
 
     hoy = datetime.now()
 
-    # Semana: domingo a domingo
+    # Leer fechas de query params o usar valores por defecto (mes actual)
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+
+    if desde and hasta:
+        fecha_desde = desde
+        fecha_hasta = hasta
+    else:
+        # Por defecto: mes actual
+        inicio_mes = hoy.replace(day=1)
+        if hoy.month == 12:
+            fin_mes = hoy.replace(year=hoy.year + 1, month=1, day=1)
+        else:
+            fin_mes = hoy.replace(month=hoy.month + 1, day=1)
+        fecha_desde = inicio_mes.strftime("%Y-%m-%d")
+        fecha_hasta = fin_mes.strftime("%Y-%m-%d")
+
+    # Datos del reporte
+    datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
+    datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=20)
+
+    # Semana actual para referencia rapida
     diasem = hoy.weekday()
     domingo_pasado = hoy - timedelta(days=(diasem + 1) % 7)
     domingo_siguiente = domingo_pasado + timedelta(days=7)
 
-    # Mes actual
-    inicio_mes = hoy.replace(day=1)
-    if hoy.month == 12:
-        fin_mes = hoy.replace(year=hoy.year + 1, month=1, day=1)
-    else:
-        fin_mes = hoy.replace(month=hoy.month + 1, day=1)
-
-    # Obtener datos semanales
-    datos_semanales = bd.obtener_datos_reporte(
-        domingo_pasado.strftime("%Y-%m-%d"),
-        domingo_siguiente.strftime("%Y-%m-%d")
-    )
-
-    # Obtener datos mensuales
-    datos_mensuales = bd.obtener_datos_reporte(
-        inicio_mes.strftime("%Y-%m-%d"),
-        fin_mes.strftime("%Y-%m-%d")
-    )
-
     return render_template(
         'reportes.html',
+        desde=fecha_desde,
+        hasta=fecha_hasta,
+        datos=datos,
+        productos_pag=datos_productos,
         semana_inicio=domingo_pasado.strftime("%d/%m/%Y"),
-        semana_fin=domingo_siguiente.strftime("%d/%m/%Y"),
-        mes_inicio=inicio_mes.strftime("%d/%m/%Y"),
-        mes_fin=fin_mes.strftime("%d/%m/%Y"),
-        ds=datos_semanales,
-        dm=datos_mensuales
+        semana_fin=domingo_siguiente.strftime("%d/%m/%Y")
     )
+
+
+@app.route('/api/reporte_productos')
+@login_requerido
+def api_reporte_productos():
+    """API JSON para paginacion de productos en reporte."""
+    from datetime import datetime, timedelta
+
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+    pagina = request.args.get('pagina', 1, type=int)
+
+    if not desde or not hasta:
+        return {"productos": [], "total": 0, "html": ""}
+
+    datos = bd.obtener_productos_por_fecha(desde, hasta, pagina=pagina, por_pagina=20)
+
+    html = ""
+    for p in datos["productos"]:
+        precio = f"${float(p[4]):,.2f}" if p[4] else "—"
+        html += f"""<tr>
+            <td><span class="sku-badge">{p[0]}</span></td>
+            <td>{p[1]}</td>
+            <td>{p[2]}</td>
+            <td class="precio">{precio}</td>
+        </tr>"""
+
+    return {
+        "productos": datos["productos"],
+        "total": datos["total"],
+        "pagina": datos["pagina"],
+        "total_paginas": datos["total_paginas"],
+        "html": html
+    }
 
 
 @app.route('/reporte_pdf/<tipo>')
+@app.route('/reporte_pdf')
 @login_requerido
-def reporte_pdf(tipo):
-    """Descarga el PDF de reporte semanal o mensual."""
+def reporte_pdf(tipo=None):
+    """Descarga el PDF de reporte semanal, mensual o personalizado."""
     from datetime import datetime, timedelta
 
     hoy = datetime.now()
 
-    if tipo == "semanal":
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+
+    if desde and hasta:
+        fecha_inicio = desde
+        fecha_fin = hasta
+        tipo_reporte = "Personalizado"
+    elif tipo == "semanal":
         diasem = hoy.weekday()
         fecha_inicio = hoy - timedelta(days=(diasem + 1) % 7)
         fecha_fin = fecha_inicio + timedelta(days=7)
@@ -797,15 +841,20 @@ def reporte_pdf(tipo):
             fecha_fin = hoy.replace(month=hoy.month + 1, day=1)
         tipo_reporte = "Mensual"
     else:
-        flash("Tipo de reporte no válido.", "error")
+        flash("Especifica un tipo de reporte o fechas.", "error")
         return redirect(url_for('reportes'))
 
-    datos = bd.obtener_datos_reporte(
-        fecha_inicio.strftime("%Y-%m-%d"),
-        fecha_fin.strftime("%Y-%m-%d")
-    )
+    fi = fecha_inicio if isinstance(fecha_inicio, str) else fecha_inicio.strftime("%Y-%m-%d")
+    ff = fecha_fin if isinstance(fecha_fin, str) else fecha_fin.strftime("%Y-%m-%d")
 
-    buffer = generar_reporte_pdf(datos, tipo_reporte)
+    datos = bd.obtener_datos_reporte(fi, ff)
+    datos["fecha_inicio"] = fi
+    datos["fecha_fin"] = ff
+
+    prod_data = bd.obtener_productos_por_fecha(fi, ff, pagina=1, por_pagina=500)
+    productos_list = prod_data.get("productos", [])
+
+    buffer = generar_reporte_pdf(datos, tipo_reporte, productos_list=productos_list)
 
     return send_file(
         buffer,

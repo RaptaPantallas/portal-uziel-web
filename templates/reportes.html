@@ -1,10 +1,73 @@
 {% extends "base.html" %}
 {% block title %}Reportes — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .reporte-fechas {
+        display: flex; gap: 12px; align-items: flex-end;
+        flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .reporte-fechas .campo label {
+        display: block; font-size: 12px; font-weight: 600;
+        color: var(--text-muted); margin-bottom: 4px;
+    }
+    .reporte-fechas .campo input {
+        padding: 8px 12px; border: 1.5px solid var(--border);
+        border-radius: var(--radius); font-size: 14px;
+        font-family: inherit; color: var(--text);
+        background: var(--card-bg); outline: none;
+    }
+    .reporte-fechas .campo input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+    }
+    .presets {
+        display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .presets button {
+        padding: 5px 14px; border-radius: 20px; font-size: 12px;
+        font-weight: 500; border: 1.5px solid var(--border);
+        background: var(--card-bg); color: var(--text-muted);
+        cursor: pointer; transition: all 0.15s;
+    }
+    .presets button:hover {
+        border-color: var(--primary); color: var(--primary);
+    }
+    .bar-chart { margin-bottom: 16px; }
+    .bar-chart .bar-label {
+        display: flex; justify-content: space-between;
+        font-size: 13px; color: var(--text); margin-bottom: 4px;
+    }
+    .bar-chart .bar-label span:last-child {
+        font-weight: 700; color: var(--primary);
+    }
+    .bar-chart .bar-track {
+        height: 10px; background: #e2e8f0; border-radius: 5px;
+        overflow: hidden;
+    }
+    .bar-chart .bar-fill {
+        height: 100%; border-radius: 5px; transition: width 0.4s ease;
+    }
+    .prod-paginacion {
+        display: flex; justify-content: center; align-items: center;
+        gap: 12px; margin: 16px 0;
+    }
+    .prod-paginacion span {
+        font-size: 13px; color: var(--text-muted);
+    }
+    .total-badge {
+        display: inline-block; background: var(--primary-light);
+        color: var(--primary-dark); padding: 2px 10px;
+        border-radius: 20px; font-size: 12px; font-weight: 700;
+    }
+    .stat-icon { font-size: 22px; }
+    .stat-col { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>📊 Reportes de Actividad</h1>
-        <p class="subtitulo">Resumen semanal y mensual del trabajo realizado. Descarga el PDF para tu respaldo.</p>
+        <h1>Reportes de Actividad</h1>
+        <p class="subtitulo">Selecciona un rango de fechas para ver las estadisticas del periodo.</p>
     </div>
 </div>
 
@@ -16,147 +79,256 @@
   {% endif %}
 {% endwith %}
 
-<!-- Reporte Semanal -->
-<div class="card" style="margin-bottom: 24px;">
-    <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e2e8f0;">
-        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📅 Reporte Semanal</h2>
-        <span style="font-size:13px; color:#64748b;">{{ semana_inicio }} → {{ semana_fin }}</span>
+<!-- Selector de Fechas -->
+<form method="GET" action="{{ url_for('reportes') }}" style="margin-bottom:20px;">
+<div class="card" style="margin-bottom:0;">
+    <div class="card-header">
+        <span class="card-title">Seleccionar Periodo</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary">Aplicar</button>
+            <a href="{{ url_for('reporte_pdf', desde=desde, hasta=hasta) }}" class="btn btn-primary">Descargar PDF</a>
+        </div>
+    </div>
+    <div style="padding:16px 20px;">
+        <div class="reporte-fechas">
+            <div class="campo">
+                <label>Fecha Desde</label>
+                <input type="date" name="desde" value="{{ desde }}" id="input-desde">
+            </div>
+            <div class="campo">
+                <label>Fecha Hasta</label>
+                <input type="date" name="hasta" value="{{ hasta }}" id="input-hasta">
+            </div>
+        </div>
+        <div class="presets">
+            <button type="button" onclick="setRangoSemana()">Esta Semana</button>
+            <button type="button" onclick="setRangoMes()">Este Mes</button>
+            <button type="button" onclick="setRangoMesPasado()">Mes Pasado</button>
+            <button type="button" onclick="setRangoAnio()">Este Ano</button>
+        </div>
+    </div>
+</div>
+</form>
+
+<!-- Estadisticas -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <span class="card-title">Resumen del Periodo</span>
+        <span class="total-badge">{{ datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.tareas_completadas|length + datos.cotizaciones_creadas|length }} eventos</span>
     </div>
     <div style="padding:20px;">
-        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:20px;">
-            <div class="stat-card" style="background:#eff6ff; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#2563eb;">{{ ds.clientes_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">👥 Clientes Nuevos</div>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));">
+            <div class="stat-card" style="background:#eff6ff;border-left:4px solid #2563eb;">
+                <div class="stat-label"><span class="stat-icon">Clientes Nuevos</span><span class="icon">+</span></div>
+                <div class="stat-value" style="color:#2563eb;">{{ datos.clientes_nuevos|length }}</div>
+                <div class="stat-col">vs {{ datos.total_clientes }} totales</div>
             </div>
-            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ ds.productos_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">📦 Productos Nuevos</div>
+            <div class="stat-card" style="background:#f0fdf4;border-left:4px solid #16a34a;">
+                <div class="stat-label"><span class="stat-icon">Productos Nuevos</span><span class="icon">+</span></div>
+                <div class="stat-value" style="color:#16a34a;">{{ datos.productos_nuevos|length }}</div>
+                <div class="stat-col">vs {{ datos.total_productos }} totales</div>
             </div>
-            <div class="stat-card" style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#d97706;">{{ ds.activos_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">🖼️ Fotos Vinculadas</div>
+            <div class="stat-card" style="background:#fffbeb;border-left:4px solid #d97706;">
+                <div class="stat-label"><span class="stat-icon">Fotos Vinculadas</span><span class="icon">+</span></div>
+                <div class="stat-value" style="color:#d97706;">{{ datos.activos_nuevos|length }}</div>
             </div>
-            <div class="stat-card" style="background:#faf5ff; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#9333ea;">{{ ds.tareas_creadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">📋 Tareas Creadas</div>
+            <div class="stat-card" style="background:#faf5ff;border-left:4px solid #9333ea;">
+                <div class="stat-label"><span class="stat-icon">Tareas Creadas</span><span class="icon">+</span></div>
+                <div class="stat-value" style="color:#9333ea;">{{ datos.tareas_creadas|length }}</div>
+                <div class="stat-col">{{ datos.tareas_completadas|length }} completadas</div>
             </div>
-            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ ds.tareas_completadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">✅ Tareas Completadas</div>
+            <div class="stat-card" style="background:#fef2f2;border-left:4px solid #dc2626;">
+                <div class="stat-label"><span class="stat-icon">Cotizaciones</span><span class="icon">+</span></div>
+                <div class="stat-value" style="color:#dc2626;">{{ datos.cotizaciones_creadas|length }}</div>
             </div>
-            <div class="stat-card" style="background:#fef2f2; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#dc2626;">{{ ds.cotizaciones_creadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">🧾 Cotizaciones</div>
-            </div>
-        </div>
-
-        <div style="display:flex; gap:16px; flex-wrap:wrap;">
-            <div style="flex:1; min-width:200px;">
-                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Clientes Nuevos</h3>
-                {% if ds.clientes_nuevos %}
-                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
-                    {% for c in ds.clientes_nuevos %}
-                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• {{ c[1] }} <span style="color:#94a3b8;">({{ c[0] }})</span></li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
-            <div style="flex:1; min-width:200px;">
-                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Productos Nuevos</h3>
-                {% if ds.productos_nuevos %}
-                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
-                    {% for p in ds.productos_nuevos %}
-                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• {{ p[0] }} — {{ p[1] }}</li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
-            <div style="flex:1; min-width:200px;">
-                <h3 style="font-size:13px; font-weight:600; color:#475569; margin-bottom:8px;">Tareas Creadas</h3>
-                {% if ds.tareas_creadas %}
-                <ul style="font-size:12px; color:#334155; list-style:none; padding:0;">
-                    {% for t in ds.tareas_creadas %}
-                    <li style="padding:4px 0; border-bottom:1px solid #f1f5f9;">• [{{ t[3] }}] {{ t[2] }} — {{ t[1] }}</li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:12px; color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
-        </div>
-
-        <div style="margin-top:20px; text-align:right;">
-            <a href="{{ url_for('reporte_pdf', tipo='semanal') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
-                📄 Descargar PDF Semanal
-            </a>
         </div>
     </div>
 </div>
 
-<!-- Reporte Mensual -->
-<div class="card" style="margin-bottom: 24px;">
-    <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e2e8f0;">
-        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📅 Reporte Mensual</h2>
-        <span style="font-size:13px; color:#64748b;">{{ mes_inicio }} → {{ mes_fin }}</span>
+<!-- Graficos de texto (barras) -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <span class="card-title">Proporcion de Actividad</span>
     </div>
     <div style="padding:20px;">
-        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:20px;">
-            <div class="stat-card" style="background:#eff6ff; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#2563eb;">{{ dm.clientes_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">👥 Clientes Nuevos</div>
-            </div>
-            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ dm.productos_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">📦 Productos Nuevos</div>
-            </div>
-            <div class="stat-card" style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#d97706;">{{ dm.activos_nuevos|length }}</div>
-                <div style="font-size:12px; color:#64748b;">🖼️ Fotos Vinculadas</div>
-            </div>
-            <div class="stat-card" style="background:#faf5ff; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#9333ea;">{{ dm.tareas_creadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">📋 Tareas Creadas</div>
-            </div>
-            <div class="stat-card" style="background:#f0fdf4; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#16a34a;">{{ dm.tareas_completadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">✅ Tareas Completadas</div>
-            </div>
-            <div class="stat-card" style="background:#fef2f2; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:28px; font-weight:700; color:#dc2626;">{{ dm.cotizaciones_creadas|length }}</div>
-                <div style="font-size:12px; color:#64748b;">🧾 Cotizaciones</div>
-            </div>
+        {% set total_eventos = datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.cotizaciones_creadas|length %}
+        {% if total_eventos > 0 %}
+        {% set pct_clientes = (datos.clientes_nuevos|length / total_eventos * 100)|round %}
+        {% set pct_productos = (datos.productos_nuevos|length / total_eventos * 100)|round %}
+        {% set pct_activos = (datos.activos_nuevos|length / total_eventos * 100)|round %}
+        {% set pct_tareas = (datos.tareas_creadas|length / total_eventos * 100)|round %}
+        {% set pct_cotizaciones = (datos.cotizaciones_creadas|length / total_eventos * 100)|round %}
+        <div class="bar-chart">
+            <div class="bar-label"><span>Clientes Nuevos</span><span>{{ pct_clientes }}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_clientes }}%;background:#2563eb;"></div></div>
         </div>
+        <div class="bar-chart">
+            <div class="bar-label"><span>Productos Nuevos</span><span>{{ pct_productos }}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_productos }}%;background:#16a34a;"></div></div>
+        </div>
+        <div class="bar-chart">
+            <div class="bar-label"><span>Fotos Vinculadas</span><span>{{ pct_activos }}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_activos }}%;background:#d97706;"></div></div>
+        </div>
+        <div class="bar-chart">
+            <div class="bar-label"><span>Tareas Creadas</span><span>{{ pct_tareas }}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_tareas }}%;background:#9333ea;"></div></div>
+        </div>
+        <div class="bar-chart">
+            <div class="bar-label"><span>Cotizaciones</span><span>{{ pct_cotizaciones }}%</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_cotizaciones }}%;background:#dc2626;"></div></div>
+        </div>
+        {% else %}
+        <p style="text-align:center;color:var(--text-muted);padding:20px;">No hay datos en el periodo seleccionado.</p>
+        {% endif %}
+    </div>
+</div>
 
-        <div style="margin-top:20px; text-align:right;">
-            <a href="{{ url_for('reporte_pdf', tipo='mensual') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
-                📄 Descargar PDF Mensual
-            </a>
+<!-- Detalle por categoria -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <span class="card-title">Detalle por Categoria</span>
+    </div>
+    <div style="padding:20px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+            <!-- Clientes Nuevos -->
+            <div>
+                <h3 style="font-size:14px;font-weight:600;color:#2563eb;margin-bottom:8px;">Clientes Nuevos ({{ datos.clientes_nuevos|length }})</h3>
+                {% if datos.clientes_nuevos %}
+                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                    {% for c in datos.clientes_nuevos %}
+                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ c[1] }} <span style="color:#94a3b8;font-size:11px;">({{ c[0] }})</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
+            <!-- Tareas Creadas -->
+            <div>
+                <h3 style="font-size:14px;font-weight:600;color:#9333ea;margin-bottom:8px;">Tareas Creadas ({{ datos.tareas_creadas|length }})</h3>
+                {% if datos.tareas_creadas %}
+                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                    {% for t in datos.tareas_creadas %}
+                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">[{{ t[3] }}] {{ t[2] }} — <span style="color:#94a3b8;">{{ t[1] }}</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
+            <!-- Cotizaciones -->
+            <div>
+                <h3 style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:8px;">Cotizaciones ({{ datos.cotizaciones_creadas|length }})</h3>
+                {% if datos.cotizaciones_creadas %}
+                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                    {% for cot in datos.cotizaciones_creadas %}
+                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ cot[1] }} — {{ cot[2] }} <span style="color:var(--primary);font-weight:600;">${{ cot[3] }}</span></li>
+                    {% endfor %}
+                </ul>
+                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Totales del Sistema -->
+<!-- Lista de Productos Agregados con Paginado -->
 <div class="card">
-    <div class="card-header" style="padding:16px 20px; border-bottom:1px solid #e2e8f0;">
-        <h2 style="font-size:16px; font-weight:600; color:#0f172a;">📊 Totales del Sistema</h2>
+    <div class="card-header">
+        <span class="card-title">Productos Agregados en el Periodo</span>
+        <span class="total-badge" id="prod-total-badge">{{ productos_pag.total }} productos</span>
     </div>
-    <div style="padding:20px;">
-        <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
-            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
-                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_clientes }}</div>
-                <div style="font-size:13px; color:#64748b;">👥 Total Clientes</div>
-            </div>
-            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
-                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_productos }}</div>
-                <div style="font-size:13px; color:#64748b;">📦 Total Productos</div>
-            </div>
-            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
-                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_tareas_pendientes }}</div>
-                <div style="font-size:13px; color:#64748b;">📋 Tareas Pendientes</div>
-            </div>
-            <div class="stat-card" style="background:#f8fafc; padding:20px; border-radius:8px; text-align:center; border:1px solid #e2e8f0;">
-                <div style="font-size:32px; font-weight:700; color:#0f172a;">{{ ds.total_cotizaciones }}</div>
-                <div style="font-size:13px; color:#64748b;">🧾 Total Cotizaciones</div>
-            </div>
-        </div>
+    <table>
+        <thead>
+            <tr>
+                <th>SKU</th>
+                <th>Nombre</th>
+                <th>Marca</th>
+                <th>Precio</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-productos-reporte">
+            {% for p in productos_pag.productos %}
+            <tr>
+                <td><span class="sku-badge">{{ p[0] }}</span></td>
+                <td>{{ p[1] }}</td>
+                <td>{{ p[2] }}</td>
+                <td class="precio">${{ "%.2f"|format(p[4]|float) if p[4] else "—" }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:30px;">No hay productos agregados en este periodo.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if productos_pag.total_paginas > 1 %}
+    <div class="prod-paginacion">
+        <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)">← Anterior</button>
+        <span id="prod-info-pagina">Pagina {{ productos_pag.pagina }} de {{ productos_pag.total_paginas }} ({{ productos_pag.total }} productos)</span>
+        <button class="btn btn-ghost btn-sm" id="prod-btn-sig" onclick="cambiarPaginaProd(1)">Siguiente →</button>
     </div>
+    {% endif %}
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+var prodPaginaActual = {{ productos_pag.pagina }};
+var prodTotalPaginas = {{ productos_pag.total_paginas }};
+
+function setRangoSemana() {
+    var hoy = new Date();
+    var dia = hoy.getDay();
+    var diff = hoy.getDate() - dia + (dia === 0 ? -6 : 1);
+    var lunes = new Date(hoy.setDate(diff));
+    var domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    document.getElementById('input-desde').value = lunes.toISOString().split('T')[0];
+    document.getElementById('input-hasta').value = domingo.toISOString().split('T')[0];
+    document.querySelector('form').submit();
+}
+
+function setRangoMes() {
+    var hoy = new Date();
+    var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    var fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    document.getElementById('input-desde').value = inicio.toISOString().split('T')[0];
+    document.getElementById('input-hasta').value = fin.toISOString().split('T')[0];
+    document.querySelector('form').submit();
+}
+
+function setRangoMesPasado() {
+    var hoy = new Date();
+    var inicio = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    var fin = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    document.getElementById('input-desde').value = inicio.toISOString().split('T')[0];
+    document.getElementById('input-hasta').value = fin.toISOString().split('T')[0];
+    document.querySelector('form').submit();
+}
+
+function setRangoAnio() {
+    var hoy = new Date();
+    var inicio = new Date(hoy.getFullYear(), 0, 1);
+    var fin = new Date(hoy.getFullYear(), 11, 31);
+    document.getElementById('input-desde').value = inicio.toISOString().split('T')[0];
+    document.getElementById('input-hasta').value = fin.toISOString().split('T')[0];
+    document.querySelector('form').submit();
+}
+
+function cambiarPaginaProd(delta) {
+    var nueva = prodPaginaActual + delta;
+    if (nueva < 1 || nueva > prodTotalPaginas) return;
+    prodPaginaActual = nueva;
+
+    var desde = document.getElementById('input-desde').value;
+    var hasta = document.getElementById('input-hasta').value;
+
+    fetch('/api/reporte_productos?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&pagina=' + nueva)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('tabla-productos-reporte').innerHTML = data.html;
+            document.getElementById('prod-info-pagina').textContent = 'Pagina ' + data.pagina + ' de ' + data.total_paginas + ' (' + data.total + ' productos)';
+            document.getElementById('prod-total-badge').textContent = data.total + ' productos';
+            prodTotalPaginas = data.total_paginas;
+            document.getElementById('prod-btn-ant').disabled = data.pagina <= 1;
+            document.getElementById('prod-btn-sig').disabled = data.pagina >= data.total_paginas;
+        });
+}
+</script>
 {% endblock %}

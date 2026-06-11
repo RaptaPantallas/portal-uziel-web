@@ -1035,6 +1035,61 @@ class ConexionBD:
             conexion.close()
 
     # =========================================================================
+    # REPORTES — Productos por rango de fechas (con paginado)
+    # =========================================================================
+
+    def contar_productos_por_fecha(self, fecha_inicio, fecha_fin) -> int:
+        conexion = self.conectar()
+        total = 0
+        if not conexion: return total
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM productos
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+            """, (fecha_inicio, fecha_fin))
+            total = cursor.fetchone()[0]
+        except Error as e:
+            print(f"🔴 [Reportes] Error al contar productos por fecha: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return total
+
+    def obtener_productos_por_fecha(self, fecha_inicio, fecha_fin, pagina=1, por_pagina=20) -> dict:
+        conexion = self.conectar()
+        resultado = {"productos": [], "total": 0, "pagina": pagina, "por_pagina": por_pagina, "total_paginas": 0}
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM productos
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+            """, (fecha_inicio, fecha_fin))
+            total = cursor.fetchone()[0]
+            resultado["total"] = total
+            resultado["total_paginas"] = max(1, -(-total // por_pagina))
+
+            offset = (pagina - 1) * por_pagina
+            cursor.execute("""
+                SELECT sku, nombre, marca, categoria, COALESCE(precio, 0) AS precio, existencia, fecha_creacion
+                FROM productos
+                WHERE fecha_creacion::date BETWEEN %s AND %s
+                ORDER BY fecha_creacion DESC
+                LIMIT %s OFFSET %s
+            """, (fecha_inicio, fecha_fin, por_pagina, offset))
+            resultado["productos"] = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [Reportes] Error al obtener productos por fecha: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    # =========================================================================
     # MÓDULO ESTADÍSTICAS — Contadores para el Dashboard
     # =========================================================================
 

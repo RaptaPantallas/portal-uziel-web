@@ -562,13 +562,14 @@ def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
 # GENERADOR DE REPORTES SEMANALES / MENSUALES
 # =============================================================================
 
-def generar_reporte_pdf(datos: dict, tipo: str = "Semanal") -> io.BytesIO:
+def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list = None) -> io.BytesIO:
     """
-    Genera un PDF de reporte de actividad (semanal o mensual).
+    Genera un PDF de reporte de actividad (semanal, mensual o personalizado).
 
     Args:
         datos: Dict devuelto por ConexionBD.obtener_datos_reporte()
-        tipo: "Semanal" o "Mensual"
+        tipo: "Semanal", "Mensual" o "Personalizado"
+        productos_list: Lista opcional de productos (tuplas) para incluir en el PDF
 
     Returns:
         io.BytesIO: Buffer con el PDF listo para enviar/guardar.
@@ -756,6 +757,47 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal") -> io.BytesIO:
             y = texto_linea(texto, y, size=9)
     else:
         y = texto_linea("No se crearon cotizaciones en este periodo.", y, color=COLOR_GRIS)
+
+    # --- Productos agregados en el periodo ---
+    if productos_list:
+        if y < 120:
+            pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 120
+        else:
+            y -= 10
+        y = seccion(f"📦 Productos Agregados ({len(productos_list)})", y)
+
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColorRGB(*COLOR_AZUL_EMP)
+        c.rect(MARGEN, y - 2, ancho - 2 * MARGEN, 14, fill=True, stroke=False)
+        c.setFillColorRGB(1, 1, 1)
+        c.drawString(MARGEN + 6, y + 3, "SKU")
+        c.drawString(MARGEN + 110, y + 3, "NOMBRE")
+        c.drawString(MARGEN + 310, y + 3, "MARCA")
+        c.drawString(MARGEN + 410, y + 3, "PRECIO")
+        y -= 16
+
+        for idx, prod in enumerate(productos_list):
+            if y < 60:
+                pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 60
+            if idx % 2 == 0:
+                c.setFillColorRGB(0.97, 0.98, 1.0)
+            else:
+                c.setFillColorRGB(1, 1, 1)
+            c.rect(MARGEN, y - 2, ancho - 2 * MARGEN, 14, fill=True, stroke=False)
+
+            c.setFillColorRGB(*COLOR_NEGRO)
+            c.setFont("Courier", 8)
+            c.drawString(MARGEN + 6, y + 3, str(prod[0]))
+            c.setFont("Helvetica", 8)
+            nombre = str(prod[1])
+            if len(nombre) > 35:
+                nombre = nombre[:32] + "..."
+            c.drawString(MARGEN + 110, y + 3, nombre)
+            c.drawString(MARGEN + 310, y + 3, str(prod[2]))
+            c.setFillColorRGB(*COLOR_VERDE_PREC)
+            precio = f"${float(prod[4]):,.2f}" if prod[4] else "—"
+            c.drawRightString(ancho - MARGEN - 6, y + 3, precio)
+            y -= 14
 
     # --- Totales generales ---
     if y < 120:
