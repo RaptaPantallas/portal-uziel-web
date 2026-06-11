@@ -604,6 +604,9 @@
         </a>
         {% endif %}
         <hr class="nav-divider">
+        <a href="{{ url_for('galeria_fotos') }}" class="nav-item {% if request.endpoint == 'galeria_fotos' %}active{% endif %}">
+            <span class="nav-icon">📸</span> <span>Banco de Fotos</span>
+        </a>
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
             <span class="nav-icon">📊</span> <span>Reportes</span>
         </a>

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Banco de Fotos — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .galeria-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 16px;
+    }
+    .prod-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        transition: box-shadow 0.15s, border-color 0.15s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+    .prod-card:hover {
+        box-shadow: var(--shadow-lg);
+        border-color: var(--primary);
+        text-decoration: none;
+    }
+    .prod-card .thumb {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        display: block;
+        background: #f8fafc;
+        padding: 8px;
+    }
+    .prod-card .info {
+        padding: 10px 12px;
+        border-top: 1px solid var(--border);
+    }
+    .prod-card .sku {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 2px;
+    }
+    .prod-card .nombre {
+        font-size: 12px;
+        color: var(--text);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .prod-card .marca {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+    .prod-card .fotos-count {
+        font-size: 10px;
+        color: var(--text-light);
+        margin-top: 4px;
+    }
+    .result-stats {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+    }
+    .result-stats span { color: var(--primary); font-weight: 700; }
+    .search-bar.gallery {
+        margin-bottom: 20px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+    .galeria-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .galeria-header h1 { margin: 0; }
+    .paginacion { margin-top: 24px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="galeria-header">
+    <div>
+        <h1>📸 Banco de Fotos</h1>
+        <p class="subtitulo">Todas las fotografías de productos vinculadas</p>
+    </div>
+    <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Catálogo</a>
+</div>
+
+<div class="search-bar gallery">
+    <span style="color:var(--text-muted);font-size:16px;">🔍</span>
+    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU, nombre o marca..."
+           value="{{ busqueda }}" autocomplete="off">
+    <button class="btn-limpiar" id="btn-limpiar-galeria"
+            onclick="limpiarBusquedaGaleria()" title="Limpiar búsqueda"
+            style="{% if not busqueda %}display:none;{% endif %}">✕</button>
+</div>
+
+<div class="result-stats">
+    {% if busqueda %}
+        <span>{{ total }}</span> resultado{{ 's' if total != 1 }} para "{{ busqueda }}"
+    {% else %}
+        <span>{{ total }}</span> producto{{ 's' if total != 1 }} con fotos
+    {% endif %}
+</div>
+
+{% if items %}
+<div class="galeria-grid">
+    {% for item in items %}
+    {% set ruta = item[3] %}
+    {% set ruta_rel = ruta.replace('\\', '/').split('almacen_activos/')[1] if 'almacen_activos/' in ruta.replace('\\', '/') else ruta %}
+    <a href="{{ url_for('detalle_producto', sku=item[0]) }}" class="prod-card">
+        <img class="thumb" src="{{ url_for('servir_activo', ruta_relativa=ruta_rel) }}"
+             alt="{{ item[0] }}" loading="lazy"
+             onerror="this.parentElement.innerHTML='<div class=thumb style=display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:32px;>📷</div>'">
+        <div class="info">
+            <div class="sku">{{ item[0] }}</div>
+            <div class="nombre">{{ item[1] }}</div>
+            <div class="marca">{{ item[2] or '' }}</div>
+            <div class="fotos-count">{{ item[4] }} foto{{ 's' if item[4] != 1 }}</div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if paginas > 1 %}
+<div class="paginacion" style="display:flex;justify-content:center;align-items:center;gap:16px;">
+    {% if pagina_actual > 1 %}
+    <a href="{{ url_for('galeria_fotos', q=busqueda, pagina=pagina_actual-1) }}" class="btn btn-ghost">← Anterior</a>
+    {% endif %}
+    <span style="font-size:14px;color:var(--text-muted);">Página {{ pagina_actual }} de {{ paginas }}</span>
+    {% if pagina_actual < paginas %}
+    <a href="{{ url_for('galeria_fotos', q=busqueda, pagina=pagina_actual+1) }}" class="btn btn-ghost">Siguiente →</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="icon">📸</div>
+    <h3>No hay fotos vinculadas</h3>
+    <p>Usa el módulo DAM en la aplicación de escritorio para vincular fotografías a tus productos.</p>
+    {% if busqueda %}
+    <p style="margin-top:12px;">No se encontraron resultados para "{{ busqueda }}".</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+    var inputGaleria = document.getElementById('buscador-galeria');
+    var timerGaleria = null;
+    inputGaleria.addEventListener('input', function() {
+        clearTimeout(timerGaleria);
+        var btn = document.getElementById('btn-limpiar-galeria');
+        btn.style.display = this.value.length > 0 ? '' : 'none';
+        timerGaleria = setTimeout(function() {
+            var q = encodeURIComponent(inputGaleria.value.trim());
+            if (q.length > 0) {
+                window.location.href = '{{ url_for("galeria_fotos") }}?q=' + q;
+            } else {
+                window.location.href = '{{ url_for("galeria_fotos") }}';
+            }
+        }, 500);
+    });
+    function limpiarBusquedaGaleria() {
+        inputGaleria.value = '';
+        document.getElementById('btn-limpiar-galeria').style.display = 'none';
+        window.location.href = '{{ url_for("galeria_fotos") }}';
+    }
+    inputGaleria.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            clearTimeout(timerGaleria);
+            var q = encodeURIComponent(inputGaleria.value.trim());
+            if (q.length > 0) {
+                window.location.href = '{{ url_for("galeria_fotos") }}?q=' + q;
+            } else {
+                window.location.href = '{{ url_for("galeria_fotos") }}';
+            }
+        }
+    });
+</script>
+{% endblock %}

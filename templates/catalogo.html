@@ -48,6 +48,7 @@
             <thead>
                 <tr>
                     <th style="width:40px;">PDF</th>
+                    <th style="width:60px;">Foto</th>
                     <th>SKU</th>
                     <th>Nombre</th>
                     <th>Marca</th>
@@ -59,6 +60,8 @@
                 {% for producto in productos %}
                 {% set sku = producto[0] %}
                 {% set cat = producto[6] | e %}
+                {% set ruta_foto = fotos_principales.get(sku, '') %}
+                {% set ruta_rel = ruta_foto.replace('\\', '/').split('almacen_activos/')[1] if ruta_foto and 'almacen_activos/' in ruta_foto.replace('\\', '/') else '' %}
                 <tr data-categoria="{{ cat }}"
                     data-sku="{{ sku }}"
                     data-nombre="{{ producto[1] }}"
@@ -67,6 +70,14 @@
                     data-compatibilidad="{{ producto[4] }}"
                     data-precio="{{ producto[5] }}">
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
+                    <td>
+                        {% if ruta_rel %}
+                        <img src="{{ url_for('servir_activo', ruta_relativa=ruta_rel) }}"
+                             alt="" style="width:48px;height:48px;object-fit:contain;border-radius:4px;background:#f8fafc;"
+                             loading="lazy"
+                             onerror="this.style.display='none'">
+                        {% endif %}
+                    </td>
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
                         <a class="link-detalle" onclick="verDetalle(this)">{{ producto[1] }}</a>
@@ -84,7 +95,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px;">No hay productos registrados aún.</td>
+                    <td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px;">No hay productos registrados aún.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -261,9 +272,9 @@
         return filas.filter(function (fila) {
             const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
             const coincideTexto = !texto
-                || normalizar(fila.cells[1].textContent).includes(texto)
                 || normalizar(fila.cells[2].textContent).includes(texto)
-                || normalizar(fila.cells[3].textContent).includes(texto);
+                || normalizar(fila.cells[3].textContent).includes(texto)
+                || normalizar(fila.cells[4].textContent).includes(texto);
             return coincideCat && coincideTexto;
         });
     }

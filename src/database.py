@@ -53,6 +53,7 @@ class ConexionBD:
         self._descubrir_pk_activos()
         self._sembrar_usuario_supervisor()
         self._asegurar_columna_fecha_creacion_activos()
+        self._crear_indices_rendimiento()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL."""
@@ -175,6 +176,28 @@ class ConexionBD:
             conexion.commit()
         except Error as e:
             print(f"⚠️ [BD] Nota: columna fecha_creacion en activos no agregada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _crear_indices_rendimiento(self):
+        """Crea índices para acelerar búsquedas en productos y activos."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Índices para búsqueda de productos
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_sku ON productos (sku)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos (nombre)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_marca ON productos (marca)")
+            # Índices para activos digitales
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activos_producto_id ON activos_digitales (producto_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activos_es_principal ON activos_digitales (es_principal)")
+            conexion.commit()
+        except Error as e:
+            print(f"⚠️ [BD] Nota: no se pudieron crear índices: {e}")
             conexion.rollback()
         finally:
             if cursor: cursor.close()
@@ -769,6 +792,178 @@ class ConexionBD:
                 cursor.close()
             conexion.close()
         return existentes
+
+    def buscar_productos_fotos(self, query: str, limite: int = 30) -> list:
+        """
+        Búsqueda inteligente de productos que TIENEN fotos vinculadas.
+        Busca por SKU o nombre del producto (ILIKE) y retorna solo los que
+        tienen al menos una imagen en activos_digitales.
+        """
+        if not query or not query.strip():
+            return []
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor(cursor_factory=NamedTupleCursor)
+            termino = f"%{query.strip()}%"
+            cursor.execute("""
+                SELECT DISTINCT p.sku, p.nombre, p.marca, a.ruta_archivo
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                WHERE (p.sku ILIKE %s OR p.nombre ILIKE %s)
+                ORDER BY
+                    CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
+                    p.nombre
+                LIMIT %s
+            """, (termino, termino, query.strip() + "%", limite))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [DAM] Error en búsqueda inteligente: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
+
+    def obtener_todos_los_activos(self, pagina: int = 1, por_pagina: int = 50) -> dict:
+        """
+        Retorna todas las fotos de TODOS los productos paginadas.
+        Ideal para el banco de fotos (photo bank).
+        Retorna un dict con 'activos' (lista), 'total' y 'paginas'.
+        """
+        conexion = self.conectar()
+        resultado = {"activos": [], "total": 0, "paginas": 0}
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            offset = (pagina - 1) * por_pagina
+            pk = self._pk_activos
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+            """)
+            total = cursor.fetchone()[0]
+            cursor.execute(f"""
+                SELECT a.{pk}, a.ruta_archivo, a.angulo, a.es_principal,
+                       p.sku, p.nombre, p.marca
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                ORDER BY p.sku, a.{pk}
+                LIMIT %s OFFSET %s
+            """, (por_pagina, offset))
+            resultado["activos"] = cursor.fetchall()
+            resultado["total"] = total
+            resultado["paginas"] = max(1, (total + por_pagina - 1) // por_pagina)
+        except Error as e:
+            print(f"🔴 [DAM] Error al obtener todos los activos: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+    def contar_fotos_por_producto(self) -> list[tuple]:
+        """
+        Retorna lista de (sku, nombre, total_fotos) para todos los productos
+        que tienen al menos una foto, ordenados por total descendente.
+        """
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT p.sku, p.nombre, COUNT(a.{pk}) AS total_fotos
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                GROUP BY p.sku, p.nombre
+                ORDER BY total_fotos DESC, p.sku
+            """.format(pk=self._pk_activos))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f"🔴 [DAM] Error al contar fotos por producto: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
+
+    def buscar_galeria_web(self, query: str = "", pagina: int = 1, por_pagina: int = 30) -> dict:
+        """
+        Búsqueda optimizada para la galería web de fotos.
+        Retorna productos que tienen fotos, con su imagen principal y total de fotos.
+        Si query está vacío, retorna todos los productos con fotos.
+        """
+        conexion = self.conectar()
+        resultado = {"items": [], "total": 0, "paginas": 0, "pagina": pagina}
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            offset = (pagina - 1) * por_pagina
+            pk = self._pk_activos
+
+            if query:
+                termino = f"%{query.strip()}%"
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT p.id_producto)
+                    FROM productos p
+                    JOIN activos_digitales a ON p.id_producto = a.producto_id
+                    WHERE p.sku ILIKE %s OR p.nombre ILIKE %s
+                """, (termino, termino))
+                total = cursor.fetchone()[0]
+                cursor.execute(f"""
+                    SELECT DISTINCT ON (p.sku)
+                        p.sku, p.nombre, p.marca,
+                        a.ruta_archivo AS foto_principal,
+                        COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos
+                    FROM productos p
+                    JOIN activos_digitales a ON p.id_producto = a.producto_id
+                    WHERE p.sku ILIKE %s OR p.nombre ILIKE %s
+                    ORDER BY p.sku,
+                        CASE WHEN a.es_principal THEN 0 ELSE 1 END,
+                        a.{pk}
+                    LIMIT %s OFFSET %s
+                """, (termino, termino, por_pagina, offset))
+            else:
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT p.id_producto)
+                    FROM productos p
+                    JOIN activos_digitales a ON p.id_producto = a.producto_id
+                """)
+                total = cursor.fetchone()[0]
+                cursor.execute(f"""
+                    SELECT DISTINCT ON (p.sku)
+                        p.sku, p.nombre, p.marca,
+                        a.ruta_archivo AS foto_principal,
+                        COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos
+                    FROM productos p
+                    JOIN activos_digitales a ON p.id_producto = a.producto_id
+                    ORDER BY p.sku,
+                        CASE WHEN a.es_principal THEN 0 ELSE 1 END,
+                        a.{pk}
+                    LIMIT %s OFFSET %s
+                """, (por_pagina, offset))
+
+            resultado["items"] = cursor.fetchall()
+            resultado["total"] = total
+            resultado["paginas"] = max(1, (total + por_pagina - 1) // por_pagina)
+        except Error as e:
+            print(f"🔴 [DAM] Error en búsqueda galería web: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
 
     # =========================================================================
     # MÓDULO DE SEGURIDAD — Autenticación de Usuarios
