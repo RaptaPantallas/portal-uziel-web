@@ -128,6 +128,20 @@ class ConexionBD:
             row = cursor.fetchone()
             if row:
                 self._pk_activos = row[0]
+                return
+
+            # Fallback: inspeccionar columnas reales y buscar nombres típicos de PK
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'activos_digitales'
+            """)
+            columns = [r[0] for r in cursor.fetchall()]
+            for candidate in ('id_activo', 'activo_id', 'id_producto', 'id'):
+                if candidate in columns:
+                    self._pk_activos = candidate
+                    print(f" [BD] PK inferido como '{candidate}' desde columnas disponibles")
+                    return
+            print(f" [BD] No se encontró PK en columnas: {columns}, usando default 'id'")
         except Exception as e:
             print(f" [BD] No se pudo descubrir PK de activos_digitales: {e}")
         finally:
