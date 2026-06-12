@@ -695,6 +695,55 @@ class ConexionBD:
             conexion.close()
         return resultado  # (bytes | None, ruta_archivo_str)
 
+    def actualizar_preview_activo(self, activo_id, preview_binary):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(
+                f"UPDATE activos_digitales SET preview_webp = %s WHERE {pk} = %s",
+                (psycopg2.Binary(preview_binary), activo_id)
+            )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [DAM] Error al actualizar preview del activo #{activo_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_activos_sin_preview(self, sku=None):
+        conexion = self.conectar()
+        resultados = []
+        if not conexion: return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            if sku:
+                cursor.execute(f"""
+                    SELECT a.{pk}, a.ruta_archivo FROM activos_digitales a
+                    JOIN productos p ON p.id_producto = a.producto_id
+                    WHERE p.sku = %s AND a.preview_webp IS NULL
+                """, (sku,))
+            else:
+                cursor.execute(f"""
+                    SELECT a.{pk}, a.ruta_archivo, p.sku FROM activos_digitales a
+                    JOIN productos p ON p.id_producto = a.producto_id
+                    WHERE a.preview_webp IS NULL
+                """)
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener activos sin preview: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultados
+
     def obtener_producto_con_imagen(self, sku):
         conexion = self.conectar()
         datos_completos = None

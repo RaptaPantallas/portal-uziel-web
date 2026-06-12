@@ -46,6 +46,11 @@
 <div class="card" style="margin-top:20px;">
     <div class="card-header">
         <span class="card-title">Galería de imágenes ({{ total_fotos }})</span>
+        {% if session['rol'] == 'Admin' %}
+        <form method="POST" action="{{ url_for('sincronizar_previews', sku=producto[0]) }}" style="display:inline;">
+            <button type="submit" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;" title="Generar WebP preview para imágenes sin preview en BD"> Sincronizar previews</button>
+        </form>
+        {% endif %}
     </div>
     <div class="card-body">
         {% for angulo, imagenes in galeria.items() %}

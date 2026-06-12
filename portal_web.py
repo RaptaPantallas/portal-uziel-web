@@ -412,8 +412,7 @@ def subir_imagen(sku):
 def servir_preview(activo_id):
     """
     Sirve la previsualización WebP (baja calidad) desde la base de datos.
-    Si el activo no tiene preview (subido desde desktop), redirige a la
-    imagen original en el filesystem.
+    Si el activo no tiene preview en BD, redirige al JPG original del filesystem.
     """
     resultado = bd.obtener_preview_activo(activo_id)
     if resultado:
@@ -423,21 +422,59 @@ def servir_preview(activo_id):
                 io.BytesIO(bytes(preview_bytes)),
                 mimetype='image/webp'
             )
-        # Fallback: servir la imagen original desde filesystem
+        # Fallback: extraer ruta relativa y redirigir al archivo original
         if ruta_fallback:
             ruta_normalizada = ruta_fallback.replace('\\', '/')
-            carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-            # Extraer ruta relativa a almacen_activos
             try:
                 idx = ruta_normalizada.index('almacen_activos/')
                 rel_path = ruta_normalizada[idx + len('almacen_activos/'):]
-                return send_from_directory(carpeta_activos, rel_path)
+                return redirect(url_for('servir_activo', nombre_archivo=rel_path))
             except ValueError:
-                flash(' Imagen no encontrada.', 'error')
-                return redirect(url_for('catalogo'))
+                pass
 
-    flash(' Activo no encontrado.', 'error')
-    return redirect(url_for('catalogo'))
+    # Si no hay nada, devolver un placeholder 1x1 transparente
+    return send_file(io.BytesIO(b''), mimetype='image/png')
+
+
+@app.route('/sincronizar_previews/<sku>', methods=['POST'])
+@login_requerido
+def sincronizar_previews(sku):
+    """
+    Escanea los archivos JPG en almacen_activos/<SKU>/ y genera los previews
+    WebP en la BD para todos los activos que aún no tengan preview.
+    Solo Admin.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden sincronizar.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    activos_sin_preview = bd.obtener_activos_sin_preview(sku)
+    if not activos_sin_preview:
+        flash(f' Todos los activos de "{sku}" ya tienen preview.', 'info')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    contador = 0
+    for activo_id, ruta_archivo in activos_sin_preview:
+        ruta_normalizada = ruta_archivo.replace('\\', '/')
+        try:
+            with Image.open(ruta_normalizada) as img:
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                preview = img.copy()
+                if preview.width > 300 or preview.height > 300:
+                    preview.thumbnail((300, 300))
+                buf = io.BytesIO()
+                preview.save(buf, "WEBP", quality=20, optimize=True)
+                preview_binary = buf.getvalue()
+                buf.close()
+
+                if bd.actualizar_preview_activo(activo_id, preview_binary):
+                    contador += 1
+        except Exception as e:
+            print(f" [Sync] Error al procesar {ruta_archivo}: {e}")
+
+    flash(f' Sincronización completada: {contador} preview(s) generado(s) para "{sku}".', 'exito')
+    return redirect(url_for('detalle_producto', sku=sku))
 
 
 @app.route('/clientes')
