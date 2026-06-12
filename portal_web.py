@@ -86,6 +86,11 @@ if SECRET_KEY == SECRET_KEY_DEFAULT:
         stacklevel=1
     )
 
+# Clave API para que la aplicación de escritorio pueda subir imágenes.
+# Debe ser la misma en main.py (variable API_KEY).
+# En Render, configúrala como variable de entorno: DESKTOP_API_KEY
+API_KEY_DESKTOP = os.getenv("DESKTOP_API_KEY", "uziel-desktop-sync-2026")
+
 # Nombre de la empresa que aparece en el encabezado del PDF generado
 NOMBRE_EMPRESA_PDF = "Catálogo de Productos - Importadora Uziel"
 SUBTITULO_PDF = "Generado automáticamente desde el Portal B2B"
@@ -100,6 +105,35 @@ app.secret_key = SECRET_KEY
 
 # Instancia global del módulo de base de datos
 bd = ConexionBD()
+
+
+# =============================================================================
+# UTILIDAD — Extraer ruta relativa a almacen_activos/
+# =============================================================================
+
+def _extraer_ruta_relativa(ruta_archivo):
+    """
+    Convierte cualquier formato de ruta (absoluta Windows/Linux o relativa)
+    a una ruta relativa dentro de almacen_activos/.
+
+    Ejemplos:
+      'G:/.../almacen_activos/16572-0P030/1.jpg'  → '16572-0P030/1.jpg'
+      '/opt/render/.../almacen_activos/SKU/2.jpg'  → 'SKU/2.jpg'
+      '16572-0P030/1.jpg'                           → '16572-0P030/1.jpg'
+      '1.jpg'                                       → '1.jpg'  (caso borde)
+    """
+    if not ruta_archivo:
+        return None
+    ruta = ruta_archivo.replace('\\', '/')
+    # Si contiene 'almacen_activos/', extraer lo que sigue
+    if 'almacen_activos/' in ruta:
+        idx = ruta.index('almacen_activos/')
+        return ruta[idx + len('almacen_activos/'):]
+    # Si es ruta absoluta (Windows con letra de unidad o Linux con /)
+    if ruta.startswith('/') or (len(ruta) > 2 and ruta[1] == ':'):
+        return os.path.basename(ruta)
+    # Ya es relativa
+    return ruta
 
 # Crear tablas automáticamente al arrancar el servidor —
 # operaciones idempotentes, seguras de ejecutar en cada inicio
@@ -280,23 +314,17 @@ def detalle_producto(sku):
 
     # Agrupar activos por ángulo para los tabs de la galería
     galeria = {}
-    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
     for activo in activos:
         angulo = activo[3]
         if angulo not in galeria:
             galeria[angulo] = []
         # Extraer ruta relativa a almacen_activos/ para servirla por el navegador
-        ruta_normalizada = activo[1].replace('\\', '/')
-        try:
-            idx = ruta_normalizada.index('almacen_activos/')
-            ruta_relativa = ruta_normalizada[idx + len('almacen_activos/'):]
-        except ValueError:
-            ruta_relativa = os.path.basename(ruta_normalizada)
+        ruta_relativa = _extraer_ruta_relativa(activo[1])
         galeria[angulo].append({
             'id': activo[0],
             'ruta': activo[1],
             'tipo': activo[2],
-            'nombre': ruta_relativa
+            'nombre': ruta_relativa or os.path.basename(activo[1].replace('\\', '/'))
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
@@ -407,6 +435,161 @@ def subir_imagen(sku):
     return redirect(url_for('detalle_producto', sku=sku))
 
 
+@app.route('/api/subir_imagen/<sku>', methods=['POST'])
+def api_subir_imagen(sku):
+    """
+    Endpoint para que la aplicación de escritorio suba imágenes.
+    Usa autenticación por API Key en lugar de cookies de sesión.
+
+    Cabecera requerida: X-API-Key: <clave>
+    Body: form-data con campo 'imagen' (archivo)
+    """
+    api_key = request.headers.get('X-API-Key', '')
+    if api_key != API_KEY_DESKTOP:
+        return {"error": "API Key inválida"}, 401
+
+    if 'imagen' not in request.files:
+        return {"error": "No se envió ninguna imagen"}, 400
+
+    archivo = request.files['imagen']
+    if archivo.filename == '':
+        return {"error": "Nombre de archivo vacío"}, 400
+
+    angulo = request.form.get('angulo', 'Principal').strip()
+
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    carpeta_sku = os.path.join(carpeta_activos, sku)
+    os.makedirs(carpeta_sku, exist_ok=True)
+
+    # Determinar el siguiente número secuencial
+    existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+    numeros = []
+    for f in existentes:
+        base = os.path.splitext(f)[0]
+        try:
+            numeros.append(int(base))
+        except ValueError:
+            pass
+    siguiente = max(numeros) + 1 if numeros else 1
+
+    nombre_jpg = f"{siguiente}.jpg"
+    ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+
+    try:
+        img = Image.open(archivo)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        if img.width > 800 or img.height > 800:
+            img.thumbnail((800, 800))
+        img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+        preview = img.copy()
+        if preview.width > 300 or preview.height > 300:
+            preview.thumbnail((300, 300))
+        buf = io.BytesIO()
+        preview.save(buf, "WEBP", quality=20, optimize=True)
+        preview_binary = buf.getvalue()
+        buf.close()
+        img.close()
+
+        if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
+            return {
+                "ok": True,
+                "sku": sku,
+                "archivo": nombre_jpg,
+                "ruta": ruta_jpg
+            }
+        else:
+            return {"error": "No se pudo registrar en la BD (¿existe el SKU?)"}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route('/api/bulk_subir', methods=['POST'])
+def api_bulk_subir():
+    """
+    Endpoint para subir múltiples imágenes desde la aplicación de escritorio.
+    Recibe un archivo ZIP con la estructura: SKU/archivo.jpg
+    Cabecera requerida: X-API-Key: <clave>
+    """
+    api_key = request.headers.get('X-API-Key', '')
+    if api_key != API_KEY_DESKTOP:
+        return {"error": "API Key inválida"}, 401
+
+    import zipfile
+    import tempfile
+
+    if 'archivo' not in request.files:
+        return {"error": "No se envió ningún archivo"}, 400
+    archivo_zip = request.files['archivo']
+    if archivo_zip.filename == '':
+        return {"error": "Nombre de archivo vacío"}, 400
+
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    resultados = {"ok": 0, "errores": 0, "detalle": []}
+
+    try:
+        with zipfile.ZipFile(archivo_zip) as zf:
+            for nombre in zf.namelist():
+                # Esperamos: SKU/archivo.jpg
+                nombre_normalizado = nombre.replace('\\', '/')
+                partes = nombre_normalizado.split('/')
+                if len(partes) < 2:
+                    continue
+                sku = partes[0]
+                nombre_archivo = '/'.join(partes[1:])
+                if not nombre_archivo or not nombre_archivo.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    continue
+
+                carpeta_sku = os.path.join(carpeta_activos, sku)
+                os.makedirs(carpeta_sku, exist_ok=True)
+
+                # Determinar número secuencial
+                existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+                numeros = []
+                for f in existentes:
+                    base = os.path.splitext(f)[0]
+                    try:
+                        numeros.append(int(base))
+                    except ValueError:
+                        pass
+                siguiente = max(numeros) + 1 if numeros else 1
+                nombre_jpg = f"{siguiente}.jpg"
+                ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+
+                try:
+                    data = zf.read(nombre)
+                    img = Image.open(io.BytesIO(data))
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    if img.width > 800 or img.height > 800:
+                        img.thumbnail((800, 800))
+                    img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+                    preview = img.copy()
+                    if preview.width > 300 or preview.height > 300:
+                        preview.thumbnail((300, 300))
+                    buf = io.BytesIO()
+                    preview.save(buf, "WEBP", quality=20, optimize=True)
+                    preview_binary = buf.getvalue()
+                    buf.close()
+                    img.close()
+
+                    if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", "Principal"):
+                        resultados["ok"] += 1
+                        resultados["detalle"].append({"sku": sku, "archivo": nombre_jpg, "estado": "ok"})
+                    else:
+                        resultados["errores"] += 1
+                        resultados["detalle"].append({"sku": sku, "archivo": nombre_jpg, "estado": "error_bd"})
+                except Exception as e:
+                    resultados["errores"] += 1
+                    resultados["detalle"].append({"sku": sku, "archivo": nombre_archivo, "estado": str(e)})
+    except Exception as e:
+        return {"error": f"Error al procesar ZIP: {e}"}, 500
+
+    return {"ok": True, "resultados": resultados}
+
+
 @app.route('/preview/<int:activo_id>')
 @login_requerido
 def servir_preview(activo_id):
@@ -424,13 +607,9 @@ def servir_preview(activo_id):
             )
         # Fallback: extraer ruta relativa y redirigir al archivo original
         if ruta_fallback:
-            ruta_normalizada = ruta_fallback.replace('\\', '/')
-            try:
-                idx = ruta_normalizada.index('almacen_activos/')
-                rel_path = ruta_normalizada[idx + len('almacen_activos/'):]
+            rel_path = _extraer_ruta_relativa(ruta_fallback)
+            if rel_path:
                 return redirect(url_for('servir_activo', nombre_archivo=rel_path))
-            except ValueError:
-                pass
 
     # Si no hay nada, devolver un placeholder 1x1 transparente
     return send_file(io.BytesIO(b''), mimetype='image/png')
@@ -443,6 +622,9 @@ def sincronizar_previews(sku):
     Escanea los archivos JPG en almacen_activos/<SKU>/ y genera los previews
     WebP en la BD para todos los activos que aún no tengan preview.
     Solo Admin.
+
+    CORREGIDO: Resuelve la ruta relativa a almacen_activos/ para que funcione
+    tanto con rutas absolutas (Windows/Linux) como con rutas relativas.
     """
     if session.get('rol') != 'Admin':
         flash(' Solo los administradores pueden sincronizar.', 'error')
@@ -453,11 +635,23 @@ def sincronizar_previews(sku):
         flash(f' Todos los activos de "{sku}" ya tienen preview.', 'info')
         return redirect(url_for('detalle_producto', sku=sku))
 
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
     contador = 0
+    omitidos = 0
     for activo_id, ruta_archivo in activos_sin_preview:
-        ruta_normalizada = ruta_archivo.replace('\\', '/')
+        # Extraer ruta relativa y resolver contra la carpeta real del servidor
+        ruta_relativa = _extraer_ruta_relativa(ruta_archivo)
+        if not ruta_relativa:
+            print(f" [Sync] No se pudo extraer ruta relativa de: {ruta_archivo}")
+            omitidos += 1
+            continue
+        ruta_real = os.path.join(carpeta_activos, ruta_relativa)
+        if not os.path.exists(ruta_real):
+            print(f" [Sync] Archivo no encontrado, se omitirá: {ruta_real}")
+            omitidos += 1
+            continue
         try:
-            with Image.open(ruta_normalizada) as img:
+            with Image.open(ruta_real) as img:
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
                 preview = img.copy()
@@ -471,9 +665,13 @@ def sincronizar_previews(sku):
                 if bd.actualizar_preview_activo(activo_id, preview_binary):
                     contador += 1
         except Exception as e:
-            print(f" [Sync] Error al procesar {ruta_archivo}: {e}")
+            print(f" [Sync] Error al procesar {ruta_real}: {e}")
+            omitidos += 1
 
-    flash(f' Sincronización completada: {contador} preview(s) generado(s) para "{sku}".', 'exito')
+    if omitidos > 0:
+        flash(f' Sincronización: {contador} preview(s) generado(s), {omitidos} omitido(s) (archivos no encontrados en el servidor).', 'exito')
+    else:
+        flash(f' Sincronización completada: {contador} preview(s) generado(s) para "{sku}".', 'exito')
     return redirect(url_for('detalle_producto', sku=sku))
 
 

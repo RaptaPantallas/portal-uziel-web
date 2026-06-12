@@ -21,3 +21,6 @@ Pillow==10.2.0
 # --- Aplicación de Escritorio (local solamente) ---
 PyQt6==6.7.0
 openpyxl==3.1.2
+
+# --- Sincronización de fotos (la app de escritorio sube fotos al portal) ---
+# requests no es necesario; usamos urllib.request (built-in)
