@@ -1050,8 +1050,9 @@ class ConexionBD:
     def obtener_banco_completo(self) -> list[tuple]:
         """
         QUERY ÚNICA optimizada para el banco de fotos.
-        Retorna (sku, nombre, ruta_foto_principal, total_fotos) de TODOS los
-        productos que tienen al menos una foto, con UNA SOLA llamada a la BD.
+        Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo) de
+        TODOS los productos que tienen al menos una foto, con UNA SOLA llamada
+        a la BD.
         """
         conexion = self.conectar()
         resultados = []
@@ -1066,7 +1067,8 @@ class ConexionBD:
                     p.sku,
                     p.nombre,
                     a.ruta_archivo AS ruta_principal,
-                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos
+                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos,
+                    a.{pk} AS id_activo
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
                 ORDER BY p.sku,
@@ -1085,8 +1087,8 @@ class ConexionBD:
     def buscar_banco_completo(self, query: str, limite: int = 100) -> list[tuple]:
         """
         QUERY ÚNICA optimizada para búsqueda en el banco de fotos.
-        Retorna (sku, nombre, ruta_foto_principal, total_fotos) filtrado por
-        SKU o nombre del producto, con UNA SOLA llamada a la BD.
+        Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo)
+        filtrado por SKU o nombre del producto, con UNA SOLA llamada a la BD.
         """
         if not query or not query.strip():
             return []
@@ -1104,7 +1106,8 @@ class ConexionBD:
                     p.sku,
                     p.nombre,
                     a.ruta_archivo AS ruta_principal,
-                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos
+                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos,
+                    a.{pk} AS id_activo
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
                 WHERE p.sku ILIKE %s OR p.nombre ILIKE %s

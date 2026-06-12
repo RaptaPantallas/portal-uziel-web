@@ -589,6 +589,9 @@
         <a href="{{ url_for('catalogo') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith(('catalogo','producto','nuevo_producto','editar')) %}active{% endif %}">
             <span class="nav-icon"></span> <span>Productos</span>
         </a>
+        <a href="{{ url_for('galeria') }}" class="nav-item {% if request.endpoint == 'galeria' %}active{% endif %}">
+            <span class="nav-icon"></span> <span>Galería</span>
+        </a>
         {% endif %}
         {% if puede_ver('tareas') %}
         <a href="{{ url_for('tareas') }}" class="nav-item {% if request.endpoint == 'tareas' %}active{% endif %}">

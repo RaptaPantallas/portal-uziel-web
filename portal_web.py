@@ -292,6 +292,59 @@ def catalogo():
     return render_template('catalogo.html', productos=inventario)
 
 
+@app.route('/galeria')
+@login_requerido
+def galeria():
+    """
+    Galería visual de productos con fotos.
+    Muestra todos los productos que tienen al menos una imagen vinculada
+    en activos_digitales, con buscador inteligente por SKU o nombre.
+    """
+    query = request.args.get('q', '').strip()
+    if query:
+        resultados = bd.buscar_banco_completo(query, limite=200)
+    else:
+        resultados = bd.obtener_banco_completo()
+
+    productos_galeria = []
+    for r in resultados:
+        # r = (sku, nombre, ruta_principal, total_fotos, id_activo)
+        productos_galeria.append({
+            'sku': r[0],
+            'nombre': r[1],
+            'ruta': r[2],
+            'total_fotos': r[3],
+            'id_activo': r[4] if len(r) > 4 else None
+        })
+
+    return render_template(
+        'galeria.html',
+        productos=productos_galeria,
+        query=query,
+        total=len(productos_galeria)
+    )
+
+
+@app.route('/api/galeria/buscar')
+@login_requerido
+def api_galeria_buscar():
+    """API AJAX para búsqueda en galería — retorna JSON."""
+    query = request.args.get('q', '').strip()
+    if not query:
+        return {'results': [], 'total': 0}
+    resultados = bd.buscar_banco_completo(query, limite=50)
+    items = []
+    for r in resultados:
+        items.append({
+            'sku': r[0],
+            'nombre': r[1],
+            'total_fotos': r[3],
+            'id_activo': r[4] if len(r) > 4 else None,
+            'url': url_for('detalle_producto', sku=r[0])
+        })
+    return {'results': items, 'total': len(items)}
+
+
 @app.route('/producto/<sku>')
 @login_requerido
 def detalle_producto(sku):
