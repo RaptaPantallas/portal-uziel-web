@@ -47,6 +47,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory
 from functools import wraps
 import io
+from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
@@ -79,7 +80,7 @@ SECRET_KEY = os.getenv("FLASK_SECRET_KEY", SECRET_KEY_DEFAULT)
 if SECRET_KEY == SECRET_KEY_DEFAULT:
     import warnings
     warnings.warn(
-        "\n⚠️  SEGURIDAD: Se está usando la SECRET_KEY por defecto.\n"
+        "\n  SEGURIDAD: Se está usando la SECRET_KEY por defecto.\n"
         "   Configura la variable de entorno FLASK_SECRET_KEY antes de ir a producción.\n"
         "   Genera una clave segura con: python -c \"import secrets; print(secrets.token_hex(32))\"",
         stacklevel=1
@@ -154,7 +155,7 @@ def login_requerido(f):
     @wraps(f)
     def decorador(*args, **kwargs):
         if 'usuario' not in session:
-            flash('🔒 Acceso denegado. Por favor inicia sesión.', 'error')
+            flash(' Acceso denegado. Por favor inicia sesión.', 'error')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorador
@@ -190,7 +191,7 @@ def login():
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
-            flash('❌ Usuario o contraseña incorrectos. Inténtalo de nuevo.', 'error')
+            flash(' Usuario o contraseña incorrectos. Inténtalo de nuevo.', 'error')
 
     return render_template('login.html')
 
@@ -272,24 +273,30 @@ def detalle_producto(sku):
     """
     producto = bd.obtener_producto(sku)
     if not producto:
-        flash(f'❌ Producto "{sku}" no encontrado en el catálogo.', 'error')
+        flash(f' Producto "{sku}" no encontrado en el catálogo.', 'error')
         return redirect(url_for('catalogo'))
 
     activos = bd.obtener_activos_por_sku(sku)
 
     # Agrupar activos por ángulo para los tabs de la galería
     galeria = {}
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
     for activo in activos:
         angulo = activo[3]
         if angulo not in galeria:
             galeria[angulo] = []
-        # Normalizar separadores antes de basename para rutas Windows guardadas por el desktop app
-        nombre_archivo = os.path.basename(activo[1].replace('\\', '/'))
+        # Extraer ruta relativa a almacen_activos/ para servirla por el navegador
+        ruta_normalizada = activo[1].replace('\\', '/')
+        try:
+            idx = ruta_normalizada.index('almacen_activos/')
+            ruta_relativa = ruta_normalizada[idx + len('almacen_activos/'):]
+        except ValueError:
+            ruta_relativa = os.path.basename(ruta_normalizada)
         galeria[angulo].append({
             'id': activo[0],
             'ruta': activo[1],
             'tipo': activo[2],
-            'nombre': nombre_archivo
+            'nombre': ruta_relativa
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
@@ -318,6 +325,121 @@ def servir_activo(nombre_archivo):
     return send_from_directory(carpeta_activos, nombre_archivo)
 
 
+@app.route('/subir_imagen/<sku>', methods=['POST'])
+@login_requerido
+def subir_imagen(sku):
+    """
+    Sube una imagen desde el navegador, la guarda en alta calidad como JPG
+    en el filesystem y almacena una previsualización WebP comprimida en la BD.
+    Solo accesible para usuarios con rol 'Admin'.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden subir imágenes.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    # Validar que el producto existe
+    producto = bd.obtener_producto(sku)
+    if not producto:
+        flash(f' El producto con SKU "{sku}" no existe.', 'error')
+        return redirect(url_for('catalogo'))
+
+    if 'imagen' not in request.files:
+        flash(' No se seleccionó ningún archivo.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    archivo = request.files['imagen']
+    if archivo.filename == '':
+        flash(' No se seleccionó ningún archivo.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    angulo = request.form.get('angulo', 'Principal').strip()
+
+    # Crear carpeta del SKU
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    carpeta_sku = os.path.join(carpeta_activos, sku)
+    os.makedirs(carpeta_sku, exist_ok=True)
+
+    # Determinar el siguiente número secuencial
+    existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+    numeros = []
+    for f in existentes:
+        base = os.path.splitext(f)[0]
+        try:
+            numeros.append(int(base))
+        except ValueError:
+            pass
+    siguiente = max(numeros) + 1 if numeros else 1
+
+    nombre_jpg = f"{siguiente}.jpg"
+    ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+
+    try:
+        # Procesar imagen con Pillow
+        img = Image.open(archivo)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # Guardar JPG alta calidad en filesystem (mismo formato que desktop)
+        if img.width > 800 or img.height > 800:
+            img.thumbnail((800, 800))
+        img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+        # Generar WebP de baja calidad para preview en la BD
+        preview = img.copy()
+        if preview.width > 300 or preview.height > 300:
+            preview.thumbnail((300, 300))
+        buf = io.BytesIO()
+        preview.save(buf, "WEBP", quality=20, optimize=True)
+        preview_binary = buf.getvalue()
+        buf.close()
+
+        img.close()
+
+        # Guardar en BD con preview
+        if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
+            flash(f' Imagen subida correctamente para SKU "{sku}".', 'exito')
+        else:
+            flash(f' La imagen se guardó en disco pero no se pudo registrar en la BD.', 'error')
+
+    except Exception as e:
+        flash(f' Error al procesar la imagen: {e}', 'error')
+
+    return redirect(url_for('detalle_producto', sku=sku))
+
+
+@app.route('/preview/<int:activo_id>')
+@login_requerido
+def servir_preview(activo_id):
+    """
+    Sirve la previsualización WebP (baja calidad) desde la base de datos.
+    Si el activo no tiene preview (subido desde desktop), redirige a la
+    imagen original en el filesystem.
+    """
+    resultado = bd.obtener_preview_activo(activo_id)
+    if resultado:
+        preview_bytes, ruta_fallback = resultado
+        if preview_bytes:
+            return send_file(
+                io.BytesIO(bytes(preview_bytes)),
+                mimetype='image/webp'
+            )
+        # Fallback: servir la imagen original desde filesystem
+        if ruta_fallback:
+            ruta_normalizada = ruta_fallback.replace('\\', '/')
+            carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+            # Extraer ruta relativa a almacen_activos
+            try:
+                idx = ruta_normalizada.index('almacen_activos/')
+                rel_path = ruta_normalizada[idx + len('almacen_activos/'):]
+                return send_from_directory(carpeta_activos, rel_path)
+            except ValueError:
+                flash(' Imagen no encontrada.', 'error')
+                return redirect(url_for('catalogo'))
+
+    flash(' Activo no encontrado.', 'error')
+    return redirect(url_for('catalogo'))
+
+
 @app.route('/clientes')
 @login_requerido
 def clientes():
@@ -341,7 +463,7 @@ def cliente_detalle(rif):
     """
     cliente = bd.obtener_cliente(rif)
     if not cliente:
-        flash('⚠️ Cliente no encontrado.', 'error')
+        flash(' Cliente no encontrado.', 'error')
         return redirect(url_for('clientes'))
 
     tareas = bd.obtener_tareas_por_cliente(rif)
@@ -372,7 +494,7 @@ def cliente_editar(rif):
         rif (str): RIF del cliente a actualizar.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden editar clientes.', 'error')
+        flash(' Solo los administradores pueden editar clientes.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
     nombre_empresa = request.form.get('nombre_empresa', '').strip()
@@ -381,14 +503,14 @@ def cliente_editar(rif):
     direccion      = request.form.get('direccion', '').strip()
 
     if not nombre_empresa:
-        flash('⚠️ El nombre de la empresa es obligatorio.', 'error')
+        flash(' El nombre de la empresa es obligatorio.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
     ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion)
     if ok:
-        flash('✅ Datos del cliente actualizados correctamente.', 'success')
+        flash(' Datos del cliente actualizados correctamente.', 'success')
     else:
-        flash('🔴 Error al actualizar el cliente. Intenta de nuevo.', 'error')
+        flash(' Error al actualizar el cliente. Intenta de nuevo.', 'error')
 
     return redirect(url_for('cliente_detalle', rif=rif))
 
@@ -405,7 +527,7 @@ def nuevo_producto():
           muestra un error sin perder los datos del formulario.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para agregar productos.', 'error')
+        flash(' No tienes permisos para agregar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -417,10 +539,10 @@ def nuevo_producto():
         precio = request.form['precio']
 
         if bd.registrar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
-            flash(f'✅ ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
+            flash(f' ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
             return redirect(url_for('catalogo'))
         else:
-            flash(f'❌ Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
+            flash(f' Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
 
     return render_template('nuevo_producto.html')
 
@@ -436,7 +558,7 @@ def nuevo_cliente():
     POST: Valida y guarda el nuevo cliente. Si el RIF ya existe, muestra un error.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para agregar clientes.', 'error')
+        flash(' No tienes permisos para agregar clientes.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -447,10 +569,10 @@ def nuevo_cliente():
         direccion = request.form['direccion'].strip()
 
         if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion):
-            flash(f'✅ ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
+            flash(f' ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
             return redirect(url_for('clientes'))
         else:
-            flash('❌ Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
+            flash(' Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
 
     return render_template('nuevo_cliente.html')
 
@@ -466,7 +588,7 @@ def editar_producto(sku):
     POST: Guarda los cambios y redirige al catálogo.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para editar productos.', 'error')
+        flash(' No tienes permisos para editar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -477,15 +599,15 @@ def editar_producto(sku):
         precio = request.form['precio']
 
         if bd.actualizar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
-            flash(f'✅ Producto {sku} actualizado correctamente.', 'exito')
+            flash(f' Producto {sku} actualizado correctamente.', 'exito')
             return redirect(url_for('catalogo'))
         else:
-            flash(f'❌ No se pudo actualizar el producto {sku}.', 'error')
+            flash(f' No se pudo actualizar el producto {sku}.', 'error')
     else:
         # GET: cargar datos actuales del producto para pre-llenar el formulario
         producto = bd.obtener_producto(sku)
         if not producto:
-            flash(f'❌ El producto con SKU "{sku}" no fue encontrado.', 'error')
+            flash(f' El producto con SKU "{sku}" no fue encontrado.', 'error')
             return redirect(url_for('catalogo'))
         return render_template('editar.html', producto=producto)
 
@@ -499,13 +621,13 @@ def eliminar_producto(sku):
     La confirmación visual se maneja con un onclick en el HTML.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para eliminar productos.', 'error')
+        flash(' No tienes permisos para eliminar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if bd.eliminar_producto(sku):
-        flash(f'🗑️ El producto {sku} fue eliminado del inventario.', 'exito')
+        flash(f' El producto {sku} fue eliminado del inventario.', 'exito')
     else:
-        flash(f'❌ No se pudo eliminar el producto {sku}.', 'error')
+        flash(f' No se pudo eliminar el producto {sku}.', 'error')
 
     return redirect(url_for('catalogo'))
 
@@ -560,7 +682,7 @@ def asignar_tarea():
     """
     # Verificar que el usuario tenga permiso de crear tareas
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los supervisores pueden asignar tareas.', 'error')
+        flash(' Solo los supervisores pueden asignar tareas.', 'error')
         return redirect(url_for('inicio'))
 
     # Leer y limpiar campos del formulario
@@ -574,15 +696,15 @@ def asignar_tarea():
 
     # Validar que todos los campos obligatorios estén completos
     if not all([cliente_rif, asignado_a, tipo_tarea, fecha_limite]):
-        flash('⚠️ Completa todos los campos obligatorios de la tarea.', 'error')
+        flash(' Completa todos los campos obligatorios de la tarea.', 'error')
         return redirect(request.referrer or url_for('tareas'))
 
     # Guardar la tarea en la base de datos
     if bd.crear_tarea(cliente_rif, cliente_nombre, asignado_a,
                       tipo_tarea, descripcion, fecha_limite, creado_por):
-        flash(f'✅ Tarea asignada a "{asignado_a}" correctamente.', 'exito')
+        flash(f' Tarea asignada a "{asignado_a}" correctamente.', 'exito')
     else:
-        flash('❌ No se pudo crear la tarea. Intenta de nuevo.', 'error')
+        flash(' No se pudo crear la tarea. Intenta de nuevo.', 'error')
 
     # Regresar a la página desde donde se envió el formulario
     return redirect(request.referrer or url_for('tareas'))
@@ -606,13 +728,13 @@ def actualizar_tarea(tarea_id):
     # Validar que el estado recibido sea uno de los permitidos
     estados_validos = {'Pendiente', 'En Progreso', 'Completada'}
     if nuevo_estado not in estados_validos:
-        flash('⚠️ Estado no válido.', 'error')
+        flash(' Estado no válido.', 'error')
         return redirect(url_for('tareas'))
 
     if bd.actualizar_estado_tarea(tarea_id, nuevo_estado):
-        flash(f'✅ Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
+        flash(f' Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
     else:
-        flash(f'❌ No se pudo actualizar la tarea #{tarea_id}.', 'error')
+        flash(f' No se pudo actualizar la tarea #{tarea_id}.', 'error')
 
     return redirect(url_for('tareas'))
 
@@ -627,7 +749,7 @@ def generar_pdf():
     skus_seleccionados = request.form.getlist('skus_seleccionados')
 
     if not skus_seleccionados:
-        flash('⚠️ Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
+        flash(' Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
         return redirect(url_for('catalogo'))
 
     # Colores corporativos (RGB 0.0-1.0) — idénticos al generador de escritorio
@@ -873,7 +995,7 @@ def cotizaciones():
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden acceder a las cotizaciones.', 'error')
+        flash(' Solo los administradores pueden acceder a las cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     estado_filtro = request.args.get('estado', '')
     lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
@@ -897,7 +1019,7 @@ def cotizacion_nueva():
     Solo permite rol Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden crear cotizaciones.', 'error')
+        flash(' Solo los administradores pueden crear cotizaciones.', 'error')
         return redirect(url_for('cotizaciones'))
 
     if request.method == 'POST':
@@ -912,7 +1034,7 @@ def cotizacion_nueva():
         precios    = request.form.getlist('precio_unitario[]')
 
         if not cliente_rif or not cliente_nombre or not skus:
-            flash('⚠️ Debes seleccionar un cliente y agregar al menos un producto.', 'error')
+            flash(' Debes seleccionar un cliente y agregar al menos un producto.', 'error')
         else:
             # Parseo completo primero — si algo falla, no se guarda nada
             items = []
@@ -926,7 +1048,7 @@ def cotizacion_nueva():
                     if cant <= 0 or prec < 0:
                         raise ValueError("Valores fuera de rango")
                 except (ValueError, IndexError):
-                    flash('⚠️ Cantidad o precio inválido en uno de los productos.', 'error')
+                    flash(' Cantidad o precio inválido en uno de los productos.', 'error')
                     error_validacion = True
                     break
                 items.append({
@@ -943,12 +1065,12 @@ def cotizacion_nueva():
                     session['usuario'], items, notas
                 )
                 if cot_id:
-                    flash('✅ Cotización creada exitosamente.', 'success')
+                    flash(' Cotización creada exitosamente.', 'success')
                     return redirect(url_for('cotizacion_detalle', cotizacion_id=cot_id))
                 else:
-                    flash('🔴 Error al guardar la cotización. Intenta de nuevo.', 'error')
+                    flash(' Error al guardar la cotización. Intenta de nuevo.', 'error')
             elif not error_validacion:
-                flash('⚠️ Debes agregar al menos un producto válido.', 'error')
+                flash(' Debes agregar al menos un producto válido.', 'error')
 
     # GET — cargar clientes y productos para los selectores.
     # Si viene ?cliente_rif=<rif>, pre-seleccionar ese cliente.
@@ -971,11 +1093,11 @@ def cotizacion_detalle(cotizacion_id):
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden ver cotizaciones.', 'error')
+        flash(' Solo los administradores pueden ver cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash('⚠️ Cotización no encontrada.', 'error')
+        flash(' Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
     estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
     # El template usa 'cab' e 'items' directamente (desestructurado del dict)
@@ -995,19 +1117,19 @@ def cotizacion_estado(cotizacion_id):
     POST param: nuevo_estado
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden cambiar el estado.', 'error')
+        flash(' Solo los administradores pueden cambiar el estado.', 'error')
         return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
     estados_validos = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
     if nuevo_estado not in estados_validos:
-        flash('⚠️ Estado no válido.', 'error')
+        flash(' Estado no válido.', 'error')
     else:
         ok = bd.actualizar_estado_cotizacion(cotizacion_id, nuevo_estado)
         if ok:
-            flash(f'✅ Estado actualizado a "{nuevo_estado}".', 'success')
+            flash(f' Estado actualizado a "{nuevo_estado}".', 'success')
         else:
-            flash('🔴 Error al actualizar el estado.', 'error')
+            flash(' Error al actualizar el estado.', 'error')
 
     return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
@@ -1020,11 +1142,11 @@ def cotizacion_pdf(cotizacion_id):
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden descargar cotizaciones.', 'error')
+        flash(' Solo los administradores pueden descargar cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash('⚠️ Cotización no encontrada.', 'error')
+        flash(' Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
 
     buffer = generar_pdf_cotizacion(datos)
@@ -1050,7 +1172,7 @@ def admin_usuarios():
     Solo accesible para el rol Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden gestionar usuarios.', 'error')
+        flash(' Solo los administradores pueden gestionar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     usuarios = bd.obtener_todos_usuarios()
@@ -1065,7 +1187,7 @@ def admin_usuario_nuevo():
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden crear usuarios.', 'error')
+        flash(' Solo los administradores pueden crear usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     username   = request.form.get('username', '').strip()
@@ -1075,14 +1197,14 @@ def admin_usuario_nuevo():
     permisos   = ','.join(request.form.getlist('permisos'))
 
     if not username or not password:
-        flash('⚠️ El usuario y la contraseña son obligatorios.', 'error')
+        flash(' El usuario y la contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.crear_usuario(username, password, rol, permisos)
     if ok:
-        flash(f'✅ Usuario "{username}" creado correctamente.', 'success')
+        flash(f' Usuario "{username}" creado correctamente.', 'success')
     else:
-        flash(f'🔴 No se pudo crear el usuario "{username}". '
+        flash(f' No se pudo crear el usuario "{username}". '
               'Es posible que ya exista.', 'error')
 
     return redirect(url_for('admin_usuarios'))
@@ -1096,7 +1218,7 @@ def admin_usuario_editar(username):
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden editar usuarios.', 'error')
+        flash(' Solo los administradores pueden editar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     nuevo_username = request.form.get('nuevo_username', '').strip()
@@ -1104,14 +1226,14 @@ def admin_usuario_editar(username):
     permisos       = ','.join(request.form.getlist('permisos'))
 
     if not nuevo_username:
-        flash('⚠️ El nombre de usuario no puede quedar vacío.', 'error')
+        flash(' El nombre de usuario no puede quedar vacío.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos)
     if ok:
-        flash(f'✅ Usuario "{username}" actualizado correctamente.', 'success')
+        flash(f' Usuario "{username}" actualizado correctamente.', 'success')
     else:
-        flash(f'🔴 No se pudo actualizar el usuario "{username}".', 'error')
+        flash(f' No se pudo actualizar el usuario "{username}".', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1124,25 +1246,25 @@ def admin_usuario_pass(username):
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden cambiar contraseñas.', 'error')
+        flash(' Solo los administradores pueden cambiar contraseñas.', 'error')
         return redirect(url_for('inicio'))
 
     nueva_pass   = request.form.get('nueva_password', '').strip()
     confirmar    = request.form.get('confirmar_password', '').strip()
 
     if not nueva_pass or not confirmar:
-        flash('⚠️ Ambos campos de contraseña son obligatorios.', 'error')
+        flash(' Ambos campos de contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     if nueva_pass != confirmar:
-        flash('⚠️ Las contraseñas no coinciden.', 'error')
+        flash(' Las contraseñas no coinciden.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.actualizar_password_usuario(username, nueva_pass)
     if ok:
-        flash(f'✅ Contraseña de "{username}" actualizada.', 'success')
+        flash(f' Contraseña de "{username}" actualizada.', 'success')
     else:
-        flash(f'🔴 No se pudo cambiar la contraseña de "{username}".', 'error')
+        flash(f' No se pudo cambiar la contraseña de "{username}".', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1155,14 +1277,14 @@ def admin_usuario_borrar(username):
     Solo Admin puede usar esta ruta. No permite eliminar al último Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden eliminar usuarios.', 'error')
+        flash(' Solo los administradores pueden eliminar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     ok = bd.eliminar_usuario(username)
     if ok:
-        flash(f'✅ Usuario "{username}" eliminado.', 'success')
+        flash(f' Usuario "{username}" eliminado.', 'success')
     else:
-        flash(f'🔴 No se pudo eliminar "{username}". '
+        flash(f' No se pudo eliminar "{username}". '
               'Asegúrate de que no sea el único administrador.', 'error')
 
     return redirect(url_for('admin_usuarios'))
@@ -1177,7 +1299,7 @@ def admin_usuario_borrar(username):
 def diagnostico():
     """Muestra los datos crudos de los primeros 10 productos para depuración."""
     if session.get('rol') != 'Admin':
-        flash('⛌ Solo administradores.', 'error')
+        flash(' Solo administradores.', 'error')
         return redirect(url_for('inicio'))
     from src.database import ConexionBD as BD
     bd_local = BD()

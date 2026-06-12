@@ -19,7 +19,7 @@
     <div class="card-header">
         <span class="card-title">Ficha Técnica</span>
         {% if session['rol'] == 'Admin' %}
-            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">✏️ Editar</a>
+            <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary" style="padding:6px 14px;font-size:12px;"> Editar</a>
         {% endif %}
     </div>
     <div class="card-body">
@@ -41,4 +41,63 @@
         </div>
     </div>
 </div>
+
+{% if galeria %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header">
+        <span class="card-title">Galería de imágenes ({{ total_fotos }})</span>
+    </div>
+    <div class="card-body">
+        {% for angulo, imagenes in galeria.items() %}
+        <div style="margin-bottom:20px;">
+            <h3 style="font-size:14px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">{{ angulo }}</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                {% for img in imagenes %}
+                <a href="{{ url_for('servir_activo', nombre_archivo=img.nombre) }}" target="_blank" title="Ver original">
+                    <img src="{{ url_for('servir_preview', activo_id=img.id) }}"
+                         alt="{{ img.nombre }}"
+                         style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;">
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-muted);">
+        <p>Este producto no tiene imágenes vinculadas.</p>
+    </div>
+</div>
+{% endif %}
+
+{% if session['rol'] == 'Admin' %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header">
+        <span class="card-title"> Subir nueva imagen</span>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('subir_imagen', sku=producto[0]) }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Seleccionar imagen</label>
+                <input type="file" name="imagen" accept="image/*" required class="form-control" style="padding:8px;">
+            </div>
+            <div class="form-group">
+                <label>Ángulo / Vista</label>
+                <select name="angulo" class="form-control">
+                    <option value="Principal">Principal</option>
+                    <option value="Frontal">Frontal</option>
+                    <option value="Lateral">Lateral</option>
+                    <option value="Detalle">Detalle</option>
+                    <option value="En-contexto">En contexto</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary"> Subir imagen</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

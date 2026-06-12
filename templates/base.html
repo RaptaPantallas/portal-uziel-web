@@ -582,17 +582,17 @@
         </a>
         {% if puede_ver('clientes') %}
         <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cliente') %}active{% endif %}">
-            <span class="nav-icon">👤</span> <span>Clientes</span>
+            <span class="nav-icon"></span> <span>Clientes</span>
         </a>
         {% endif %}
         {% if puede_ver('productos') %}
         <a href="{{ url_for('catalogo') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith(('catalogo','producto','nuevo_producto','editar')) %}active{% endif %}">
-            <span class="nav-icon">📦</span> <span>Productos</span>
+            <span class="nav-icon"></span> <span>Productos</span>
         </a>
         {% endif %}
         {% if puede_ver('tareas') %}
         <a href="{{ url_for('tareas') }}" class="nav-item {% if request.endpoint == 'tareas' %}active{% endif %}">
-            <span class="nav-icon">📋</span> <span>Tareas</span>
+            <span class="nav-icon"></span> <span>Tareas</span>
             {% if total_notif > 0 %}
                 <span class="nav-badge">{{ total_notif }}</span>
             {% endif %}
@@ -600,16 +600,16 @@
         {% endif %}
         {% if puede_ver('cotizaciones') %}
         <a href="{{ url_for('cotizaciones') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cotizacion') %}active{% endif %}">
-            <span class="nav-icon">🧾</span> <span>Cotizaciones</span>
+            <span class="nav-icon"></span> <span>Cotizaciones</span>
         </a>
         {% endif %}
         <hr class="nav-divider">
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
-            <span class="nav-icon">📊</span> <span>Reportes</span>
+            <span class="nav-icon"></span> <span>Reportes</span>
         </a>
         {% if session.get('rol') == 'Admin' %}
         <a href="{{ url_for('admin_usuarios') }}" class="nav-item {% if request.endpoint == 'admin_usuarios' %}active{% endif %}">
-            <span class="nav-icon">⚙️</span> <span>Usuarios</span>
+            <span class="nav-icon"></span> <span>Usuarios</span>
         </a>
         {% endif %}
         {% endblock %}

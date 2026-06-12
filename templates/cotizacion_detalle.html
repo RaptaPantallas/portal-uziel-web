@@ -25,7 +25,7 @@
 <div class="page-header">
     <div>
         <nav class="breadcrumb">
-            <a href="{{ url_for('cotizaciones') }}">🧾 Cotizaciones</a>
+            <a href="{{ url_for('cotizaciones') }}"> Cotizaciones</a>
             <span class="breadcrumb-sep">›</span>
             <span>{{ cab[1] }}</span>
         </nav>
@@ -47,7 +47,7 @@
 {% endwith %}
 
 <div class="card">
-    <div class="card-title">👤 Datos del Cliente</div>
+    <div class="card-title"> Datos del Cliente</div>
     <div class="info-grid">
         <div class="info-item"><label>Empresa</label><div class="valor">{{ cab[3] }}</div></div>
         <div class="info-item"><label>RIF</label><div class="valor">{{ cab[2] }}</div></div>
@@ -58,7 +58,7 @@
 </div>
 
 <div class="card">
-    <div class="card-title">📦 Productos Cotizados</div>
+    <div class="card-title"> Productos Cotizados</div>
     <table>
         <thead>
             <tr>
@@ -91,14 +91,14 @@
 
 {% if cab[5] %}
 <div class="card">
-    <div class="card-title">📝 Notas / Observaciones</div>
+    <div class="card-title"> Notas / Observaciones</div>
     <div class="notas-box">{{ cab[5] }}</div>
 </div>
 {% endif %}
 
 {% if session['rol'] == 'Admin' %}
 <div class="card">
-    <div class="card-title">🔄 Cambiar Estado</div>
+    <div class="card-title"> Cambiar Estado</div>
     <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" class="estado-form">
         <select name="nuevo_estado">
             {% for est in estados %}

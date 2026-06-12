@@ -25,7 +25,7 @@
 {% endwith %}
 
 <div class="search-bar">
-    <span style="color:var(--text-muted);font-size:16px;">🔍</span>
+    <span style="color:var(--text-muted);font-size:16px;"></span>
     <input type="text" id="buscador" placeholder="Buscar por RIF, empresa o correo..." oninput="filtrarClientes()" autocomplete="off">
     <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
@@ -69,7 +69,7 @@
 <div class="modal-overlay" id="modalNuevoCliente">
     <div class="modal">
         <div class="modal-header">
-            <span>👤 Nuevo Cliente</span>
+            <span> Nuevo Cliente</span>
             <button class="modal-close" onclick="cerrarModalCliente()">✕</button>
         </div>
         <form method="POST" action="{{ url_for('nuevo_cliente') }}">
@@ -95,7 +95,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalCliente()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">💾 Guardar Cliente</button>
+                <button type="submit" class="btn btn-primary"> Guardar Cliente</button>
             </div>
         </form>
     </div>

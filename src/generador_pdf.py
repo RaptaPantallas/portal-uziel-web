@@ -291,7 +291,7 @@ def generar_ficha_tecnica(sku: str) -> bool:
     datos = bd.obtener_producto_con_imagen(sku)
 
     if not datos:
-        print(f"🔴 [PDF] SKU '{sku}' no encontrado en la base de datos.")
+        print(f" [PDF] SKU '{sku}' no encontrado en la base de datos.")
         return False
 
     nombre_pdf  = f"Ficha_Tecnica_{sku}.pdf"
@@ -301,7 +301,7 @@ def generar_ficha_tecnica(sku: str) -> bool:
     _dibujar_pagina_producto(c, sku, datos, ancho, alto)
     c.save()
 
-    print(f"🟢 [PDF] Ficha técnica generada: '{nombre_pdf}'")
+    print(f" [PDF] Ficha técnica generada: '{nombre_pdf}'")
     return True
 
 
@@ -330,10 +330,10 @@ def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
         if datos:
             paginas.append((sku.strip().upper(), datos))
         else:
-            print(f"⚠️  [PDF Catálogo] SKU '{sku}' no encontrado — se omitirá.")
+            print(f"  [PDF Catálogo] SKU '{sku}' no encontrado — se omitirá.")
 
     if not paginas:
-        print("🔴 [PDF Catálogo] Ningún SKU válido encontrado. PDF no generado.")
+        print(" [PDF Catálogo] Ningún SKU válido encontrado. PDF no generado.")
         return False, ""
 
     timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -362,7 +362,7 @@ def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
     _dibujar_pie(c, ancho)
     c.save()
 
-    print(f"🟢 [PDF Catálogo] {len(paginas)} producto(s) incluidos. Archivo: '{nombre_pdf}'")
+    print(f" [PDF Catálogo] {len(paginas)} producto(s) incluidos. Archivo: '{nombre_pdf}'")
     return True, nombre_pdf
 
 
@@ -554,7 +554,7 @@ def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
 
     c.save()
     buffer.seek(0)
-    print(f"🟢 [PDF Cotiz] PDF de '{numero}' generado en memoria.")
+    print(f" [PDF Cotiz] PDF de '{numero}' generado en memoria.")
     return buffer
 
 
@@ -653,12 +653,12 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # Tarjetas de resumen
     y -= 40
     tarjetas = [
-        ("👥 Clientes Nuevos", len(datos["clientes_nuevos"]), "#2563eb"),
-        ("📦 Productos Nuevos", len(datos["productos_nuevos"]), "#27ae5f"),
-        ("🖼️ Fotos Vinculadas", len(datos["activos_nuevos"]), "#e67e22"),
-        ("📋 Tareas Creadas", len(datos["tareas_creadas"]), "#8e44ad"),
-        ("✅ Tareas Completadas", len(datos["tareas_completadas"]), "#27ae5f"),
-        ("🧾 Cotizaciones", len(datos["cotizaciones_creadas"]), "#e74c3c"),
+        (" Clientes Nuevos", len(datos["clientes_nuevos"]), "#2563eb"),
+        (" Productos Nuevos", len(datos["productos_nuevos"]), "#27ae5f"),
+        (" Fotos Vinculadas", len(datos["activos_nuevos"]), "#e67e22"),
+        (" Tareas Creadas", len(datos["tareas_creadas"]), "#8e44ad"),
+        (" Tareas Completadas", len(datos["tareas_completadas"]), "#27ae5f"),
+        (" Cotizaciones", len(datos["cotizaciones_creadas"]), "#e74c3c"),
     ]
 
     c.setStrokeColorRGB(*COLOR_LINEA)
@@ -695,7 +695,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     y = alto - 120
 
     # 1. Clientes nuevos
-    y = seccion(f"👥 Clientes Nuevos ({len(datos['clientes_nuevos'])})", y)
+    y = seccion(f" Clientes Nuevos ({len(datos['clientes_nuevos'])})", y)
     if datos["clientes_nuevos"]:
         for cli in datos["clientes_nuevos"]:
             texto = f"• {cli[1]} — RIF: {cli[0]} — Tlf: {cli[2]}"
@@ -706,7 +706,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # 2. Productos nuevos
     if y < 120:
         pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
-    y = seccion(f"📦 Productos Nuevos ({len(datos['productos_nuevos'])})", y)
+    y = seccion(f" Productos Nuevos ({len(datos['productos_nuevos'])})", y)
     if datos["productos_nuevos"]:
         for prod in datos["productos_nuevos"]:
             texto = f"• {prod[0]} — {prod[1]} — {prod[3]} — ${float(prod[4]):.2f}" if prod[4] else f"• {prod[0]} — {prod[1]} — {prod[3]}"
@@ -717,7 +717,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # 3. Fotos vinculadas
     if y < 120:
         pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
-    y = seccion(f"🖼️ Fotos Vinculadas ({len(datos['activos_nuevos'])})", y)
+    y = seccion(f" Fotos Vinculadas ({len(datos['activos_nuevos'])})", y)
     if datos["activos_nuevos"]:
         for act in datos["activos_nuevos"]:
             texto = f"• SKU: {act[2]} ({act[3]}) — Ángulo: {act[1]}"
@@ -728,7 +728,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # 4. Tareas creadas
     if y < 120:
         pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
-    y = seccion(f"📋 Tareas Creadas ({len(datos['tareas_creadas'])})", y)
+    y = seccion(f" Tareas Creadas ({len(datos['tareas_creadas'])})", y)
     if datos["tareas_creadas"]:
         for t in datos["tareas_creadas"]:
             texto = f"• [{t[3]}] {t[2]} — Cliente: {t[1]} — Estado: {t[4]}"
@@ -739,7 +739,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # 5. Tareas completadas
     if y < 120:
         pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
-    y = seccion(f"✅ Tareas Completadas ({len(datos['tareas_completadas'])})", y)
+    y = seccion(f" Tareas Completadas ({len(datos['tareas_completadas'])})", y)
     if datos["tareas_completadas"]:
         for t in datos["tareas_completadas"]:
             texto = f"• {t[2]} — Asignado a: {t[3]} — Límite: {t[4]}"
@@ -750,7 +750,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # 6. Cotizaciones
     if y < 120:
         pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
-    y = seccion(f"🧾 Cotizaciones ({len(datos['cotizaciones_creadas'])})", y)
+    y = seccion(f" Cotizaciones ({len(datos['cotizaciones_creadas'])})", y)
     if datos["cotizaciones_creadas"]:
         for cot in datos["cotizaciones_creadas"]:
             texto = f"• {cot[1]} — {cot[2]} — ${float(cot[3]):,.2f} — {cot[4]}"
@@ -764,7 +764,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
             pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 120
         else:
             y -= 10
-        y = seccion(f"📦 Productos Agregados ({len(productos_list)})", y)
+        y = seccion(f" Productos Agregados ({len(productos_list)})", y)
 
         c.setFont("Helvetica-Bold", 8)
         c.setFillColorRGB(*COLOR_AZUL_EMP)
@@ -804,7 +804,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
         pie(); c.showPage(); encabezado("Totales Generales"); y = alto - 120
     else:
         y -= 20
-    y = seccion("📊 Totales Generales del Sistema", y)
+    y = seccion(" Totales Generales del Sistema", y)
     totales = [
         f"Total de clientes registrados:  {datos['total_clientes']}",
         f"Total de productos en catálogo: {datos['total_productos']}",
@@ -829,6 +829,6 @@ if __name__ == "__main__":
     print(f"Generando catálogo para: {skus_prueba}")
     exito, ruta = generar_pdf_catalogo(skus_prueba)
     if exito:
-        print(f"✅ PDF generado: {ruta}")
+        print(f" PDF generado: {ruta}")
     else:
-        print("❌ No se pudo generar el PDF. Verifica los SKUs y la conexión a BD.")
+        print(" No se pudo generar el PDF. Verifica los SKUs y la conexión a BD.")

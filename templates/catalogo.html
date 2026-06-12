@@ -29,7 +29,7 @@
 {% endwith %}
 
 <div class="search-bar">
-    <span style="color:var(--text-muted);font-size:16px;">🔍</span>
+    <span style="color:var(--text-muted);font-size:16px;"></span>
     <input type="text" id="buscador" placeholder="Buscar por SKU, nombre o marca..." oninput="filtrarProductos()" autocomplete="off">
     <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
@@ -42,7 +42,7 @@
     <form action="{{ url_for('generar_pdf') }}" method="POST">
         <div class="card-header">
             <span class="card-title">Inventario completo</span>
-            <button type="submit" class="btn btn-primary">📄 Generar PDF Seleccionados</button>
+            <button type="submit" class="btn btn-primary"> Generar PDF Seleccionados</button>
         </div>
         <table id="tabla-productos">
             <thead>
@@ -102,7 +102,7 @@
 <div class="modal-overlay" id="modalNuevoProducto">
     <div class="modal wide">
         <div class="modal-header">
-            <span>📦 Nuevo Producto</span>
+            <span> Nuevo Producto</span>
             <button class="modal-close" onclick="cerrarModalProducto()">✕</button>
         </div>
         <form method="POST" action="{{ url_for('nuevo_producto') }}">
@@ -134,7 +134,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalProducto()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">💾 Guardar Producto</button>
+                <button type="submit" class="btn btn-primary"> Guardar Producto</button>
             </div>
         </form>
     </div>
@@ -167,7 +167,7 @@
             <div style="display:flex;gap:10px;margin-top:24px;">
                 <button class="btn btn-ghost" onclick="cerrarDetalle()">← Cerrar</button>
                 {% if session['rol'] == 'Admin' %}
-                <a id="detalle-editar-link" href="" class="btn btn-primary">✏️ Editar</a>
+                <a id="detalle-editar-link" href="" class="btn btn-primary"> Editar</a>
                 {% endif %}
             </div>
         </div>

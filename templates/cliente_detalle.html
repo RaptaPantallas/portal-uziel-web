@@ -39,7 +39,7 @@
 {# cliente = (rif, nombre_empresa, telefono, correo, direccion, fecha_registro) #}
 
 <div class="breadcrumb">
-    <a href="{{ url_for('clientes') }}">👤 Clientes</a> › {{ cliente[1] }}
+    <a href="{{ url_for('clientes') }}"> Clientes</a> › {{ cliente[1] }}
 </div>
 
 {% with msgs = get_flashed_messages(with_categories=true) %}
@@ -58,15 +58,15 @@
     </div>
     <div class="acciones">
         {% if es_admin %}
-        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary">🧾 Nueva Cotización para este cliente</a>
-        <button class="btn btn-primary" onclick="abrirModal()">✏️ Editar Datos</button>
+        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Nueva Cotización para este cliente</a>
+        <button class="btn btn-primary" onclick="abrirModal()"> Editar Datos</button>
         {% endif %}
         <a href="{{ url_for('clientes') }}" class="btn btn-ghost">← Volver</a>
     </div>
 </div>
 
 <div class="card">
-    <div class="card-title">📊 Resumen de Actividad</div>
+    <div class="card-title"> Resumen de Actividad</div>
     <div class="resumen-grid">
         <div class="resumen-card">
             <div class="resumen-num">{{ tareas | length }}</div>
@@ -89,7 +89,7 @@
 
 <div class="card">
     <div class="card-title">
-        <span>📋 Datos de Contacto</span>
+        <span> Datos de Contacto</span>
         {% if cliente[5] %}
         <span style="font-size:12px;font-weight:400;color:var(--text-muted);">Cliente desde {{ cliente[5].strftime('%d/%m/%Y') }}</span>
         {% endif %}
@@ -121,7 +121,7 @@
 </div>
 
 <div class="card">
-    <div class="card-title">📋 Tareas Asociadas</div>
+    <div class="card-title"> Tareas Asociadas</div>
     <table>
         <thead>
             <tr>
@@ -156,7 +156,7 @@
 {% if es_admin %}
 <div class="card">
     <div class="card-title">
-        <span>🧾 Cotizaciones</span>
+        <span> Cotizaciones</span>
         <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Nueva</a>
     </div>
     <table>
@@ -195,7 +195,7 @@
 <div class="modal-overlay" id="modal-editar">
     <div class="modal">
         <div class="modal-header">
-            <span>✏️ Editar Datos del Cliente</span>
+            <span> Editar Datos del Cliente</span>
             <button class="modal-close" onclick="cerrarModal()">×</button>
         </div>
         <form method="POST" action="{{ url_for('cliente_editar', rif=cliente[0]) }}">
@@ -221,7 +221,7 @@
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
+                <button type="submit" class="btn btn-primary"> Guardar Cambios</button>
             </div>
         </form>
     </div>
