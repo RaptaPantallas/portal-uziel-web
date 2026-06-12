@@ -730,6 +730,30 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def actualizar_preview_por_ruta(self, ruta_archivo, preview_binary):
+        """
+        Busca un activo por ruta_archivo y actualiza su preview_webp.
+        Retorna True si encontró y actualizó, False si no existe.
+        """
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE activos_digitales SET preview_webp = %s WHERE ruta_archivo = %s",
+                (psycopg2.Binary(preview_binary), ruta_archivo)
+            )
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [DAM] Error al actualizar preview por ruta '{ruta_archivo}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def obtener_activos_sin_preview(self, sku=None):
         conexion = self.conectar()
         resultados = []

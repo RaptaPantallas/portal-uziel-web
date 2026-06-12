@@ -493,9 +493,12 @@ def api_subir_imagen(sku):
     """
     Endpoint para que la aplicación de escritorio suba imágenes.
     Usa autenticación por API Key en lugar de cookies de sesión.
+    El desktop ya registró el activo en BD; aquí solo se guarda el
+    archivo y se actualiza el preview_webp, evitando duplicados.
 
     Cabecera requerida: X-API-Key: <clave>
     Body: form-data con campo 'imagen' (archivo)
+    Campo opcional: ruta_relativa (ej: 'SKU/3.jpg')
     """
     api_key = request.headers.get('X-API-Key', '')
     if api_key != API_KEY_DESKTOP:
@@ -509,24 +512,31 @@ def api_subir_imagen(sku):
         return {"error": "Nombre de archivo vacío"}, 400
 
     angulo = request.form.get('angulo', 'Principal').strip()
+    ruta_relativa = request.form.get('ruta_relativa', '').strip()
 
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-    carpeta_sku = os.path.join(carpeta_activos, sku)
-    os.makedirs(carpeta_sku, exist_ok=True)
 
-    # Determinar el siguiente número secuencial
-    existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
-    numeros = []
-    for f in existentes:
-        base = os.path.splitext(f)[0]
-        try:
-            numeros.append(int(base))
-        except ValueError:
-            pass
-    siguiente = max(numeros) + 1 if numeros else 1
-
-    nombre_jpg = f"{siguiente}.jpg"
-    ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+    if ruta_relativa:
+        # Usar la ruta exacta que envió el desktop (evita duplicados)
+        nombre_jpg = os.path.basename(ruta_relativa)
+        ruta_jpg = os.path.join(carpeta_activos, ruta_relativa)
+        os.makedirs(os.path.dirname(ruta_jpg), exist_ok=True)
+    else:
+        # Fallback: calcular número secuencial (solo si no se envió ruta)
+        carpeta_sku = os.path.join(carpeta_activos, sku)
+        os.makedirs(carpeta_sku, exist_ok=True)
+        existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+        numeros = []
+        for f in existentes:
+            base = os.path.splitext(f)[0]
+            try:
+                numeros.append(int(base))
+            except ValueError:
+                pass
+        siguiente = max(numeros) + 1 if numeros else 1
+        nombre_jpg = f"{siguiente}.jpg"
+        ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+        ruta_relativa = os.path.join(sku, nombre_jpg)
 
     try:
         img = Image.open(archivo)
@@ -545,12 +555,25 @@ def api_subir_imagen(sku):
         buf.close()
         img.close()
 
+        # Actualizar preview en el registro existente (no duplicar)
+        actualizado = bd.actualizar_preview_por_ruta(ruta_relativa, preview_binary)
+        if actualizado:
+            return {
+                "ok": True,
+                "sku": sku,
+                "archivo": nombre_jpg,
+                "ruta": ruta_jpg,
+                "accion": "preview_actualizado"
+            }
+
+        # Fallback: si no existía el registro, crearlo (migración/datos antiguos)
         if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
             return {
                 "ok": True,
                 "sku": sku,
                 "archivo": nombre_jpg,
-                "ruta": ruta_jpg
+                "ruta": ruta_jpg,
+                "accion": "registro_creado"
             }
         else:
             return {"error": "No se pudo registrar en la BD (¿existe el SKU?)"}, 500
