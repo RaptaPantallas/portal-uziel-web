@@ -69,16 +69,17 @@
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
-                        <a class="link-detalle" onclick="verDetalle(this)">{{ producto[1] }}</a>
+                        <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">{{ producto[1] }}</a>
                     </td>
                     <td>{{ producto[3] }}</td>
                     <td class="precio">${{ producto[5] }}</td>
                     <td>
                         {% if session['rol'] == 'Admin' %}
-                            <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary">Editar</a>
-                            <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
+                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Galería</a>
+                            <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Editar</a>
+                            <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
                         {% else %}
-                            <button class="btn btn-primary" style="padding:6px 10px;font-size:12px;" onclick="verDetalle(this)">Ver ficha</button>
+                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Ver galería</a>
                         {% endif %}
                     </td>
                 </tr>
