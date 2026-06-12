@@ -835,6 +835,33 @@ class ConexionBD:
             conexion.close()
         return activos
 
+    def obtener_todos_activos_con_sku(self):
+        """
+        Retorna lista de (sku, activo_id, ruta_archivo, tipo_archivo, angulo)
+        para todos los activos_digitales que tienen ruta_archivo no NULL.
+        """
+        conexion = self.conectar()
+        filas = []
+        if not conexion: return filas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(f"""
+                SELECT p.sku, a.{pk}, a.ruta_archivo, a.tipo_archivo, a.angulo
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE a.ruta_archivo IS NOT NULL
+                ORDER BY p.sku, a.{pk}
+            """)
+            filas = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener todos los activos: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return filas
+
     def obtener_fotos_principales(self):
         conexion = self.conectar()
         fotos = {}
