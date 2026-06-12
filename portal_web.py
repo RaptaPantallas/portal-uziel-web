@@ -566,8 +566,8 @@ def api_subir_imagen(sku):
                 "accion": "preview_actualizado"
             }
 
-        # Fallback: si no existía el registro, crearlo (migración/datos antiguos)
-        if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
+        # Fallback: si no existía el registro, crearlo con ruta relativa
+        if bd.registrar_activo_con_preview(sku, ruta_relativa, preview_binary, "Imagen", angulo):
             return {
                 "ok": True,
                 "sku": sku,

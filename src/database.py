@@ -732,17 +732,20 @@ class ConexionBD:
 
     def actualizar_preview_por_ruta(self, ruta_archivo, preview_binary):
         """
-        Busca un activo por ruta_archivo y actualiza su preview_webp.
-        Retorna True si encontró y actualizó, False si no existe.
+        Busca un activo por ruta_archivo (normalizando separadores) y actualiza
+        su preview_webp. Retorna True si encontró y actualizó, False si no existe.
         """
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
+            # Normalizar separadores para coincidir con Windows (\\) o Linux (/)
+            ruta_normalizada = ruta_archivo.replace("\\", "/")
             cursor.execute(
-                "UPDATE activos_digitales SET preview_webp = %s WHERE ruta_archivo = %s",
-                (psycopg2.Binary(preview_binary), ruta_archivo)
+                "UPDATE activos_digitales SET preview_webp = %s"
+                " WHERE REPLACE(ruta_archivo, '\\', '/') = %s",
+                (psycopg2.Binary(preview_binary), ruta_normalizada)
             )
             conexion.commit()
             return cursor.rowcount > 0
@@ -753,6 +756,45 @@ class ConexionBD:
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    def eliminar_duplicados_activos(self):
+        """
+        Busca activos_digitales con la misma ruta_archivo (normalizada) y
+        elimina los duplicados, conservando solo el registro con el ID más
+        bajo (el primero creado). Retorna la cantidad de duplicados eliminados.
+        """
+        conexion = self.conectar()
+        if not conexion: return 0
+        cursor = None
+        eliminados = 0
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            # Encontrar duplicados por ruta_archivo normalizada
+            cursor.execute(f"""
+                DELETE FROM activos_digitales
+                WHERE {pk} IN (
+                    SELECT {pk} FROM (
+                        SELECT {pk},
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY REPLACE(ruta_archivo, '\\', '/')
+                                   ORDER BY {pk}
+                               ) AS rn
+                        FROM activos_digitales
+                        WHERE ruta_archivo IS NOT NULL
+                    ) sub
+                    WHERE sub.rn > 1
+                )
+            """)
+            eliminados = cursor.rowcount
+            conexion.commit()
+        except Error as e:
+            print(f" [DAM] Error al eliminar duplicados: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return eliminados
 
     def obtener_activos_sin_preview(self, sku=None):
         conexion = self.conectar()
@@ -837,8 +879,9 @@ class ConexionBD:
 
     def obtener_todos_activos_con_sku(self):
         """
-        Retorna lista de (sku, activo_id, ruta_archivo, tipo_archivo, angulo)
+        Retorna lista de (sku, activo_id, ruta_archivo, tipo_archivo, angulo, preview_webp)
         para todos los activos_digitales que tienen ruta_archivo no NULL.
+        preview_webp es None si no se ha subido preview al servidor web.
         """
         conexion = self.conectar()
         filas = []
@@ -848,7 +891,7 @@ class ConexionBD:
             cursor = conexion.cursor()
             pk = self._pk_activos
             cursor.execute(f"""
-                SELECT p.sku, a.{pk}, a.ruta_archivo, a.tipo_archivo, a.angulo
+                SELECT p.sku, a.{pk}, a.ruta_archivo, a.tipo_archivo, a.angulo, a.preview_webp
                 FROM activos_digitales a
                 JOIN productos p ON p.id_producto = a.producto_id
                 WHERE a.ruta_archivo IS NOT NULL
