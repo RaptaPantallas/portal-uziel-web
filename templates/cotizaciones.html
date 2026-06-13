@@ -10,7 +10,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>🧾 Cotizaciones</h1>
+        <h1> Cotizaciones</h1>
         <p class="subtitulo">
             {{ cotizaciones|length }} cotizacion{{ 'es' if cotizaciones|length != 1 else '' }} encontrada{{ 's' if cotizaciones|length != 1 else '' }}
             {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
@@ -36,7 +36,7 @@
 
 <div class="card">
     {% if cotizaciones %}
-    <table>
+    <div class="table-responsive"><table>
         <thead>
             <tr>
                 <th>Número</th>
@@ -62,10 +62,10 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+        </table></div>
     {% else %}
     <div class="empty-state">
-        <span class="icon">🧾</span>
+        <span class="icon"></span>
         <p>No hay cotizaciones{% if estado_activo %} con estado <strong>{{ estado_activo }}</strong>{% endif %} registradas.</p>
         {% if session['rol'] == 'Admin' %}
         <br>

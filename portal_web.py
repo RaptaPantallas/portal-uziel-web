@@ -47,6 +47,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory
 from functools import wraps
 import io
+from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
@@ -79,11 +80,16 @@ SECRET_KEY = os.getenv("FLASK_SECRET_KEY", SECRET_KEY_DEFAULT)
 if SECRET_KEY == SECRET_KEY_DEFAULT:
     import warnings
     warnings.warn(
-        "\n⚠️  SEGURIDAD: Se está usando la SECRET_KEY por defecto.\n"
+        "\n  SEGURIDAD: Se está usando la SECRET_KEY por defecto.\n"
         "   Configura la variable de entorno FLASK_SECRET_KEY antes de ir a producción.\n"
         "   Genera una clave segura con: python -c \"import secrets; print(secrets.token_hex(32))\"",
         stacklevel=1
     )
+
+# Clave API para que la aplicación de escritorio pueda subir imágenes.
+# Debe ser la misma en main.py (variable API_KEY).
+# En Render, configúrala como variable de entorno: DESKTOP_API_KEY
+API_KEY_DESKTOP = os.getenv("DESKTOP_API_KEY", "uziel-desktop-sync-2026")
 
 # Nombre de la empresa que aparece en el encabezado del PDF generado
 NOMBRE_EMPRESA_PDF = "Catálogo de Productos - Importadora Uziel"
@@ -99,6 +105,35 @@ app.secret_key = SECRET_KEY
 
 # Instancia global del módulo de base de datos
 bd = ConexionBD()
+
+
+# =============================================================================
+# UTILIDAD — Extraer ruta relativa a almacen_activos/
+# =============================================================================
+
+def _extraer_ruta_relativa(ruta_archivo):
+    """
+    Convierte cualquier formato de ruta (absoluta Windows/Linux o relativa)
+    a una ruta relativa dentro de almacen_activos/.
+
+    Ejemplos:
+      'G:/.../almacen_activos/16572-0P030/1.jpg'  → '16572-0P030/1.jpg'
+      '/opt/render/.../almacen_activos/SKU/2.jpg'  → 'SKU/2.jpg'
+      '16572-0P030/1.jpg'                           → '16572-0P030/1.jpg'
+      '1.jpg'                                       → '1.jpg'  (caso borde)
+    """
+    if not ruta_archivo:
+        return None
+    ruta = ruta_archivo.replace('\\', '/')
+    # Si contiene 'almacen_activos/', extraer lo que sigue
+    if 'almacen_activos/' in ruta:
+        idx = ruta.index('almacen_activos/')
+        return ruta[idx + len('almacen_activos/'):]
+    # Si es ruta absoluta (Windows con letra de unidad o Linux con /)
+    if ruta.startswith('/') or (len(ruta) > 2 and ruta[1] == ':'):
+        return os.path.basename(ruta)
+    # Ya es relativa
+    return ruta
 
 # Crear tablas automáticamente al arrancar el servidor —
 # operaciones idempotentes, seguras de ejecutar en cada inicio
@@ -154,7 +189,7 @@ def login_requerido(f):
     @wraps(f)
     def decorador(*args, **kwargs):
         if 'usuario' not in session:
-            flash('🔒 Acceso denegado. Por favor inicia sesión.', 'error')
+            flash(' Acceso denegado. Por favor inicia sesión.', 'error')
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorador
@@ -190,7 +225,7 @@ def login():
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
-            flash('❌ Usuario o contraseña incorrectos. Inténtalo de nuevo.', 'error')
+            flash(' Usuario o contraseña incorrectos. Inténtalo de nuevo.', 'error')
 
     return render_template('login.html')
 
@@ -254,11 +289,60 @@ def catalogo():
     para mostrar miniaturas en la tabla.
     """
     inventario = bd.obtener_productos()
-    # DEBUG: verificar datos del primer producto (NamedTupleCursor: acceso por nombre y por índice)
-    if inventario:
-        p = inventario[0]
-        print(f"[DEBUG catalogo] sku={p.sku}, nombre={p.nombre}, marca={p.marca}, precio={p.precio}")
     return render_template('catalogo.html', productos=inventario)
+
+
+@app.route('/galeria')
+@login_requerido
+def galeria():
+    """
+    Galería visual de productos con fotos.
+    Muestra todos los productos que tienen al menos una imagen vinculada
+    en activos_digitales, con buscador inteligente por SKU o nombre.
+    """
+    query = request.args.get('q', '').strip()
+    if query:
+        resultados = bd.buscar_banco_completo(query, limite=200)
+    else:
+        resultados = bd.obtener_banco_completo()
+
+    productos_galeria = []
+    for r in resultados:
+        # r = (sku, nombre, ruta_principal, total_fotos, id_activo)
+        productos_galeria.append({
+            'sku': r[0],
+            'nombre': r[1],
+            'ruta': r[2],
+            'total_fotos': r[3],
+            'id_activo': r[4] if len(r) > 4 else None
+        })
+
+    return render_template(
+        'galeria.html',
+        productos=productos_galeria,
+        query=query,
+        total=len(productos_galeria)
+    )
+
+
+@app.route('/api/galeria/buscar')
+@login_requerido
+def api_galeria_buscar():
+    """API AJAX para búsqueda en galería — retorna JSON."""
+    query = request.args.get('q', '').strip()
+    if not query:
+        return {'results': [], 'total': 0}
+    resultados = bd.buscar_banco_completo(query, limite=50)
+    items = []
+    for r in resultados:
+        items.append({
+            'sku': r[0],
+            'nombre': r[1],
+            'total_fotos': r[3],
+            'id_activo': r[4] if len(r) > 4 else None,
+            'url': url_for('detalle_producto', sku=r[0])
+        })
+    return {'results': items, 'total': len(items)}
 
 
 @app.route('/producto/<sku>')
@@ -276,7 +360,7 @@ def detalle_producto(sku):
     """
     producto = bd.obtener_producto(sku)
     if not producto:
-        flash(f'❌ Producto "{sku}" no encontrado en el catálogo.', 'error')
+        flash(f' Producto "{sku}" no encontrado en el catálogo.', 'error')
         return redirect(url_for('catalogo'))
 
     activos = bd.obtener_activos_por_sku(sku)
@@ -287,13 +371,13 @@ def detalle_producto(sku):
         angulo = activo[3]
         if angulo not in galeria:
             galeria[angulo] = []
-        # Normalizar separadores antes de basename para rutas Windows guardadas por el desktop app
-        nombre_archivo = os.path.basename(activo[1].replace('\\', '/'))
+        # Extraer ruta relativa a almacen_activos/ para servirla por el navegador
+        ruta_relativa = _extraer_ruta_relativa(activo[1])
         galeria[angulo].append({
             'id': activo[0],
             'ruta': activo[1],
             'tipo': activo[2],
-            'nombre': nombre_archivo
+            'nombre': ruta_relativa or os.path.basename(activo[1].replace('\\', '/'))
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
@@ -322,6 +406,351 @@ def servir_activo(nombre_archivo):
     return send_from_directory(carpeta_activos, nombre_archivo)
 
 
+@app.route('/subir_imagen/<sku>', methods=['POST'])
+@login_requerido
+def subir_imagen(sku):
+    """
+    Sube una imagen desde el navegador, la guarda en alta calidad como JPG
+    en el filesystem y almacena una previsualización WebP comprimida en la BD.
+    Solo accesible para usuarios con rol 'Admin'.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden subir imágenes.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    # Validar que el producto existe
+    producto = bd.obtener_producto(sku)
+    if not producto:
+        flash(f' El producto con SKU "{sku}" no existe.', 'error')
+        return redirect(url_for('catalogo'))
+
+    if 'imagen' not in request.files:
+        flash(' No se seleccionó ningún archivo.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    archivo = request.files['imagen']
+    if archivo.filename == '':
+        flash(' No se seleccionó ningún archivo.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    angulo = request.form.get('angulo', 'Principal').strip()
+
+    # Crear carpeta del SKU
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    carpeta_sku = os.path.join(carpeta_activos, sku)
+    os.makedirs(carpeta_sku, exist_ok=True)
+
+    # Determinar el siguiente número secuencial
+    existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+    numeros = []
+    for f in existentes:
+        base = os.path.splitext(f)[0]
+        try:
+            numeros.append(int(base))
+        except ValueError:
+            pass
+    siguiente = max(numeros) + 1 if numeros else 1
+
+    nombre_jpg = f"{siguiente}.jpg"
+    ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+
+    try:
+        # Procesar imagen con Pillow
+        img = Image.open(archivo)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+
+        # Guardar JPG alta calidad en filesystem (mismo formato que desktop)
+        if img.width > 800 or img.height > 800:
+            img.thumbnail((800, 800))
+        img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+        # Generar WebP de baja calidad para preview en la BD
+        preview = img.copy()
+        if preview.width > 300 or preview.height > 300:
+            preview.thumbnail((300, 300))
+        buf = io.BytesIO()
+        preview.save(buf, "WEBP", quality=20, optimize=True)
+        preview_binary = buf.getvalue()
+        buf.close()
+
+        img.close()
+
+        # Guardar en BD con preview
+        if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
+            flash(f' Imagen subida correctamente para SKU "{sku}".', 'exito')
+        else:
+            flash(f' La imagen se guardó en disco pero no se pudo registrar en la BD.', 'error')
+
+    except Exception as e:
+        flash(f' Error al procesar la imagen: {e}', 'error')
+
+    return redirect(url_for('detalle_producto', sku=sku))
+
+
+@app.route('/api/subir_imagen/<sku>', methods=['POST'])
+def api_subir_imagen(sku):
+    """
+    Endpoint para que la aplicación de escritorio suba imágenes.
+    Usa autenticación por API Key en lugar de cookies de sesión.
+    El desktop ya registró el activo en BD; aquí solo se guarda el
+    archivo y se actualiza el preview_webp, evitando duplicados.
+
+    Cabecera requerida: X-API-Key: <clave>
+    Body: form-data con campo 'imagen' (archivo)
+    Campo opcional: ruta_relativa (ej: 'SKU/3.jpg')
+    """
+    api_key = request.headers.get('X-API-Key', '')
+    if api_key != API_KEY_DESKTOP:
+        return {"error": "API Key inválida"}, 401
+
+    if 'imagen' not in request.files:
+        return {"error": "No se envió ninguna imagen"}, 400
+
+    archivo = request.files['imagen']
+    if archivo.filename == '':
+        return {"error": "Nombre de archivo vacío"}, 400
+
+    angulo = request.form.get('angulo', 'Principal').strip()
+    ruta_relativa = request.form.get('ruta_relativa', '').strip()
+
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+
+    if ruta_relativa:
+        # Usar la ruta exacta que envió el desktop (evita duplicados)
+        nombre_jpg = os.path.basename(ruta_relativa)
+        ruta_jpg = os.path.join(carpeta_activos, ruta_relativa)
+        os.makedirs(os.path.dirname(ruta_jpg), exist_ok=True)
+    else:
+        # Fallback: calcular número secuencial (solo si no se envió ruta)
+        carpeta_sku = os.path.join(carpeta_activos, sku)
+        os.makedirs(carpeta_sku, exist_ok=True)
+        existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+        numeros = []
+        for f in existentes:
+            base = os.path.splitext(f)[0]
+            try:
+                numeros.append(int(base))
+            except ValueError:
+                pass
+        siguiente = max(numeros) + 1 if numeros else 1
+        nombre_jpg = f"{siguiente}.jpg"
+        ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+        ruta_relativa = os.path.join(sku, nombre_jpg)
+
+    try:
+        img = Image.open(archivo)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        if img.width > 800 or img.height > 800:
+            img.thumbnail((800, 800))
+        img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+        preview = img.copy()
+        if preview.width > 300 or preview.height > 300:
+            preview.thumbnail((300, 300))
+        buf = io.BytesIO()
+        preview.save(buf, "WEBP", quality=20, optimize=True)
+        preview_binary = buf.getvalue()
+        buf.close()
+        img.close()
+
+        # Actualizar preview en el registro existente (no duplicar)
+        actualizado = bd.actualizar_preview_por_ruta(ruta_relativa, preview_binary)
+        if actualizado:
+            return {
+                "ok": True,
+                "sku": sku,
+                "archivo": nombre_jpg,
+                "ruta": ruta_jpg,
+                "accion": "preview_actualizado"
+            }
+
+        # Fallback: si no existía el registro, crearlo con ruta relativa
+        if bd.registrar_activo_con_preview(sku, ruta_relativa, preview_binary, "Imagen", angulo):
+            return {
+                "ok": True,
+                "sku": sku,
+                "archivo": nombre_jpg,
+                "ruta": ruta_jpg,
+                "accion": "registro_creado"
+            }
+        else:
+            return {"error": "No se pudo registrar en la BD (¿existe el SKU?)"}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+@app.route('/api/bulk_subir', methods=['POST'])
+def api_bulk_subir():
+    """
+    Endpoint para subir múltiples imágenes desde la aplicación de escritorio.
+    Recibe un archivo ZIP con la estructura: SKU/archivo.jpg
+    Cabecera requerida: X-API-Key: <clave>
+    """
+    api_key = request.headers.get('X-API-Key', '')
+    if api_key != API_KEY_DESKTOP:
+        return {"error": "API Key inválida"}, 401
+
+    import zipfile
+    import tempfile
+
+    if 'archivo' not in request.files:
+        return {"error": "No se envió ningún archivo"}, 400
+    archivo_zip = request.files['archivo']
+    if archivo_zip.filename == '':
+        return {"error": "Nombre de archivo vacío"}, 400
+
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    resultados = {"ok": 0, "errores": 0, "detalle": []}
+
+    try:
+        with zipfile.ZipFile(archivo_zip) as zf:
+            for nombre in zf.namelist():
+                # Esperamos: SKU/archivo.jpg
+                nombre_normalizado = nombre.replace('\\', '/')
+                partes = nombre_normalizado.split('/')
+                if len(partes) < 2:
+                    continue
+                sku = partes[0]
+                nombre_archivo = '/'.join(partes[1:])
+                if not nombre_archivo or not nombre_archivo.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    continue
+
+                carpeta_sku = os.path.join(carpeta_activos, sku)
+                os.makedirs(carpeta_sku, exist_ok=True)
+
+                # Determinar número secuencial
+                existentes = [f for f in os.listdir(carpeta_sku) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+                numeros = []
+                for f in existentes:
+                    base = os.path.splitext(f)[0]
+                    try:
+                        numeros.append(int(base))
+                    except ValueError:
+                        pass
+                siguiente = max(numeros) + 1 if numeros else 1
+                nombre_jpg = f"{siguiente}.jpg"
+                ruta_jpg = os.path.join(carpeta_sku, nombre_jpg)
+
+                try:
+                    data = zf.read(nombre)
+                    img = Image.open(io.BytesIO(data))
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    if img.width > 800 or img.height > 800:
+                        img.thumbnail((800, 800))
+                    img.save(ruta_jpg, "JPEG", quality=90, optimize=True)
+
+                    preview = img.copy()
+                    if preview.width > 300 or preview.height > 300:
+                        preview.thumbnail((300, 300))
+                    buf = io.BytesIO()
+                    preview.save(buf, "WEBP", quality=20, optimize=True)
+                    preview_binary = buf.getvalue()
+                    buf.close()
+                    img.close()
+
+                    if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", "Principal"):
+                        resultados["ok"] += 1
+                        resultados["detalle"].append({"sku": sku, "archivo": nombre_jpg, "estado": "ok"})
+                    else:
+                        resultados["errores"] += 1
+                        resultados["detalle"].append({"sku": sku, "archivo": nombre_jpg, "estado": "error_bd"})
+                except Exception as e:
+                    resultados["errores"] += 1
+                    resultados["detalle"].append({"sku": sku, "archivo": nombre_archivo, "estado": str(e)})
+    except Exception as e:
+        return {"error": f"Error al procesar ZIP: {e}"}, 500
+
+    return {"ok": True, "resultados": resultados}
+
+
+@app.route('/preview/<int:activo_id>')
+@login_requerido
+def servir_preview(activo_id):
+    """
+    Sirve la previsualización WebP (baja calidad) desde la base de datos.
+    Si el activo no tiene preview en BD, redirige al JPG original del filesystem.
+    """
+    resultado = bd.obtener_preview_activo(activo_id)
+    if resultado:
+        preview_bytes, ruta_fallback = resultado
+        if preview_bytes:
+            return send_file(
+                io.BytesIO(bytes(preview_bytes)),
+                mimetype='image/webp'
+            )
+        # Fallback: extraer ruta relativa y redirigir al archivo original
+        if ruta_fallback:
+            rel_path = _extraer_ruta_relativa(ruta_fallback)
+            if rel_path:
+                return redirect(url_for('servir_activo', nombre_archivo=rel_path))
+
+    # Si no hay nada, devolver un placeholder 1x1 transparente
+    return send_file(io.BytesIO(b''), mimetype='image/png')
+
+
+@app.route('/sincronizar_previews/<sku>', methods=['POST'])
+@login_requerido
+def sincronizar_previews(sku):
+    """
+    Escanea los archivos JPG en almacen_activos/<SKU>/ y genera los previews
+    WebP en la BD para todos los activos que aún no tengan preview.
+    Solo Admin.
+
+    CORREGIDO: Resuelve la ruta relativa a almacen_activos/ para que funcione
+    tanto con rutas absolutas (Windows/Linux) como con rutas relativas.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden sincronizar.', 'error')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    activos_sin_preview = bd.obtener_activos_sin_preview(sku)
+    if not activos_sin_preview:
+        flash(f' Todos los activos de "{sku}" ya tienen preview.', 'info')
+        return redirect(url_for('detalle_producto', sku=sku))
+
+    carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+    contador = 0
+    omitidos = 0
+    for activo_id, ruta_archivo in activos_sin_preview:
+        # Extraer ruta relativa y resolver contra la carpeta real del servidor
+        ruta_relativa = _extraer_ruta_relativa(ruta_archivo)
+        if not ruta_relativa:
+            print(f" [Sync] No se pudo extraer ruta relativa de: {ruta_archivo}")
+            omitidos += 1
+            continue
+        ruta_real = os.path.join(carpeta_activos, ruta_relativa)
+        if not os.path.exists(ruta_real):
+            print(f" [Sync] Archivo no encontrado, se omitirá: {ruta_real}")
+            omitidos += 1
+            continue
+        try:
+            with Image.open(ruta_real) as img:
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                preview = img.copy()
+                if preview.width > 300 or preview.height > 300:
+                    preview.thumbnail((300, 300))
+                buf = io.BytesIO()
+                preview.save(buf, "WEBP", quality=20, optimize=True)
+                preview_binary = buf.getvalue()
+                buf.close()
+
+                if bd.actualizar_preview_activo(activo_id, preview_binary):
+                    contador += 1
+        except Exception as e:
+            print(f" [Sync] Error al procesar {ruta_real}: {e}")
+            omitidos += 1
+
+    if omitidos > 0:
+        flash(f' Sincronización: {contador} preview(s) generado(s), {omitidos} omitido(s) (archivos no encontrados en el servidor).', 'exito')
+    else:
+        flash(f' Sincronización completada: {contador} preview(s) generado(s) para "{sku}".', 'exito')
+    return redirect(url_for('detalle_producto', sku=sku))
+
+
 @app.route('/clientes')
 @login_requerido
 def clientes():
@@ -345,7 +774,7 @@ def cliente_detalle(rif):
     """
     cliente = bd.obtener_cliente(rif)
     if not cliente:
-        flash('⚠️ Cliente no encontrado.', 'error')
+        flash(' Cliente no encontrado.', 'error')
         return redirect(url_for('clientes'))
 
     tareas = bd.obtener_tareas_por_cliente(rif)
@@ -376,7 +805,7 @@ def cliente_editar(rif):
         rif (str): RIF del cliente a actualizar.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden editar clientes.', 'error')
+        flash(' Solo los administradores pueden editar clientes.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
     nombre_empresa = request.form.get('nombre_empresa', '').strip()
@@ -385,14 +814,14 @@ def cliente_editar(rif):
     direccion      = request.form.get('direccion', '').strip()
 
     if not nombre_empresa:
-        flash('⚠️ El nombre de la empresa es obligatorio.', 'error')
+        flash(' El nombre de la empresa es obligatorio.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
     ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion)
     if ok:
-        flash('✅ Datos del cliente actualizados correctamente.', 'success')
+        flash(' Datos del cliente actualizados correctamente.', 'success')
     else:
-        flash('🔴 Error al actualizar el cliente. Intenta de nuevo.', 'error')
+        flash(' Error al actualizar el cliente. Intenta de nuevo.', 'error')
 
     return redirect(url_for('cliente_detalle', rif=rif))
 
@@ -409,7 +838,7 @@ def nuevo_producto():
           muestra un error sin perder los datos del formulario.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para agregar productos.', 'error')
+        flash(' No tienes permisos para agregar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -421,10 +850,10 @@ def nuevo_producto():
         precio = request.form['precio']
 
         if bd.registrar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
-            flash(f'✅ ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
+            flash(f' ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
             return redirect(url_for('catalogo'))
         else:
-            flash(f'❌ Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
+            flash(f' Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
 
     return render_template('nuevo_producto.html')
 
@@ -440,7 +869,7 @@ def nuevo_cliente():
     POST: Valida y guarda el nuevo cliente. Si el RIF ya existe, muestra un error.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para agregar clientes.', 'error')
+        flash(' No tienes permisos para agregar clientes.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -451,10 +880,10 @@ def nuevo_cliente():
         direccion = request.form['direccion'].strip()
 
         if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion):
-            flash(f'✅ ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
+            flash(f' ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
             return redirect(url_for('clientes'))
         else:
-            flash('❌ Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
+            flash(' Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
 
     return render_template('nuevo_cliente.html')
 
@@ -470,7 +899,7 @@ def editar_producto(sku):
     POST: Guarda los cambios y redirige al catálogo.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para editar productos.', 'error')
+        flash(' No tienes permisos para editar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -481,15 +910,15 @@ def editar_producto(sku):
         precio = request.form['precio']
 
         if bd.actualizar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
-            flash(f'✅ Producto {sku} actualizado correctamente.', 'exito')
+            flash(f' Producto {sku} actualizado correctamente.', 'exito')
             return redirect(url_for('catalogo'))
         else:
-            flash(f'❌ No se pudo actualizar el producto {sku}.', 'error')
+            flash(f' No se pudo actualizar el producto {sku}.', 'error')
     else:
         # GET: cargar datos actuales del producto para pre-llenar el formulario
         producto = bd.obtener_producto(sku)
         if not producto:
-            flash(f'❌ El producto con SKU "{sku}" no fue encontrado.', 'error')
+            flash(f' El producto con SKU "{sku}" no fue encontrado.', 'error')
             return redirect(url_for('catalogo'))
         return render_template('editar.html', producto=producto)
 
@@ -503,13 +932,13 @@ def eliminar_producto(sku):
     La confirmación visual se maneja con un onclick en el HTML.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ No tienes permisos para eliminar productos.', 'error')
+        flash(' No tienes permisos para eliminar productos.', 'error')
         return redirect(url_for('inicio'))
 
     if bd.eliminar_producto(sku):
-        flash(f'🗑️ El producto {sku} fue eliminado del inventario.', 'exito')
+        flash(f' El producto {sku} fue eliminado del inventario.', 'exito')
     else:
-        flash(f'❌ No se pudo eliminar el producto {sku}.', 'error')
+        flash(f' No se pudo eliminar el producto {sku}.', 'error')
 
     return redirect(url_for('catalogo'))
 
@@ -564,7 +993,7 @@ def asignar_tarea():
     """
     # Verificar que el usuario tenga permiso de crear tareas
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los supervisores pueden asignar tareas.', 'error')
+        flash(' Solo los supervisores pueden asignar tareas.', 'error')
         return redirect(url_for('inicio'))
 
     # Leer y limpiar campos del formulario
@@ -578,15 +1007,15 @@ def asignar_tarea():
 
     # Validar que todos los campos obligatorios estén completos
     if not all([cliente_rif, asignado_a, tipo_tarea, fecha_limite]):
-        flash('⚠️ Completa todos los campos obligatorios de la tarea.', 'error')
+        flash(' Completa todos los campos obligatorios de la tarea.', 'error')
         return redirect(request.referrer or url_for('tareas'))
 
     # Guardar la tarea en la base de datos
     if bd.crear_tarea(cliente_rif, cliente_nombre, asignado_a,
                       tipo_tarea, descripcion, fecha_limite, creado_por):
-        flash(f'✅ Tarea asignada a "{asignado_a}" correctamente.', 'exito')
+        flash(f' Tarea asignada a "{asignado_a}" correctamente.', 'exito')
     else:
-        flash('❌ No se pudo crear la tarea. Intenta de nuevo.', 'error')
+        flash(' No se pudo crear la tarea. Intenta de nuevo.', 'error')
 
     # Regresar a la página desde donde se envió el formulario
     return redirect(request.referrer or url_for('tareas'))
@@ -610,13 +1039,13 @@ def actualizar_tarea(tarea_id):
     # Validar que el estado recibido sea uno de los permitidos
     estados_validos = {'Pendiente', 'En Progreso', 'Completada'}
     if nuevo_estado not in estados_validos:
-        flash('⚠️ Estado no válido.', 'error')
+        flash(' Estado no válido.', 'error')
         return redirect(url_for('tareas'))
 
     if bd.actualizar_estado_tarea(tarea_id, nuevo_estado):
-        flash(f'✅ Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
+        flash(f' Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
     else:
-        flash(f'❌ No se pudo actualizar la tarea #{tarea_id}.', 'error')
+        flash(f' No se pudo actualizar la tarea #{tarea_id}.', 'error')
 
     return redirect(url_for('tareas'))
 
@@ -631,7 +1060,7 @@ def generar_pdf():
     skus_seleccionados = request.form.getlist('skus_seleccionados')
 
     if not skus_seleccionados:
-        flash('⚠️ Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
+        flash(' Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
         return redirect(url_for('catalogo'))
 
     # Colores corporativos (RGB 0.0-1.0) — idénticos al generador de escritorio
@@ -877,7 +1306,7 @@ def cotizaciones():
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden acceder a las cotizaciones.', 'error')
+        flash(' Solo los administradores pueden acceder a las cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     estado_filtro = request.args.get('estado', '')
     lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
@@ -901,7 +1330,7 @@ def cotizacion_nueva():
     Solo permite rol Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden crear cotizaciones.', 'error')
+        flash(' Solo los administradores pueden crear cotizaciones.', 'error')
         return redirect(url_for('cotizaciones'))
 
     if request.method == 'POST':
@@ -916,7 +1345,7 @@ def cotizacion_nueva():
         precios    = request.form.getlist('precio_unitario[]')
 
         if not cliente_rif or not cliente_nombre or not skus:
-            flash('⚠️ Debes seleccionar un cliente y agregar al menos un producto.', 'error')
+            flash(' Debes seleccionar un cliente y agregar al menos un producto.', 'error')
         else:
             # Parseo completo primero — si algo falla, no se guarda nada
             items = []
@@ -930,7 +1359,7 @@ def cotizacion_nueva():
                     if cant <= 0 or prec < 0:
                         raise ValueError("Valores fuera de rango")
                 except (ValueError, IndexError):
-                    flash('⚠️ Cantidad o precio inválido en uno de los productos.', 'error')
+                    flash(' Cantidad o precio inválido en uno de los productos.', 'error')
                     error_validacion = True
                     break
                 items.append({
@@ -947,12 +1376,12 @@ def cotizacion_nueva():
                     session['usuario'], items, notas
                 )
                 if cot_id:
-                    flash('✅ Cotización creada exitosamente.', 'success')
+                    flash(' Cotización creada exitosamente.', 'success')
                     return redirect(url_for('cotizacion_detalle', cotizacion_id=cot_id))
                 else:
-                    flash('🔴 Error al guardar la cotización. Intenta de nuevo.', 'error')
+                    flash(' Error al guardar la cotización. Intenta de nuevo.', 'error')
             elif not error_validacion:
-                flash('⚠️ Debes agregar al menos un producto válido.', 'error')
+                flash(' Debes agregar al menos un producto válido.', 'error')
 
     # GET — cargar clientes y productos para los selectores.
     # Si viene ?cliente_rif=<rif>, pre-seleccionar ese cliente.
@@ -975,11 +1404,11 @@ def cotizacion_detalle(cotizacion_id):
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden ver cotizaciones.', 'error')
+        flash(' Solo los administradores pueden ver cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash('⚠️ Cotización no encontrada.', 'error')
+        flash(' Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
     estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
     # El template usa 'cab' e 'items' directamente (desestructurado del dict)
@@ -999,19 +1428,19 @@ def cotizacion_estado(cotizacion_id):
     POST param: nuevo_estado
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden cambiar el estado.', 'error')
+        flash(' Solo los administradores pueden cambiar el estado.', 'error')
         return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
     estados_validos = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
     if nuevo_estado not in estados_validos:
-        flash('⚠️ Estado no válido.', 'error')
+        flash(' Estado no válido.', 'error')
     else:
         ok = bd.actualizar_estado_cotizacion(cotizacion_id, nuevo_estado)
         if ok:
-            flash(f'✅ Estado actualizado a "{nuevo_estado}".', 'success')
+            flash(f' Estado actualizado a "{nuevo_estado}".', 'success')
         else:
-            flash('🔴 Error al actualizar el estado.', 'error')
+            flash(' Error al actualizar el estado.', 'error')
 
     return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
@@ -1024,11 +1453,11 @@ def cotizacion_pdf(cotizacion_id):
     Solo accesible para usuarios con rol 'Admin'.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden descargar cotizaciones.', 'error')
+        flash(' Solo los administradores pueden descargar cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash('⚠️ Cotización no encontrada.', 'error')
+        flash(' Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
 
     buffer = generar_pdf_cotizacion(datos)
@@ -1054,7 +1483,7 @@ def admin_usuarios():
     Solo accesible para el rol Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden gestionar usuarios.', 'error')
+        flash(' Solo los administradores pueden gestionar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     usuarios = bd.obtener_todos_usuarios()
@@ -1069,7 +1498,7 @@ def admin_usuario_nuevo():
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden crear usuarios.', 'error')
+        flash(' Solo los administradores pueden crear usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     username   = request.form.get('username', '').strip()
@@ -1079,14 +1508,14 @@ def admin_usuario_nuevo():
     permisos   = ','.join(request.form.getlist('permisos'))
 
     if not username or not password:
-        flash('⚠️ El usuario y la contraseña son obligatorios.', 'error')
+        flash(' El usuario y la contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.crear_usuario(username, password, rol, permisos)
     if ok:
-        flash(f'✅ Usuario "{username}" creado correctamente.', 'success')
+        flash(f' Usuario "{username}" creado correctamente.', 'success')
     else:
-        flash(f'🔴 No se pudo crear el usuario "{username}". '
+        flash(f' No se pudo crear el usuario "{username}". '
               'Es posible que ya exista.', 'error')
 
     return redirect(url_for('admin_usuarios'))
@@ -1100,7 +1529,7 @@ def admin_usuario_editar(username):
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden editar usuarios.', 'error')
+        flash(' Solo los administradores pueden editar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     nuevo_username = request.form.get('nuevo_username', '').strip()
@@ -1108,14 +1537,14 @@ def admin_usuario_editar(username):
     permisos       = ','.join(request.form.getlist('permisos'))
 
     if not nuevo_username:
-        flash('⚠️ El nombre de usuario no puede quedar vacío.', 'error')
+        flash(' El nombre de usuario no puede quedar vacío.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos)
     if ok:
-        flash(f'✅ Usuario "{username}" actualizado correctamente.', 'success')
+        flash(f' Usuario "{username}" actualizado correctamente.', 'success')
     else:
-        flash(f'🔴 No se pudo actualizar el usuario "{username}".', 'error')
+        flash(f' No se pudo actualizar el usuario "{username}".', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1128,25 +1557,25 @@ def admin_usuario_pass(username):
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden cambiar contraseñas.', 'error')
+        flash(' Solo los administradores pueden cambiar contraseñas.', 'error')
         return redirect(url_for('inicio'))
 
     nueva_pass   = request.form.get('nueva_password', '').strip()
     confirmar    = request.form.get('confirmar_password', '').strip()
 
     if not nueva_pass or not confirmar:
-        flash('⚠️ Ambos campos de contraseña son obligatorios.', 'error')
+        flash(' Ambos campos de contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     if nueva_pass != confirmar:
-        flash('⚠️ Las contraseñas no coinciden.', 'error')
+        flash(' Las contraseñas no coinciden.', 'error')
         return redirect(url_for('admin_usuarios'))
 
     ok = bd.actualizar_password_usuario(username, nueva_pass)
     if ok:
-        flash(f'✅ Contraseña de "{username}" actualizada.', 'success')
+        flash(f' Contraseña de "{username}" actualizada.', 'success')
     else:
-        flash(f'🔴 No se pudo cambiar la contraseña de "{username}".', 'error')
+        flash(f' No se pudo cambiar la contraseña de "{username}".', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1159,14 +1588,14 @@ def admin_usuario_borrar(username):
     Solo Admin puede usar esta ruta. No permite eliminar al último Admin.
     """
     if session.get('rol') != 'Admin':
-        flash('⛔ Solo los administradores pueden eliminar usuarios.', 'error')
+        flash(' Solo los administradores pueden eliminar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     ok = bd.eliminar_usuario(username)
     if ok:
-        flash(f'✅ Usuario "{username}" eliminado.', 'success')
+        flash(f' Usuario "{username}" eliminado.', 'success')
     else:
-        flash(f'🔴 No se pudo eliminar "{username}". '
+        flash(f' No se pudo eliminar "{username}". '
               'Asegúrate de que no sea el único administrador.', 'error')
 
     return redirect(url_for('admin_usuarios'))
@@ -1181,7 +1610,7 @@ def admin_usuario_borrar(username):
 def diagnostico():
     """Muestra los datos crudos de los primeros 10 productos para depuración."""
     if session.get('rol') != 'Admin':
-        flash('⛌ Solo administradores.', 'error')
+        flash(' Solo administradores.', 'error')
         return redirect(url_for('inicio'))
     from src.database import ConexionBD as BD
     bd_local = BD()

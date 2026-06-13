@@ -234,7 +234,7 @@
         <span class="card-title">Productos Agregados en el Periodo</span>
         <span class="total-badge" id="prod-total-badge">{{ productos_pag.total }} productos</span>
     </div>
-    <table>
+    <div class="table-responsive"><table>
         <thead>
             <tr>
                 <th>SKU</th>
@@ -257,7 +257,7 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+        </table></div>
     {% if productos_pag.total_paginas > 1 %}
     <div class="prod-paginacion">
         <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)">← Anterior</button>
