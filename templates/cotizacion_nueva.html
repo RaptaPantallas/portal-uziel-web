@@ -29,7 +29,7 @@
 <div class="page-header">
     <div>
         <nav class="breadcrumb">
-            <a href="{{ url_for('cotizaciones') }}">🧾 Cotizaciones</a>
+            <a href="{{ url_for('cotizaciones') }}"> Cotizaciones</a>
             <span class="breadcrumb-sep">›</span>
             <span>Nueva</span>
         </nav>
@@ -45,7 +45,7 @@
 
 <form method="POST" action="{{ url_for('cotizacion_nueva') }}" id="form-cotizacion">
     <div class="card">
-        <div class="card-title">👤 Cliente</div>
+        <div class="card-title"> Cliente</div>
         <div class="form-grid">
             <div class="form-group">
                 <label>Empresa</label>
@@ -65,7 +65,7 @@
     </div>
 
     <div class="card">
-        <div class="card-title">📦 Productos</div>
+        <div class="card-title"> Productos</div>
         <div class="search-row">
             <input type="text" id="buscador-producto" placeholder="Buscar producto por nombre o SKU..." autocomplete="off">
         </div>
@@ -78,7 +78,7 @@
             {% endfor %}
             <div id="sin-resultados">Sin resultados para tu búsqueda.</div>
         </div>
-        <table id="tabla-items" style="margin-top:16px;">
+        <div class="table-responsive"><table id="tabla-items" style="margin-top:16px;">
             <thead>
                 <tr>
                     <th>SKU</th>
@@ -90,7 +90,7 @@
                 </tr>
             </thead>
             <tbody id="cuerpo-items"></tbody>
-        </table>
+        </table></div>
         <div class="total-row">
             <span class="total-label">TOTAL USD:</span>
             <span class="total-valor" id="total-display">$ 0.00</span>
@@ -98,13 +98,13 @@
     </div>
 
     <div class="card">
-        <div class="card-title">📝 Notas / Observaciones (opcional)</div>
+        <div class="card-title"> Notas / Observaciones (opcional)</div>
         <textarea name="notas" class="form-control" placeholder="Condiciones de pago, tiempo de entrega, descuentos, etc."></textarea>
     </div>
 
     <div class="form-actions">
         <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">Cancelar</a>
-        <button type="submit" class="btn btn-primary">✅ Guardar Cotización</button>
+        <button type="submit" class="btn btn-primary"> Guardar Cotización</button>
     </div>
 </form>
 {% endblock %}

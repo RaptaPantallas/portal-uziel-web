@@ -73,16 +73,16 @@
 
 <div class="stats-grid">
     <div class="stat-card clientes-card">
-        <div class="stat-label">Total Clientes <span class="icon">👤</span></div>
+        <div class="stat-label">Total Clientes <span class="icon"></span></div>
         <div class="stat-value">{{ total_cli }}</div>
     </div>
     <div class="stat-card productos-card">
-        <div class="stat-label">Total Productos <span class="icon">📦</span></div>
+        <div class="stat-label">Total Productos <span class="icon"></span></div>
         <div class="stat-value">{{ total_prod }}</div>
     </div>
     {% if mis_tareas %}
     <div class="stat-card tareas-card">
-        <div class="stat-label">Mis Tareas Activas <span class="icon">📋</span></div>
+        <div class="stat-label">Mis Tareas Activas <span class="icon"></span></div>
         <div class="stat-value">{{ mis_tareas | length }}</div>
     </div>
     {% endif %}
@@ -91,7 +91,7 @@
 {% if session['rol'] == 'Admin' %}
 <div class="card" style="padding:24px;text-align:center;">
     <p style="color:var(--text-muted);margin-bottom:12px;">Asigna trabajo a tu equipo de forma rápida</p>
-    <button type="button" class="btn btn-primary" onclick="abrirModalTarea()">📋 Asignar Nueva Tarea</button>
+    <button type="button" class="btn btn-primary" onclick="abrirModalTarea()"> Asignar Nueva Tarea</button>
 </div>
 {% endif %}
 
@@ -104,10 +104,10 @@
                     <button type="button" class="btn btn-primary" onclick="abrirModalNuevoProducto()">+ Nuevo Producto</button>
                     <button type="button" class="btn btn-primary" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
                 {% endif %}
-                <button type="submit" class="btn btn-primary">📄 Generar PDF</button>
+                <button type="submit" class="btn btn-primary"> Generar PDF</button>
             </div>
         </div>
-        <table>
+        <div class="table-responsive"><table>
             <thead>
                 <tr>
                     <th style="width:40px;">PDF</th>
@@ -141,17 +141,17 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        </table></div>
     </form>
 </div>
 
 {% if mis_tareas %}
 <div class="card">
     <div class="card-header">
-        <span class="card-title">📋 Mis Tareas Activas</span>
+        <span class="card-title"> Mis Tareas Activas</span>
         <a href="{{ url_for('tareas') }}" class="btn btn-primary">Ver todas</a>
     </div>
-    <table>
+    <div class="table-responsive"><table>
         <thead>
             <tr>
                 <th>Cliente</th>
@@ -189,7 +189,7 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+    </table></div>
 </div>
 {% endif %}
 
@@ -198,7 +198,7 @@
     <div class="modal-notif-box">
         <div class="modal-notif-header">
             <div style="display:flex;align-items:center;">
-                <span class="campana">🔔</span>
+                <span class="campana"></span>
                 <h2>Tienes {{ mis_tareas | length }} tarea(s) pendiente(s)</h2>
             </div>
             <button class="modal-notif-close" onclick="cerrarModal()">✕</button>
@@ -247,7 +247,7 @@
             {% endfor %}
         </div>
         <div class="modal-notif-footer">
-            <a href="{{ url_for('tareas') }}" class="btn btn-primary" style="margin-right:10px;">📋 Ver todas mis tareas</a>
+            <a href="{{ url_for('tareas') }}" class="btn btn-primary" style="margin-right:10px;"> Ver todas mis tareas</a>
             <button class="btn btn-ghost" onclick="cerrarModal()">Entendido, cerrar</button>
         </div>
     </div>
@@ -258,7 +258,7 @@
 <div class="modal-overlay" id="modalTarea">
     <div class="modal wide">
         <div class="modal-header">
-            <span>📋 Asignar Nueva Tarea</span>
+            <span> Asignar Nueva Tarea</span>
             <button class="modal-close" onclick="cerrarModalTarea()">✕</button>
         </div>
         <form action="{{ url_for('asignar_tarea') }}" method="POST">
@@ -308,7 +308,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalTarea()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
+                <button type="submit" class="btn btn-primary"> Asignar Tarea</button>
             </div>
         </form>
     </div>
@@ -318,7 +318,7 @@
 <div class="modal-overlay" id="modalNuevoProducto">
     <div class="modal wide">
         <div class="modal-header">
-            <span>📦 Nuevo Producto</span>
+            <span> Nuevo Producto</span>
             <button class="modal-close" onclick="cerrarModalNuevoProducto()">✕</button>
         </div>
         <form method="POST" action="{{ url_for('nuevo_producto') }}">
@@ -350,7 +350,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalNuevoProducto()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">💾 Guardar Producto</button>
+                <button type="submit" class="btn btn-primary"> Guardar Producto</button>
             </div>
         </form>
     </div>
@@ -360,7 +360,7 @@
 <div class="modal-overlay" id="modalNuevoCliente">
     <div class="modal">
         <div class="modal-header">
-            <span>👤 Nuevo Cliente</span>
+            <span> Nuevo Cliente</span>
             <button class="modal-close" onclick="cerrarModalNuevoCliente()">✕</button>
         </div>
         <form method="POST" action="{{ url_for('nuevo_cliente') }}">
@@ -386,7 +386,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalNuevoCliente()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">💾 Guardar Cliente</button>
+                <button type="submit" class="btn btn-primary"> Guardar Cliente</button>
             </div>
         </form>
     </div>
@@ -425,16 +425,16 @@
             const diffMs = fechaLimite - hoy;
             const diasRest = Math.ceil(diffMs / (1000*60*60*24));
             if (diasRest < 0) {
-                badge.textContent = '⚠️ Vencida hace ' + Math.abs(diasRest) + ' día(s)';
+                badge.textContent = ' Vencida hace ' + Math.abs(diasRest) + ' día(s)';
                 badge.className = 'dias-badge dias-urgente';
             } else if (diasRest === 0) {
-                badge.textContent = '🔴 Vence HOY';
+                badge.textContent = ' Vence HOY';
                 badge.className = 'dias-badge dias-urgente';
             } else if (diasRest <= 3) {
-                badge.textContent = '⏰ ' + diasRest + ' día(s) restante(s)';
+                badge.textContent = ' ' + diasRest + ' día(s) restante(s)';
                 badge.className = 'dias-badge dias-warning';
             } else {
-                badge.textContent = '✅ ' + diasRest + ' días restantes';
+                badge.textContent = ' ' + diasRest + ' días restantes';
                 badge.className = 'dias-badge dias-normal';
             }
         });

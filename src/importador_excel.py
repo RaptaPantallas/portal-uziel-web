@@ -227,7 +227,7 @@ def _leer_html_xls(ruta: str) -> list[dict]:
             continue
 
     if contenido is None:
-        print("🔴 [Importador] No se pudo decodificar el archivo.")
+        print(" [Importador] No se pudo decodificar el archivo.")
         return []
 
     # Parsear la tabla HTML
@@ -235,7 +235,7 @@ def _leer_html_xls(ruta: str) -> list[dict]:
     parser.feed(contenido)
 
     if not parser.filas:
-        print("🔴 [Importador] No se encontraron filas de tabla en el archivo.")
+        print(" [Importador] No se encontraron filas de tabla en el archivo.")
         return []
 
     productos            = []
@@ -250,7 +250,7 @@ def _leer_html_xls(ruta: str) -> list[dict]:
         if not encabezado_detectado and _es_encabezado(textos):
             encabezado_detectado = True
             mapa_columnas = _mapear_columnas(textos)
-            print(f"📊 [Importador] Mapa de columnas detectado: {mapa_columnas}")
+            print(f" [Importador] Mapa de columnas detectado: {mapa_columnas}")
             continue
 
         if not encabezado_detectado:
@@ -306,7 +306,7 @@ def _leer_html_xls(ruta: str) -> list[dict]:
         }
         productos.append(producto)
 
-    print(f"📦 [Importador] Total leídos del archivo HTML/XLS: {len(productos)} producto(s).")
+    print(f" [Importador] Total leídos del archivo HTML/XLS: {len(productos)} producto(s).")
     return productos
 
 
@@ -345,7 +345,7 @@ def _leer_xlsx(ruta: str) -> list[dict]:
         if not encabezado_detectado and _es_encabezado(textos):
             encabezado_detectado = True
             mapa_columnas = _mapear_columnas(textos)
-            print(f"📊 [Importador] Mapa de columnas detectado (XLSX): {mapa_columnas}")
+            print(f" [Importador] Mapa de columnas detectado (XLSX): {mapa_columnas}")
             continue
 
         if not encabezado_detectado:
@@ -382,5 +382,5 @@ def _leer_xlsx(ruta: str) -> list[dict]:
             "categoria":      cat_str[:60]
         })
 
-    print(f"📦 [Importador] Total leídos del XLSX: {len(productos)} producto(s).")
+    print(f" [Importador] Total leídos del XLSX: {len(productos)} producto(s).")
     return productos

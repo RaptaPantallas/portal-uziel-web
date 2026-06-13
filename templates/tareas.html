@@ -8,7 +8,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>📋 Gestión de Tareas</h1>
+        <h1> Gestión de Tareas</h1>
         <p class="subtitulo">
             {% if session['rol'] == 'Admin' %}
                 Asigna trabajo al equipo y monitorea el avance de cada tarea.
@@ -32,14 +32,14 @@
 
 <div class="filtros">
     <button class="filtro-btn activo" onclick="filtrarEstado('todos', this)">Todas ({{ lista_tareas | length }})</button>
-    <button class="filtro-btn" onclick="filtrarEstado('Pendiente', this)">🟡 Pendientes</button>
-    <button class="filtro-btn" onclick="filtrarEstado('En Progreso', this)">🔵 En Progreso</button>
-    <button class="filtro-btn" onclick="filtrarEstado('Completada', this)">🟢 Completadas</button>
+    <button class="filtro-btn" onclick="filtrarEstado('Pendiente', this)"> Pendientes</button>
+    <button class="filtro-btn" onclick="filtrarEstado('En Progreso', this)"> En Progreso</button>
+    <button class="filtro-btn" onclick="filtrarEstado('Completada', this)"> Completadas</button>
 </div>
 
 <div class="card" style="overflow-x: auto;">
     {% if lista_tareas %}
-    <table id="tabla-tareas">
+    <div class="table-responsive"><table id="tabla-tareas">
         <thead>
             <tr>
                 <th>#</th>
@@ -105,10 +105,10 @@
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+        </table></div>
     {% else %}
     <div class="empty-state">
-        <span class="icon">📭</span>
+        <span class="icon"></span>
         <p>{% if session['rol'] == 'Admin' %}No hay tareas registradas aún. ¡Crea la primera!{% else %}No tienes tareas asignadas en este momento.{% endif %}</p>
     </div>
     {% endif %}
@@ -118,7 +118,7 @@
 <div class="modal-overlay" id="modalTarea">
     <div class="modal wide">
         <div class="modal-header">
-            <span>📋 Asignar Nueva Tarea</span>
+            <span> Asignar Nueva Tarea</span>
             <button class="modal-close" onclick="cerrarModalTarea()">✕</button>
         </div>
         <form action="{{ url_for('asignar_tarea') }}" method="POST">
@@ -168,7 +168,7 @@
             </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalTarea()">Cancelar</button>
-                <button type="submit" class="btn btn-primary">📋 Asignar Tarea</button>
+                <button type="submit" class="btn btn-primary"> Asignar Tarea</button>
             </div>
         </form>
     </div>

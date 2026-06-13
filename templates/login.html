@@ -87,6 +87,19 @@
             margin-top: 28px; font-size: 13px; color: #94a3b8;
             display: flex; align-items: center; justify-content: center; gap: 6px;
         }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 28px 20px 24px;
+            }
+            .login-card h1 {
+                font-size: 20px;
+            }
+            .login-card .subtitulo {
+                margin-bottom: 24px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -113,6 +126,6 @@
             <button type="submit" class="btn-ingresar">Ingresar al Sistema</button>
         </form>
     </div>
-    <p class="pie-seguridad">🛡️ Acceso restringido a personal autorizado</p>
+    <p class="pie-seguridad"> Acceso restringido a personal autorizado</p>
 </body>
 </html>

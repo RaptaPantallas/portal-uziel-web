@@ -53,6 +53,8 @@ class ConexionBD:
         self._descubrir_pk_activos()
         self._sembrar_usuario_supervisor()
         self._asegurar_columna_fecha_creacion_activos()
+        self._asegurar_columna_preview_webp()
+        self._crear_indices_rendimiento()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL."""
@@ -60,7 +62,7 @@ class ConexionBD:
             conexion = psycopg2.connect(self.url_nube)
             return conexion
         except Error as e:
-            print(f"🔴 [BD] Error al conectar a PostgreSQL: {e}")
+            print(f" [BD] Error al conectar a PostgreSQL: {e}")
             return None
 
     def actualizar_esquema_productos(self):
@@ -78,7 +80,7 @@ class ConexionBD:
             cursor.execute("ALTER TABLE productos ADD COLUMN IF NOT EXISTS existencia INTEGER DEFAULT 0")
             conexion.commit()
         except Error as e:
-            print(f"⚠️ [BD] Nota: No se pudo verificar el esquema de productos: {e}")
+            print(f" [BD] Nota: No se pudo verificar el esquema de productos: {e}")
             conexion.rollback()
         finally:
             if cursor:
@@ -99,7 +101,7 @@ class ConexionBD:
             )
             conexion.commit()
         except Error as e:
-            print(f"⚠️ [BD] Nota: columna es_principal no agregada: {e}")
+            print(f" [BD] Nota: columna es_principal no agregada: {e}")
             conexion.rollback()
         finally:
             if cursor:
@@ -126,8 +128,22 @@ class ConexionBD:
             row = cursor.fetchone()
             if row:
                 self._pk_activos = row[0]
+                return
+
+            # Fallback: inspeccionar columnas reales y buscar nombres típicos de PK
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'activos_digitales'
+            """)
+            columns = [r[0] for r in cursor.fetchall()]
+            for candidate in ('id_activo', 'activo_id', 'id_producto', 'id'):
+                if candidate in columns:
+                    self._pk_activos = candidate
+                    print(f" [BD] PK inferido como '{candidate}' desde columnas disponibles")
+                    return
+            print(f" [BD] No se encontró PK en columnas: {columns}, usando default 'id'")
         except Exception as e:
-            print(f"⚠️ [BD] No se pudo descubrir PK de activos_digitales: {e}")
+            print(f" [BD] No se pudo descubrir PK de activos_digitales: {e}")
         finally:
             if cursor:
                 cursor.close()
@@ -152,9 +168,9 @@ class ConexionBD:
                      "clientes,productos,tareas,cotizaciones")
                 )
                 conexion.commit()
-                print("🟢 [Auth] Usuario 'supervisor marketing' creado.")
+                print(" [Auth] Usuario 'supervisor marketing' creado.")
         except Exception as e:
-            print(f"⚠️ [Auth] No se pudo sembrar usuario supervisor: {e}")
+            print(f" [Auth] No se pudo sembrar usuario supervisor: {e}")
             conexion.rollback()
         finally:
             if cursor:
@@ -174,7 +190,48 @@ class ConexionBD:
             )
             conexion.commit()
         except Error as e:
-            print(f"⚠️ [BD] Nota: columna fecha_creacion en activos no agregada: {e}")
+            print(f" [BD] Nota: columna fecha_creacion en activos no agregada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _asegurar_columna_preview_webp(self):
+        """Agrega columna preview_webp (BYTEA) a activos_digitales si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "ALTER TABLE activos_digitales "
+                "ADD COLUMN IF NOT EXISTS preview_webp BYTEA"
+            )
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: columna preview_webp en activos no agregada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _crear_indices_rendimiento(self):
+        """Crea índices para acelerar búsquedas en productos y activos."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Índices para búsqueda de productos
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_sku ON productos (sku)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos (nombre)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_productos_marca ON productos (marca)")
+            # Índices para activos digitales
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activos_producto_id ON activos_digitales (producto_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activos_es_principal ON activos_digitales (es_principal)")
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: no se pudieron crear índices: {e}")
             conexion.rollback()
         finally:
             if cursor: cursor.close()
@@ -280,7 +337,7 @@ class ConexionBD:
             resultado["total_cotizaciones"] = cursor.fetchone()[0]
 
         except Error as e:
-            print(f"🔴 [Reportes] Error al obtener datos del reporte: {e}")
+            print(f" [Reportes] Error al obtener datos del reporte: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -304,7 +361,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [CRM] Error al registrar cliente '{rif}': {e}")
+            print(f" [CRM] Error al registrar cliente '{rif}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -325,7 +382,7 @@ class ConexionBD:
             )
             cliente = cursor.fetchone()
         except Error as e:
-            print(f"🔴 [CRM] Error al obtener cliente '{rif}': {e}")
+            print(f" [CRM] Error al obtener cliente '{rif}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -349,7 +406,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [CRM] Error al actualizar cliente '{rif}': {e}")
+            print(f" [CRM] Error al actualizar cliente '{rif}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -372,7 +429,7 @@ class ConexionBD:
             """, (cliente_rif,))
             tareas = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [CRM] Error al obtener tareas del cliente '{cliente_rif}': {e}")
+            print(f" [CRM] Error al obtener tareas del cliente '{cliente_rif}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -391,7 +448,7 @@ class ConexionBD:
             )
             lista_clientes = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [CRM] Error al obtener clientes: {e}")
+            print(f" [CRM] Error al obtener clientes: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -415,7 +472,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [PIM] Error al registrar producto '{sku}': {e}")
+            print(f" [PIM] Error al registrar producto '{sku}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -442,7 +499,7 @@ class ConexionBD:
             )
             lista_productos = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [PIM] Error al obtener lista de productos: {e}")
+            print(f" [PIM] Error al obtener lista de productos: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -464,7 +521,7 @@ class ConexionBD:
             )
             producto = cursor.fetchone()
         except Error as e:
-            print(f"🔴 [PIM] Error al obtener producto '{sku}': {e}")
+            print(f" [PIM] Error al obtener producto '{sku}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -485,7 +542,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [PIM] Error al actualizar producto '{sku}': {e}")
+            print(f" [PIM] Error al actualizar producto '{sku}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -502,7 +559,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [PIM] Error al eliminar producto '{sku}': {e}")
+            print(f" [PIM] Error al eliminar producto '{sku}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -570,9 +627,9 @@ class ConexionBD:
                     insertados += 1
 
             conexion.commit()
-            print(f"🟢 [Import] {insertados} nuevos, {actualizados} actualizados.")
+            print(f" [Import] {insertados} nuevos, {actualizados} actualizados.")
         except Error as e:
-            print(f"🔴 [Import] Error durante la importación masiva: {e}")
+            print(f" [Import] Error durante la importación masiva: {e}")
             conexion.rollback()
         finally:
             if cursor: cursor.close()
@@ -601,12 +658,171 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [DAM] Error al vincular activo (¿El SKU '{sku}' existe?): {e}")
+            print(f" [DAM] Error al vincular activo (¿El SKU '{sku}' existe?): {e}")
             conexion.rollback()
             return False
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    def registrar_activo_con_preview(self, sku, ruta_archivo, preview_binary, tipo_archivo, angulo):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            consulta_sql = """
+                INSERT INTO activos_digitales (producto_id, ruta_archivo, preview_webp, tipo_archivo, angulo)
+                VALUES (
+                    (SELECT id_producto FROM productos WHERE sku = %s),
+                    %s, %s, %s, %s
+                )
+            """
+            cursor.execute(consulta_sql, (sku, ruta_archivo, psycopg2.Binary(preview_binary), tipo_archivo, angulo))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [DAM] Error al vincular activo con preview (¿El SKU '{sku}' existe?): {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_preview_activo(self, activo_id):
+        conexion = self.conectar()
+        resultado = None
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(
+                f"SELECT preview_webp, ruta_archivo FROM activos_digitales WHERE {pk} = %s",
+                (activo_id,)
+            )
+            resultado = cursor.fetchone()
+        except Error as e:
+            print(f" [DAM] Error al obtener preview del activo #{activo_id}: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado  # (bytes | None, ruta_archivo_str)
+
+    def actualizar_preview_activo(self, activo_id, preview_binary):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(
+                f"UPDATE activos_digitales SET preview_webp = %s WHERE {pk} = %s",
+                (psycopg2.Binary(preview_binary), activo_id)
+            )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [DAM] Error al actualizar preview del activo #{activo_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def actualizar_preview_por_ruta(self, ruta_archivo, preview_binary):
+        """
+        Busca un activo por ruta_archivo (normalizando separadores) y actualiza
+        su preview_webp. Retorna True si encontró y actualizó, False si no existe.
+        """
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Normalizar separadores para coincidir con Windows (\\) o Linux (/)
+            ruta_normalizada = ruta_archivo.replace("\\", "/")
+            cursor.execute(
+                "UPDATE activos_digitales SET preview_webp = %s"
+                " WHERE REPLACE(ruta_archivo, '\\', '/') = %s",
+                (psycopg2.Binary(preview_binary), ruta_normalizada)
+            )
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [DAM] Error al actualizar preview por ruta '{ruta_archivo}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def eliminar_duplicados_activos(self):
+        """
+        Busca activos_digitales con la misma ruta_archivo (normalizada) y
+        elimina los duplicados, conservando solo el registro con el ID más
+        bajo (el primero creado). Retorna la cantidad de duplicados eliminados.
+        """
+        conexion = self.conectar()
+        if not conexion: return 0
+        cursor = None
+        eliminados = 0
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            # Encontrar duplicados por ruta_archivo normalizada
+            cursor.execute(f"""
+                DELETE FROM activos_digitales
+                WHERE {pk} IN (
+                    SELECT {pk} FROM (
+                        SELECT {pk},
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY REPLACE(ruta_archivo, '\\', '/')
+                                   ORDER BY {pk}
+                               ) AS rn
+                        FROM activos_digitales
+                        WHERE ruta_archivo IS NOT NULL
+                    ) sub
+                    WHERE sub.rn > 1
+                )
+            """)
+            eliminados = cursor.rowcount
+            conexion.commit()
+        except Error as e:
+            print(f" [DAM] Error al eliminar duplicados: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return eliminados
+
+    def obtener_activos_sin_preview(self, sku=None):
+        conexion = self.conectar()
+        resultados = []
+        if not conexion: return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            if sku:
+                cursor.execute(f"""
+                    SELECT a.{pk}, a.ruta_archivo FROM activos_digitales a
+                    JOIN productos p ON p.id_producto = a.producto_id
+                    WHERE p.sku = %s AND a.preview_webp IS NULL
+                """, (sku,))
+            else:
+                cursor.execute(f"""
+                    SELECT a.{pk}, a.ruta_archivo, p.sku FROM activos_digitales a
+                    JOIN productos p ON p.id_producto = a.producto_id
+                    WHERE a.preview_webp IS NULL
+                """)
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener activos sin preview: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultados
 
     def obtener_producto_con_imagen(self, sku):
         conexion = self.conectar()
@@ -625,7 +841,7 @@ class ConexionBD:
             cursor.execute(consulta, (sku,))
             datos_completos = cursor.fetchone()
         except Error as e:
-            print(f"🔴 [DAM] Error al obtener producto+imagen para SKU '{sku}': {e}")
+            print(f" [DAM] Error al obtener producto+imagen para SKU '{sku}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -655,11 +871,39 @@ class ConexionBD:
             cursor.execute(consulta, (sku,))
             activos = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [DAM] Error al obtener activos del SKU '{sku}': {e}")
+            print(f" [DAM] Error al obtener activos del SKU '{sku}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
         return activos
+
+    def obtener_todos_activos_con_sku(self):
+        """
+        Retorna lista de (sku, activo_id, ruta_archivo, tipo_archivo, angulo, preview_webp)
+        para todos los activos_digitales que tienen ruta_archivo no NULL.
+        preview_webp es None si no se ha subido preview al servidor web.
+        """
+        conexion = self.conectar()
+        filas = []
+        if not conexion: return filas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(f"""
+                SELECT p.sku, a.{pk}, a.ruta_archivo, a.tipo_archivo, a.angulo, a.preview_webp
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE a.ruta_archivo IS NOT NULL
+                ORDER BY p.sku, a.{pk}
+            """)
+            filas = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener todos los activos: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return filas
 
     def obtener_fotos_principales(self):
         conexion = self.conectar()
@@ -686,7 +930,7 @@ class ConexionBD:
             for sku, ruta in cursor.fetchall():
                 fotos[sku] = ruta
         except Error as e:
-            print(f"🔴 [DAM] Error al obtener fotos principales: {e}")
+            print(f" [DAM] Error al obtener fotos principales: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -711,7 +955,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [DAM] Error al establecer activo principal: {e}")
+            print(f" [DAM] Error al establecer activo principal: {e}")
             conexion.rollback()
             return False
         finally:
@@ -738,12 +982,36 @@ class ConexionBD:
             if row:
                 resultado = row[0]
         except Error as e:
-            print(f"🔴 [DAM] Error al obtener activo principal: {e}")
+            print(f" [DAM] Error al obtener activo principal: {e}")
         finally:
             if cursor:
                 cursor.close()
             conexion.close()
         return resultado
+
+    def actualizar_ruta_activo(self, activo_id: int, nueva_ruta: str) -> bool:
+        """Actualiza la ruta de un activo digital (ej: WebP → JPG)."""
+        conexion = self.conectar()
+        if not conexion:
+            return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(
+                f"UPDATE activos_digitales SET ruta_archivo = %s WHERE {pk} = %s",
+                (nueva_ruta, activo_id)
+            )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [DAM] Error al actualizar ruta de activo: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
 
     def verificar_skus_existen(self, skus: list[str]) -> set[str]:
         """Retorna un set con los SKUs de la lista que existen en productos."""
@@ -763,12 +1031,194 @@ class ConexionBD:
             for row in cursor.fetchall():
                 existentes.add(row[0])
         except Error as e:
-            print(f"🔴 [DB] Error al verificar SKUs existentes: {e}")
+            print(f" [DB] Error al verificar SKUs existentes: {e}")
         finally:
             if cursor:
                 cursor.close()
             conexion.close()
         return existentes
+
+    def buscar_productos_fotos(self, query: str, limite: int = 30) -> list:
+        """
+        Búsqueda inteligente de productos que TIENEN fotos vinculadas.
+        Busca por SKU o nombre del producto (ILIKE) y retorna solo los que
+        tienen al menos una imagen en activos_digitales.
+        """
+        if not query or not query.strip():
+            return []
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor(cursor_factory=NamedTupleCursor)
+            termino = f"%{query.strip()}%"
+            cursor.execute("""
+                SELECT DISTINCT p.sku, p.nombre, p.marca, a.ruta_archivo
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                WHERE (p.sku ILIKE %s OR p.nombre ILIKE %s)
+                ORDER BY
+                    CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
+                    p.nombre
+                LIMIT %s
+            """, (termino, termino, query.strip() + "%", limite))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error en búsqueda inteligente: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
+
+    def obtener_todos_los_activos(self, pagina: int = 1, por_pagina: int = 50) -> dict:
+        """
+        Retorna todas las fotos de TODOS los productos paginadas.
+        Ideal para el banco de fotos (photo bank).
+        Retorna un dict con 'activos' (lista), 'total' y 'paginas'.
+        """
+        conexion = self.conectar()
+        resultado = {"activos": [], "total": 0, "paginas": 0}
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            offset = (pagina - 1) * por_pagina
+            pk = self._pk_activos
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+            """)
+            total = cursor.fetchone()[0]
+            cursor.execute(f"""
+                SELECT a.{pk}, a.ruta_archivo, a.angulo, a.es_principal,
+                       p.sku, p.nombre, p.marca
+                FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                ORDER BY p.sku, a.{pk}
+                LIMIT %s OFFSET %s
+            """, (por_pagina, offset))
+            resultado["activos"] = cursor.fetchall()
+            resultado["total"] = total
+            resultado["paginas"] = max(1, (total + por_pagina - 1) // por_pagina)
+        except Error as e:
+            print(f" [DAM] Error al obtener todos los activos: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+    def contar_fotos_por_producto(self) -> list[tuple]:
+        """
+        Retorna lista de (sku, nombre, total_fotos) para todos los productos
+        que tienen al menos una foto, ordenados por total descendente.
+        """
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT p.sku, p.nombre, COUNT(a.{pk}) AS total_fotos
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                GROUP BY p.sku, p.nombre
+                ORDER BY total_fotos DESC, p.sku
+            """.format(pk=self._pk_activos))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al contar fotos por producto: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
+
+    def obtener_banco_completo(self) -> list[tuple]:
+        """
+        QUERY ÚNICA optimizada para el banco de fotos.
+        Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo) de
+        TODOS los productos que tienen al menos una foto, con UNA SOLA llamada
+        a la BD.
+        """
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute("""
+                SELECT DISTINCT ON (p.sku)
+                    p.sku,
+                    p.nombre,
+                    a.ruta_archivo AS ruta_principal,
+                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos,
+                    a.{pk} AS id_activo
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                ORDER BY p.sku,
+                    CASE WHEN a.es_principal THEN 0 ELSE 1 END,
+                    a.{pk}
+            """.format(pk=pk))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener banco completo: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
+
+    def buscar_banco_completo(self, query: str, limite: int = 100) -> list[tuple]:
+        """
+        QUERY ÚNICA optimizada para búsqueda en el banco de fotos.
+        Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo)
+        filtrado por SKU o nombre del producto, con UNA SOLA llamada a la BD.
+        """
+        if not query or not query.strip():
+            return []
+        conexion = self.conectar()
+        resultados = []
+        if not conexion:
+            return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            termino = f"%{query.strip()}%"
+            cursor.execute("""
+                SELECT DISTINCT ON (p.sku)
+                    p.sku,
+                    p.nombre,
+                    a.ruta_archivo AS ruta_principal,
+                    COUNT(*) OVER (PARTITION BY p.id_producto) AS total_fotos,
+                    a.{pk} AS id_activo
+                FROM productos p
+                JOIN activos_digitales a ON p.id_producto = a.producto_id
+                WHERE p.sku ILIKE %s OR p.nombre ILIKE %s
+                ORDER BY p.sku,
+                    CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
+                    CASE WHEN a.es_principal THEN 0 ELSE 1 END,
+                    a.{pk}
+                LIMIT %s
+            """.format(pk=pk), (termino, termino, query.strip() + "%", limite))
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al buscar en banco: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultados
 
     # =========================================================================
     # MÓDULO DE SEGURIDAD — Autenticación de Usuarios
@@ -800,7 +1250,7 @@ class ConexionBD:
                 )
             usuario_valido = cursor.fetchone()
         except Error as e:
-            print(f"🔴 [Auth] Error al verificar login del usuario '{username}': {e}")
+            print(f" [Auth] Error al verificar login del usuario '{username}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -828,7 +1278,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al cambiar contraseña de '{username}': {e}")
+            print(f" [Auth] Error al cambiar contraseña de '{username}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -857,7 +1307,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al cambiar username de '{username_actual}': {e}")
+            print(f" [Auth] Error al cambiar username de '{username_actual}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -878,7 +1328,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al inicializar permisos de usuarios: {e}")
+            print(f" [Auth] Error al inicializar permisos de usuarios: {e}")
             conexion.rollback()
             return False
         finally:
@@ -895,7 +1345,7 @@ class ConexionBD:
             cursor.execute("SELECT username, rol FROM usuarios ORDER BY username")
             usuarios = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Auth] Error al obtener lista de usuarios: {e}")
+            print(f" [Auth] Error al obtener lista de usuarios: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -914,7 +1364,7 @@ class ConexionBD:
             )
             resultado = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Auth] Error al obtener todos los usuarios: {e}")
+            print(f" [Auth] Error al obtener todos los usuarios: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -935,7 +1385,7 @@ class ConexionBD:
             if not fila or not fila[0]: return []
             return [m.strip() for m in fila[0].split(',') if m.strip()]
         except Error as e:
-            print(f"🔴 [Auth] Error al obtener permisos de '{username}': {e}")
+            print(f" [Auth] Error al obtener permisos de '{username}': {e}")
             return []
         finally:
             if cursor: cursor.close()
@@ -955,7 +1405,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al crear usuario '{username}': {e}")
+            print(f" [Auth] Error al crear usuario '{username}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -980,7 +1430,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al actualizar usuario '{username_actual}': {e}")
+            print(f" [Auth] Error al actualizar usuario '{username_actual}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -1003,7 +1453,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al cambiar contraseña de '{username}': {e}")
+            print(f" [Auth] Error al cambiar contraseña de '{username}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -1027,7 +1477,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Auth] Error al eliminar usuario '{username}': {e}")
+            print(f" [Auth] Error al eliminar usuario '{username}': {e}")
             conexion.rollback()
             return False
         finally:
@@ -1051,7 +1501,7 @@ class ConexionBD:
             """, (fecha_inicio, fecha_fin))
             total = cursor.fetchone()[0]
         except Error as e:
-            print(f"🔴 [Reportes] Error al contar productos por fecha: {e}")
+            print(f" [Reportes] Error al contar productos por fecha: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1083,7 +1533,7 @@ class ConexionBD:
             """, (fecha_inicio, fecha_fin, por_pagina, offset))
             resultado["productos"] = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Reportes] Error al obtener productos por fecha: {e}")
+            print(f" [Reportes] Error al obtener productos por fecha: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1103,7 +1553,7 @@ class ConexionBD:
             cursor.execute("SELECT COUNT(*) FROM productos")
             total = cursor.fetchone()[0]
         except Error as e:
-            print(f"🔴 [Stats] Error al contar productos: {e}")
+            print(f" [Stats] Error al contar productos: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1119,7 +1569,7 @@ class ConexionBD:
             cursor.execute("SELECT COUNT(*) FROM clientes")
             total = cursor.fetchone()[0]
         except Error as e:
-            print(f"🔴 [Stats] Error al contar clientes: {e}")
+            print(f" [Stats] Error al contar clientes: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1152,7 +1602,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Tareas] Error al inicializar tabla de tareas: {e}")
+            print(f" [Tareas] Error al inicializar tabla de tareas: {e}")
             conexion.rollback()
             return False
         finally:
@@ -1179,7 +1629,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Tareas] Error al crear tarea: {e}")
+            print(f" [Tareas] Error al crear tarea: {e}")
             conexion.rollback()
             return False
         finally:
@@ -1203,7 +1653,7 @@ class ConexionBD:
             """, (asignado_a,))
             tareas = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Tareas] Error al obtener tareas de '{asignado_a}': {e}")
+            print(f" [Tareas] Error al obtener tareas de '{asignado_a}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1225,7 +1675,7 @@ class ConexionBD:
             """)
             tareas = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Tareas] Error al obtener todas las tareas: {e}")
+            print(f" [Tareas] Error al obtener todas las tareas: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1244,7 +1694,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Tareas] Error al actualizar estado de tarea #{tarea_id}: {e}")
+            print(f" [Tareas] Error al actualizar estado de tarea #{tarea_id}: {e}")
             conexion.rollback()
             return False
         finally:
@@ -1265,7 +1715,7 @@ class ConexionBD:
             """, (asignado_a,))
             total = cursor.fetchone()[0]
         except Error as e:
-            print(f"🔴 [Tareas] Error al contar tareas de '{asignado_a}': {e}")
+            print(f" [Tareas] Error al contar tareas de '{asignado_a}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1309,7 +1759,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Cotiz] Error al inicializar tablas de cotizaciones: {e}")
+            print(f" [Cotiz] Error al inicializar tablas de cotizaciones: {e}")
             conexion.rollback()
             return False
         finally:
@@ -1351,7 +1801,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Cotiz] Error al agregar ítem a cotización #{cotizacion_id}: {e}")
+            print(f" [Cotiz] Error al agregar ítem a cotización #{cotizacion_id}: {e}")
             conexion.rollback()
             return False
         finally:
@@ -1393,9 +1843,48 @@ class ConexionBD:
             conexion.commit()
             return cotizacion_id
         except Error as e:
-            print(f"🔴 [Cotiz] Error al crear cotización: {e}")
+            print(f" [Cotiz] Error al crear cotización: {e}")
             conexion.rollback()
-            return None
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    # ─── DEPURACIÓN: Eliminar activos huérfanos ─────────────────────────
+
+    def obtener_ids_rutas_todos(self) -> list:
+        """Retorna [(id, ruta_archivo), ...] de todos los activos digitales."""
+        conexion = self.conectar()
+        if not conexion: return []
+        cursor = None
+        resultados = []
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(f"SELECT {pk}, ruta_archivo FROM activos_digitales")
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [DAM] Error al obtener todos los activos: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultados
+
+    def eliminar_activo_por_id(self, activo_id: int) -> bool:
+        """Elimina un registro de activo digital por su ID. Retorna True/False."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            pk = self._pk_activos
+            cursor.execute(f"DELETE FROM activos_digitales WHERE {pk} = %s", (activo_id,))
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [DAM] Error al eliminar activo #{activo_id}: {e}")
+            conexion.rollback()
+            return False
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1415,7 +1904,7 @@ class ConexionBD:
             """, (cliente_rif,))
             resultado = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Cotiz] Error al obtener cotizaciones del cliente '{cliente_rif}': {e}")
+            print(f" [Cotiz] Error al obtener cotizaciones del cliente '{cliente_rif}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1445,7 +1934,7 @@ class ConexionBD:
                 """)
             resultado = cursor.fetchall()
         except Error as e:
-            print(f"🔴 [Cotiz] Error al listar cotizaciones: {e}")
+            print(f" [Cotiz] Error al listar cotizaciones: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -1476,7 +1965,7 @@ class ConexionBD:
             items = cursor.fetchall()
             return {'cabecera': cabecera, 'items': items}
         except Error as e:
-            print(f"🔴 [Cotiz] Error al obtener cotización #{cotizacion_id}: {e}")
+            print(f" [Cotiz] Error al obtener cotización #{cotizacion_id}: {e}")
             return None
         finally:
             if cursor: cursor.close()
@@ -1498,7 +1987,7 @@ class ConexionBD:
             conexion.commit()
             return True
         except Error as e:
-            print(f"🔴 [Cotiz] Error al actualizar cotización #{cotizacion_id}: {e}")
+            print(f" [Cotiz] Error al actualizar cotización #{cotizacion_id}: {e}")
             conexion.rollback()
             return False
         finally:

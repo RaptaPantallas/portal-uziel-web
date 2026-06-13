@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Galería de Fotos — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .galeria-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+    }
+    .galeria-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.15s, box-shadow 0.15s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+    .galeria-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .galeria-card .thumb-wrap {
+        width: 100%;
+        aspect-ratio: 1;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .galeria-card .thumb-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .galeria-card .thumb-wrap .placeholder {
+        color: #94a3b8;
+        font-size: 36px;
+        font-weight: 300;
+    }
+    .galeria-card .card-info {
+        padding: 10px 12px 12px;
+    }
+    .galeria-card .card-info .sku-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+    .galeria-card .card-info .sku-line .sku-badge {
+        font-size: 11px;
+    }
+    .galeria-card .card-info .sku-line .foto-count {
+        font-size: 11px;
+        color: var(--text-muted);
+        background: #f1f5f9;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .galeria-card .card-info .prod-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .galeria-vacio {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+    .galeria-vacio .icono {
+        font-size: 48px;
+        margin-bottom: 12px;
+    }
+    .galeria-vacio p {
+        font-size: 15px;
+    }
+    .search-bar.galeria-search {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .search-bar.galeria-search input {
+        flex: 1;
+    }
+    .search-bar.galeria-search .btn-limpiar {
+        flex-shrink: 0;
+    }
+    .galeria-contador {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 8px;
+    }
+    @media (max-width: 600px) {
+        .galeria-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Galería de Fotos</h1>
+        <p class="subtitulo">Productos con imágenes vinculadas</p>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}{% for category, message in messages %}
+    <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+<div class="search-bar galeria-search">
+    <span style="color:var(--text-muted);font-size:16px;"></span>
+    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off">
+    <button class="btn-limpiar" id="btn-limpiar-galeria" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
+</div>
+<p class="galeria-contador" id="contador-galeria">{{ total }} producto(s) con fotos</p>
+
+<div class="galeria-grid" id="galeria-grid">
+    {% for p in productos %}
+    <a href="{{ url_for('detalle_producto', sku=p.sku) }}" class="galeria-card" data-sku="{{ p.sku }}" data-nombre="{{ p.nombre }}">
+        <div class="thumb-wrap">
+            {% if p.id_activo %}
+            <img src="{{ url_for('servir_preview', activo_id=p.id_activo) }}" alt="{{ p.sku }}" loading="lazy">
+            {% else %}
+            <span class="placeholder"></span>
+            {% endif %}
+        </div>
+        <div class="card-info">
+            <div class="sku-line">
+                <span class="sku-badge">{{ p.sku }}</span>
+                <span class="foto-count">{{ p.total_fotos }} foto{% if p.total_fotos != 1 %}s{% endif %}</span>
+            </div>
+            <div class="prod-name">{{ p.nombre }}</div>
+        </div>
+    </a>
+    {% else %}
+    <div class="galeria-vacio" style="grid-column:1/-1;">
+        <div class="icono"></div>
+        <p>No hay productos con fotos vinculadas.</p>
+        {% if session['rol'] == 'Admin' %}
+        <p style="margin-top:8px;font-size:13px;">Ve a la ficha de un producto y sube imágenes desde la sección "Subir nueva imagen".</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const buscador = document.getElementById('buscador-galeria');
+    const grid = document.getElementById('galeria-grid');
+    const contador = document.getElementById('contador-galeria');
+    const limpiarBtn = document.getElementById('btn-limpiar-galeria');
+    let timeoutId = null;
+
+    function normalizar(str) {
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+
+    function filtrarLocal() {
+        const texto = normalizar(buscador.value);
+        const cards = grid.querySelectorAll('.galeria-card');
+        let visibles = 0;
+        cards.forEach(function (card) {
+            const coincide = !texto
+                || normalizar(card.dataset.sku).includes(texto)
+                || normalizar(card.dataset.nombre).includes(texto);
+            card.style.display = coincide ? '' : 'none';
+            if (coincide) visibles++;
+        });
+        const total = cards.length;
+        contador.textContent = texto
+            ? visibles + ' de ' + total + ' producto(s) con fotos'
+            : total + ' producto(s) con fotos';
+        limpiarBtn.classList.toggle('visible', texto.length > 0);
+    }
+
+    function buscarRemoto(texto) {
+        fetch('{{ url_for("api_galeria_buscar") }}?q=' + encodeURIComponent(texto))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.results || data.results.length === 0) {
+                    grid.innerHTML = '<div class="galeria-vacio" style="grid-column:1/-1;">'
+                        + '<div class="icono"></div>'
+                        + '<p>Sin resultados para "' + texto + '"</p>'
+                        + '</div>';
+                    contador.textContent = '0 producto(s) para "' + texto + '"';
+                    return;
+                }
+                let html = '';
+                data.results.forEach(function (item) {
+                    html += '<a href="' + item.url + '" class="galeria-card" data-sku="' + item.sku + '" data-nombre="' + item.nombre + '">'
+                        + '<div class="thumb-wrap">'
+                        + '<img src="{{ url_for("servir_preview", activo_id=0) }}'.replace('/0', '/' + item.id_activo) + '" alt="' + item.sku + '" loading="lazy">'
+                        + '</div>'
+                        + '<div class="card-info">'
+                        + '<div class="sku-line">'
+                        + '<span class="sku-badge">' + item.sku + '</span>'
+                        + '<span class="foto-count">' + item.total_fotos + ' foto' + (item.total_fotos !== 1 ? 's' : '') + '</span>'
+                        + '</div>'
+                        + '<div class="prod-name">' + item.nombre + '</div>'
+                        + '</div>'
+                        + '</a>';
+                });
+                grid.innerHTML = html;
+                contador.textContent = data.total + ' producto(s) para "' + texto + '"';
+            });
+    }
+
+    function onSearchInput() {
+        const texto = buscador.value.trim();
+        if (timeoutId) clearTimeout(timeoutId);
+        if (texto.length > 0) {
+            timeoutId = setTimeout(function () { buscarRemoto(texto); }, 300);
+        } else {
+            // Restaurar vista completa via recarga de página
+            window.location.href = '{{ url_for("galeria") }}';
+        }
+    }
+
+    function limpiarBusqueda() {
+        buscador.value = '';
+        window.location.href = '{{ url_for("galeria") }}';
+    }
+
+    buscador.addEventListener('input', onSearchInput);
+    buscador.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (timeoutId) clearTimeout(timeoutId);
+            const texto = buscador.value.trim();
+            if (texto) buscarRemoto(texto);
+            else window.location.href = '{{ url_for("galeria") }}';
+        }
+    });
+
+    // Sincronizar input si se cargó con query
+    document.addEventListener('DOMContentLoaded', function () {
+        var initialQuery = {{ query | tojson | safe }};
+        if (initialQuery) {
+            buscador.value = initialQuery;
+        }
+    });
+</script>
+{% endblock %}
