@@ -62,7 +62,8 @@
         {% set urol       = u[1] %}
         {% set upermisos  = namespace(mods={}) %}
         {% set uemail     = u[3] if u[3] else '' %}
-        {% set ubloqueado = u[4] if u|length > 4 else False %}
+        {% set ubloqueado  = u[4] if u|length > 4 else False %}
+        {% set usuperadmin = u[5] if u|length > 5 else False %}
         {# Parsear permisos granulares #}
         {% if u[2] and ':' in u[2] %}
             {% for seg in u[2].split('|') %}
@@ -94,7 +95,7 @@
                 {% endif %}
             </td>
             <td>
-                {% if urol == 'Admin' %}
+                {% if usuperadmin %}
                     <span style="color:var(--text-muted);font-size:12px;font-style:italic;">Acceso total</span>
                 {% else %}
                     {% for mod_nombre, mod_label in MODULOS_ACCIONES.items() %}
@@ -368,10 +369,8 @@
         bg.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
     });
     function togglePermisos(rolSelectId, permisosContainerId) {
-        const rol = document.getElementById(rolSelectId).value;
         const container = document.getElementById(permisosContainerId);
-        if (!container) return;
-        container.style.display = (rol === 'Admin') ? 'none' : 'block';
+        if (container) container.style.display = 'block';
     }
     togglePermisos('nuevoRol', 'nuevosPermisos');
 </script>

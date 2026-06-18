@@ -721,7 +721,7 @@
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
             <span class="nav-icon"></span> <span>Reportes</span>
         </a>
-        {% if session.get('rol') == 'Admin' %}
+        {% if puede('usuarios', 'gestionar') %}
         <a href="{{ url_for('admin_usuarios') }}" class="nav-item {% if request.endpoint == 'admin_usuarios' %}active{% endif %}">
             <span class="nav-icon"></span> <span>Usuarios</span>
         </a>

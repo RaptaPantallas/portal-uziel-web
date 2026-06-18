@@ -193,7 +193,7 @@
 </div>
 {% endif %}
 
-{% if mis_tareas and session['rol'] != 'Admin' %}
+{% if mis_tareas and not puede('tareas', 'gestionar') %}
 <div class="modal-notif" id="modal-notif">
     <div class="modal-notif-box">
         <div class="modal-notif-header">

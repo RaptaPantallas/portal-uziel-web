@@ -165,9 +165,9 @@ def inyectar_notificaciones():
     def puede_ver(modulo: str) -> bool:
         """
         Devuelve True si el usuario actual puede acceder al módulo indicado.
-        Los Admin siempre tienen acceso total.
+        El superadmin siempre tiene acceso total.
         """
-        if session.get('rol') == 'Admin':
+        if session.get('es_superadmin'):
             return True
         return modulo in session.get('permisos', [])
 
@@ -183,8 +183,9 @@ def inyectar_notificaciones():
 # =============================================================================
 
 def _puede(modulo: str, accion: str = "ver") -> bool:
-    """Verifica si el usuario en sesión tiene permiso módulo:acción."""
-    if session.get('rol') == 'Admin':
+    """Verifica si el usuario en sesión tiene permiso módulo:acción.
+    El superadmin siempre tiene acceso total."""
+    if session.get('es_superadmin'):
         return True
     return session.get('permisos_dict', {}).get(modulo, {}).get(accion, False)
 
@@ -239,6 +240,7 @@ def login():
             # Cargar permisos del usuario en la sesión para el sidebar dinámico
             session['permisos'] = bd.obtener_permisos_usuario(datos_usuario[0])
             session['permisos_dict'] = bd.obtener_permisos_desktop(datos_usuario[0])
+            session['es_superadmin'] = bd.es_superadmin(datos_usuario[0])
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
@@ -350,10 +352,10 @@ def recuperar_cambiar():
 def admin_config_correo():
     """
     Página para configurar el servidor SMTP para envío de correos.
-    Solo accesible para Admin.
+    Requiere permiso usuarios:gestionar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden configurar el correo.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para configurar el correo.', 'error')
         return redirect(url_for('inicio'))
 
     if request.method == 'POST':
@@ -929,10 +931,9 @@ def cliente_detalle(rif):
 
     tareas = bd.obtener_tareas_por_cliente(rif)
 
-    # Las cotizaciones son visibles solo para Admin, ya que /cotizaciones
-    # y sus rutas derivadas también son exclusivas de Admin.
+    # Las cotizaciones se muestran según permiso
     cotizaciones = []
-    if session.get('rol') == 'Admin':
+    if _puede("cotizaciones", "ver"):
         cotizaciones = bd.obtener_cotizaciones_por_cliente(rif)
 
     return render_template(
@@ -940,7 +941,7 @@ def cliente_detalle(rif):
         cliente=cliente,
         tareas=tareas,
         cotizaciones=cotizaciones,
-        es_admin=(session.get('rol') == 'Admin')
+        puede_cotizaciones=_puede("cotizaciones", "ver")
     )
 
 
@@ -1103,17 +1104,17 @@ def tareas():
     """
     Página de gestión de tareas del sistema.
 
-    El supervisor (Admin) ve todas las tareas creadas con filtros de estado.
-    Los demás usuarios ven únicamente sus tareas activas.
+    Los usuarios con permiso tareas:gestionar ven todas las tareas.
+    Los demás ven únicamente sus tareas activas.
     """
-    # Cargar datos según el rol del usuario que accede
-    if session.get('rol') == 'Admin':
-        # El supervisor ve el panorama completo de todas las tareas
+    # Cargar datos según permisos
+    if _puede("tareas", "gestionar"):
+        # Vista completa de todas las tareas
         lista_tareas    = bd.obtener_todas_tareas()
         lista_clientes  = bd.obtener_clientes()
         lista_usuarios  = bd.obtener_usuarios()
     else:
-        # El diseñador/editor solo ve sus propias tareas pendientes
+        # Solo sus tareas pendientes
         lista_tareas    = bd.obtener_tareas_asignadas(session['usuario'])
         lista_clientes  = []
         lista_usuarios  = []
@@ -1628,10 +1629,10 @@ def admin_usuarios():
     """
     Panel de administración de usuarios.
     Muestra la lista completa de usuarios con sus roles y permisos.
-    Solo accesible para el rol Admin.
+    Requiere permiso usuarios:gestionar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden gestionar usuarios.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para gestionar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     usuarios = bd.obtener_todos_usuarios()
@@ -1643,10 +1644,10 @@ def admin_usuarios():
 def admin_usuario_nuevo():
     """
     Crea un nuevo usuario en el sistema.
-    Solo Admin puede usar esta ruta.
+    Requiere permiso usuarios:gestionar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden crear usuarios.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para crear usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     username   = request.form.get('username', '').strip()
@@ -1676,10 +1677,10 @@ def admin_usuario_nuevo():
 def admin_usuario_editar(username):
     """
     Actualiza nombre de usuario, rol, permisos y email.
-    Solo Admin puede usar esta ruta.
+    Requiere permiso usuarios:gestionar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden editar usuarios.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para editar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     nuevo_username = request.form.get('nuevo_username', '').strip()
@@ -1707,10 +1708,10 @@ def admin_usuario_editar(username):
 def admin_usuario_desbloquear(username):
     """
     Desbloquea un usuario bloqueado por intentos fallidos.
-    Solo Admin puede usar esta ruta.
+    Solo superadmin puede usar esta ruta.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden desbloquear usuarios.', 'error')
+    if not session.get('es_superadmin'):
+        flash(' Solo el superadmin puede desbloquear usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     ok = bd.desbloquear_usuario(username)
@@ -1727,10 +1728,10 @@ def admin_usuario_desbloquear(username):
 def admin_usuario_pass(username):
     """
     Cambia la contraseña de un usuario.
-    Solo Admin puede usar esta ruta.
+    Requiere permiso usuarios:gestionar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden cambiar contraseñas.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para cambiar contraseñas.', 'error')
         return redirect(url_for('inicio'))
 
     nueva_pass   = request.form.get('nueva_password', '').strip()
@@ -1758,10 +1759,10 @@ def admin_usuario_pass(username):
 def admin_usuario_borrar(username):
     """
     Elimina un usuario del sistema.
-    Solo Admin puede usar esta ruta. No permite eliminar al último Admin.
+    Requiere permiso usuarios:gestionar. No permite eliminar al último superadmin.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden eliminar usuarios.', 'error')
+    if not _puede("usuarios", "gestionar"):
+        flash(' No tienes permiso para eliminar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
     ok = bd.eliminar_usuario(username)
@@ -1782,7 +1783,7 @@ def admin_usuario_borrar(username):
 @login_requerido
 def diagnostico():
     """Muestra los datos crudos de los primeros 10 productos para depuración."""
-    if session.get('rol') != 'Admin':
+    if not _puede("usuarios", "gestionar"):
         flash(' Solo administradores.', 'error')
         return redirect(url_for('inicio'))
     from src.database import ConexionBD as BD

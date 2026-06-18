@@ -51,6 +51,7 @@ class ConexionBD:
         "tareas":      ["ver", "gestionar"],
         "reportes":    ["ver"],
         "cotizaciones": ["ver", "crear"],
+        "usuarios":    ["gestionar"],
     }
 
     def __init__(self):
@@ -67,6 +68,8 @@ class ConexionBD:
         self._asegurar_columnas_seguridad()
         self._migrar_password_hash()
         self._migrar_permisos_granulares()
+        self._crear_columna_superadmin()
+        self._sembrar_usuario_jefe()
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
 
@@ -316,11 +319,78 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def _crear_columna_superadmin(self):
+        """Agrega columna superadmin a la tabla usuarios si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS superadmin BOOLEAN DEFAULT FALSE")
+            conexion.commit()
+        except Error as e:
+            print(f" [Seguridad] Nota: columna superadmin no agregada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _sembrar_usuario_jefe(self):
+        """Crea el usuario 'jefe' como superadmin si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT 1 FROM usuarios WHERE LOWER(username) = 'jefe'")
+            if not cursor.fetchone():
+                cursor.execute(
+                    "INSERT INTO usuarios (username, password_hash, password, rol, permisos, superadmin) "
+                    "VALUES (%s, %s, '', %s, %s, TRUE)",
+                    ("jefe", generate_password_hash("UzielMaster2026!"), "Admin",
+                     "clientes:ver,editar,agregar,eliminar|productos:ver,editar,agregar,eliminar|"
+                     "activos:ver,subir|tareas:ver,gestionar|reportes:ver|cotizaciones:ver,crear")
+                )
+                conexion.commit()
+                print(" [Auth] Usuario 'jefe' (superadmin) creado.")
+            else:
+                # Asegurar que el flag superadmin esté activo para jefe
+                cursor.execute(
+                    "UPDATE usuarios SET superadmin = TRUE WHERE LOWER(username) = 'jefe'"
+                )
+                conexion.commit()
+        except Exception as e:
+            print(f" [Auth] No se pudo sembrar usuario jefe: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def es_superadmin(self, username: str) -> bool:
+        """Retorna True si el usuario es superadmin (control total)."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            return bool(fila and fila[0])
+        except Exception as e:
+            print(f" [Seguridad] Error al verificar superadmin: {e}")
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def obtener_permisos_desktop(self, usuario: str) -> dict:
         """
         Retorna dict estructurado de permisos granulares.
         Ej: {'clientes': {'ver': True, 'editar': False, ...}, ...}
-        Para Admin retorna todo True en todos los módulos.
+        Para superadmin retorna todo True en todos los módulos.
         """
         resultado = {}
         for mod, acciones in self.MODULOS_ACCIONES.items():
@@ -341,10 +411,20 @@ class ConexionBD:
                 return resultado
             rol, permisos_raw = fila
 
-            if rol == 'Admin':
+            # superadmin bypass — tiene acceso total
+            # También obtener el flag superadmin para no hacer otra query
+            cursor.execute(
+                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (usuario,)
+            )
+            sa_fila = cursor.fetchone()
+            es_super = bool(sa_fila and sa_fila[0])
+            if es_super:
                 for mod in resultado:
                     for acc in resultado[mod]:
                         resultado[mod][acc] = True
+                if cursor: cursor.close()
+                conexion.close()
                 return resultado
 
             if not permisos_raw:
@@ -1964,7 +2044,7 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT username, rol, COALESCE(permisos,''), COALESCE(email,''), bloqueado "
+                "SELECT username, rol, COALESCE(permisos,''), COALESCE(email,''), bloqueado, COALESCE(superadmin,FALSE) "
                 "FROM usuarios ORDER BY username"
             )
             resultado = cursor.fetchall()
@@ -1989,7 +2069,14 @@ El equipo de Importadora Uziel C.A."""
             fila = cursor.fetchone()
             if not fila: return []
             rol, permisos_raw = fila
-            if rol == 'Admin':
+            cursor.execute(
+                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            sa_fila = cursor.fetchone()
+            if sa_fila and sa_fila[0]:
+                if cursor: cursor.close()
+                conexion.close()
                 return list(self.MODULOS_ACCIONES.keys())
 
             if not permisos_raw:
@@ -2091,12 +2178,16 @@ El equipo de Importadora Uziel C.A."""
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'Admin'")
-            total_admins = cursor.fetchone()[0]
-            cursor.execute("SELECT rol FROM usuarios WHERE LOWER(username) = LOWER(%s)", (username,))
+            # No permitir eliminar al último superadmin
+            cursor.execute("SELECT COUNT(*) FROM usuarios WHERE superadmin = TRUE")
+            total_super = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
             fila = cursor.fetchone()
             if not fila: return False
-            if fila[0] == 'Admin' and total_admins <= 1:
+            if fila[0] and total_super <= 1:
                 return False
             cursor.execute("DELETE FROM usuarios WHERE LOWER(username) = LOWER(%s)", (username,))
             conexion.commit()

@@ -57,7 +57,7 @@
         </div>
     </div>
     <div class="acciones">
-        {% if es_admin %}
+        {% if puede_cotizaciones %}
         <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Nueva Cotización para este cliente</a>
         <button class="btn btn-primary" onclick="abrirModal()"> Editar Datos</button>
         {% endif %}
@@ -72,7 +72,7 @@
             <div class="resumen-num">{{ tareas | length }}</div>
             <div class="resumen-lbl">Tarea{{ 's' if tareas|length != 1 else '' }} registrada{{ 's' if tareas|length != 1 else '' }}</div>
         </div>
-        {% if es_admin %}
+        {% if puede_cotizaciones %}
         <div class="resumen-card">
             <div class="resumen-num">{{ cotizaciones | length }}</div>
             <div class="resumen-lbl">Cotización{{ 'es' if cotizaciones|length != 1 else '' }}</div>
@@ -153,7 +153,7 @@
         </table></div>
     </div>
 
-{% if es_admin %}
+{% if puede_cotizaciones %}
 <div class="card">
     <div class="card-title">
         <span> Cotizaciones</span>
