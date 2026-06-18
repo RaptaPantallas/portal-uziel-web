@@ -179,6 +179,17 @@ def inyectar_notificaciones():
     return {'total_notif': total, 'puede_ver': puede_ver, 'puede': puede}
 
 
+@app.context_processor
+def inject_base_template():
+    """Inyecta la plantilla base adecuada dependiendo de si la petición es AJAX o estándar."""
+    is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+               request.args.get('ajax') == '1')
+    return {
+        'base_template': 'base_ajax.html' if is_ajax else 'base.html',
+        'is_ajax': is_ajax
+    }
+
+
 # =============================================================================
 # DECORADOR DE SEGURIDAD
 # =============================================================================

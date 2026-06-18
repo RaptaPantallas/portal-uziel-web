@@ -742,50 +742,287 @@
         <span></span>
         <span></span>
     </button>
-    {% block content %}{% endblock %}
+    <div id="spa-content-area">
+        {% block content %}{% endblock %}
+    </div>
 </main>
 
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    var hamburger = document.getElementById('hamburgerBtn');
-    var sidebar = document.querySelector('.sidebar');
-    var backdrop = document.getElementById('sidebarBackdrop');
+// --- MENÚ HAMBURGUESA (MÓVIL) ---
+var hamburger = document.getElementById('hamburgerBtn');
+var sidebar = document.querySelector('.sidebar');
+var backdrop = document.getElementById('sidebarBackdrop');
 
-    if (hamburger && sidebar && backdrop) {
-        function openSidebar() {
-            sidebar.classList.add('open');
-            hamburger.classList.add('open');
-            backdrop.classList.add('open');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeSidebar() {
-            sidebar.classList.remove('open');
-            hamburger.classList.remove('open');
-            backdrop.classList.remove('open');
-            document.body.style.overflow = '';
-        }
-
-        hamburger.addEventListener('click', function() {
-            if (sidebar.classList.contains('open')) {
-                closeSidebar();
-            } else {
-                openSidebar();
-            }
-        });
-
-        backdrop.addEventListener('click', closeSidebar);
-
-        document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(link) {
-            link.addEventListener('click', function() {
-                if (window.innerWidth <= 600) {
-                    closeSidebar();
-                }
-            });
-        });
+function openSidebar() {
+    if (sidebar && hamburger && backdrop) {
+        sidebar.classList.add('open');
+        hamburger.classList.add('open');
+        backdrop.classList.add('open');
+        document.body.style.overflow = 'hidden';
     }
+}
+
+function closeSidebar() {
+    if (sidebar && hamburger && backdrop) {
+        sidebar.classList.remove('open');
+        hamburger.classList.remove('open');
+        backdrop.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+}
+
+if (hamburger && sidebar && backdrop) {
+    hamburger.addEventListener('click', function() {
+        if (sidebar.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    });
+
+    backdrop.addEventListener('click', closeSidebar);
+}
+
+// --- BARRA DE PROGRESO DE CARGA SPA ---
+function showProgress() {
+    let bar = document.getElementById('spa-progress');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'spa-progress';
+        bar.style.cssText = 'position:fixed; top:0; left:0; height:3px; background:var(--primary); z-index:99999; width:0%; transition:width 0.2s ease, opacity 0.4s ease; box-shadow:0 0 10px var(--primary);';
+        document.body.appendChild(bar);
+    }
+    bar.style.opacity = '1';
+    bar.style.width = '0%';
+    setTimeout(() => { bar.style.width = '30%'; }, 50);
+    setTimeout(() => { bar.style.width = '60%'; }, 200);
+    setTimeout(() => { bar.style.width = '85%'; }, 500);
+}
+
+function hideProgress() {
+    let bar = document.getElementById('spa-progress');
+    if (bar) {
+        bar.style.width = '100%';
+        setTimeout(() => {
+            bar.style.opacity = '0';
+            setTimeout(() => { bar.style.width = '0%'; }, 400);
+        }, 100);
+    }
+}
+
+// --- EJECUCIÓN DINÁMICA DE SCRIPTS ---
+function ejecutarScripts(contenedor) {
+    const scripts = contenedor.querySelectorAll('script');
+    
+    // Guardar addEventListener original
+    const originalAddEventListener = document.addEventListener;
+    
+    // Sobrescribir addEventListener temporalmente para ejecutar callbacks de DOMContentLoaded al instante
+    document.addEventListener = function(type, listener, options) {
+        if (type === 'DOMContentLoaded') {
+            try {
+                listener();
+            } catch(e) {
+                console.error("Error en callback DOMContentLoaded inyectado:", e);
+            }
+        } else {
+            originalAddEventListener.call(document, type, listener, options);
+        }
+    };
+
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+
+    // Restaurar addEventListener original
+    document.addEventListener = originalAddEventListener;
+}
+
+// --- RESALTAR ENLACE ACTIVO EN SIDEBAR ---
+function actualizarSidebar(url) {
+    const parser = document.createElement('a');
+    parser.href = url;
+    const path = parser.pathname;
+
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(link => {
+        link.classList.remove('active');
+        const linkParser = document.createElement('a');
+        linkParser.href = link.getAttribute('href');
+        const linkPath = linkParser.pathname;
+
+        if (linkPath === '/' || linkPath === '/inicio') {
+            if (path === '/' || path === '/inicio') {
+                link.classList.add('active');
+            }
+        } else if (linkPath.includes('/clientes')) {
+            if (path.startsWith('/cliente')) {
+                link.classList.add('active');
+            }
+        } else if (linkPath.includes('/catalogo')) {
+            if (path.startsWith('/catalogo') || path.startsWith('/producto') || path.startsWith('/nuevo_producto') || path.startsWith('/editar')) {
+                link.classList.add('active');
+            }
+        } else if (linkPath.includes('/cotizaciones')) {
+            if (path.startsWith('/cotizacion')) {
+                link.classList.add('active');
+            }
+        } else if (path.startsWith(linkPath)) {
+            link.classList.add('active');
+        }
+    });
+}
+
+// --- CARGAR CONTENIDO POR AJAX ---
+function cargarContenido(url, pushState = true) {
+    showProgress();
+    const contentArea = document.getElementById('spa-content-area');
+    if (contentArea) {
+        contentArea.style.opacity = '0.6';
+    }
+
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al cargar la página');
+        }
+        if (pushState && response.url) {
+            history.pushState(null, '', response.url);
+        }
+        return response.text();
+    })
+    .then(html => {
+        if (contentArea) {
+            contentArea.style.opacity = '1';
+            contentArea.innerHTML = html;
+            ejecutarScripts(contentArea);
+            actualizarSidebar(window.location.href);
+        }
+        hideProgress();
+        window.scrollTo({ top: 0 });
+    })
+    .catch(err => {
+        console.error(err);
+        hideProgress();
+        if (contentArea) {
+            contentArea.style.opacity = '1';
+        }
+        // Si hay error grave, recargar la página normalmente como fallback
+        window.location.href = url;
+    });
+}
+
+// --- INTERCEPTAR CLICKS EN ENLACES ---
+document.addEventListener('click', function(e) {
+    const link = e.target.closest('a');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    if (!href) return;
+
+    if (link.target === '_blank' || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+        return;
+    }
+
+    if (href.startsWith('javascript:') || href.startsWith('#') || href.includes('/logout') || href.includes('/pdf') || link.classList.contains('btn-logout')) {
+        return;
+    }
+
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) {
+        return;
+    }
+
+    e.preventDefault();
+    closeSidebar();
+    cargarContenido(link.href, true);
+});
+
+// --- INTERCEPTAR ENVÍO DE FORMULARIOS ---
+document.addEventListener('submit', function(e) {
+    const form = e.target;
+    if (form.target === '_blank') return;
+
+    const action = form.getAttribute('action') || window.location.pathname;
+    const actionUrl = new URL(action, window.location.href);
+
+    if (actionUrl.origin !== window.location.origin) {
+        return;
+    }
+
+    if (action.includes('/generar_pdf') || action.includes('/pdf')) {
+        return;
+    }
+
+    e.preventDefault();
+    closeSidebar();
+
+    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+    let url = actionUrl.pathname + actionUrl.search;
+    let fetchOptions = {
+        method: method,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    };
+
+    if (method === 'GET') {
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        const separator = url.includes('?') ? '&' : '?';
+        url = url + separator + params.toString();
+    } else {
+        fetchOptions.body = new FormData(form);
+    }
+
+    showProgress();
+    const contentArea = document.getElementById('spa-content-area');
+    if (contentArea) {
+        contentArea.style.opacity = '0.6';
+    }
+
+    fetch(url, fetchOptions)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Error al enviar formulario');
+        }
+        if (response.url) {
+            history.pushState(null, '', response.url);
+        }
+        return response.text();
+    })
+    .then(html => {
+        if (contentArea) {
+            contentArea.style.opacity = '1';
+            contentArea.innerHTML = html;
+            ejecutarScripts(contentArea);
+            actualizarSidebar(window.location.href);
+        }
+        hideProgress();
+        window.scrollTo({ top: 0 });
+    })
+    .catch(err => {
+        console.error(err);
+        hideProgress();
+        if (contentArea) {
+            contentArea.style.opacity = '1';
+        }
+        alert('Ocurrió un error al procesar el formulario. Intentando recargar...');
+        form.submit(); // Fallback clásico
+    });
+});
+
+// --- NAVEGACIÓN ATRÁS/ADELANTE DEL NAVEGADOR ---
+window.addEventListener('popstate', function() {
+    cargarContenido(window.location.href, false);
 });
 </script>
 
