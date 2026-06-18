@@ -432,7 +432,7 @@ def inicio():
       - La lista de usuarios (para el dropdown de asignación)
     """
     # Datos de inventario y estadísticas
-    inventario  = bd.obtener_productos()
+    inventario  = bd.obtener_productos()[:10]
     total_prod  = bd.contar_productos()
     total_cli   = bd.contar_clientes()
 
@@ -1360,7 +1360,7 @@ def reportes():
 
     # Datos del reporte
     datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
-    datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=20)
+    datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=10)
 
     # Semana actual para referencia rapida
     diasem = hoy.weekday()
@@ -1391,7 +1391,7 @@ def api_reporte_productos():
     if not desde or not hasta:
         return {"productos": [], "total": 0, "html": ""}
 
-    datos = bd.obtener_productos_por_fecha(desde, hasta, pagina=pagina, por_pagina=20)
+    datos = bd.obtener_productos_por_fecha(desde, hasta, pagina=pagina, por_pagina=10)
 
     html = ""
     for p in datos["productos"]:
