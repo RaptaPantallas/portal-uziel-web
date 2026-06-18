@@ -52,12 +52,30 @@
             </tr>
         </thead>
         <tbody>
+        {% set MODULOS_ACCIONES = {
+            'clientes': 'Clientes', 'productos': 'Productos',
+            'activos': 'Activos', 'tareas': 'Tareas',
+            'reportes': 'Reportes', 'cotizaciones': 'Cotizaciones'
+        } %}
         {% for u in usuarios %}
         {% set uname      = u[0] %}
         {% set urol       = u[1] %}
-        {% set upermisos  = u[2].split(',') if u[2] else [] %}
+        {% set upermisos  = namespace(mods={}) %}
         {% set uemail     = u[3] if u[3] else '' %}
         {% set ubloqueado = u[4] if u|length > 4 else False %}
+        {# Parsear permisos granulares #}
+        {% if u[2] and ':' in u[2] %}
+            {% for seg in u[2].split('|') %}
+                {% set parts = seg.split(':', 1) %}
+                {% if parts|length == 2 %}
+                    {% set _ = upermisos.mods.update({parts[0]: parts[1].split(',')}) %}
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            {% for m in (u[2].split(',') if u[2] else []) %}
+                {% set _ = upermisos.mods.update({m.strip(): ['ver']}) %}
+            {% endfor %}
+        {% endif %}
         <tr {% if ubloqueado %}style="background:#fef2f2;"{% endif %}>
             <td><span style="font-weight:600;">{{ uname }}</span></td>
             <td><span style="color:var(--text-muted);font-size:13px;">{{ uemail if uemail else '—' }}</span></td>
@@ -79,15 +97,10 @@
                 {% if urol == 'Admin' %}
                     <span style="color:var(--text-muted);font-size:12px;font-style:italic;">Acceso total</span>
                 {% else %}
-                    {% for m in upermisos %}
-                        {% if m == 'clientes' %}
-                            <span class="badge badge-primary">Clientes</span>
-                        {% elif m == 'productos' %}
-                            <span class="badge badge-primary">Productos</span>
-                        {% elif m == 'tareas' %}
-                            <span class="badge badge-primary">Tareas</span>
-                        {% elif m == 'cotizaciones' %}
-                            <span class="badge badge-primary">Cotizaciones</span>
+                    {% for mod_nombre, mod_label in MODULOS_ACCIONES.items() %}
+                        {% if mod_nombre in upermisos.mods %}
+                            {% set accs = upermisos.mods[mod_nombre] %}
+                            <span class="badge badge-primary" title="{{ ', '.join(accs) }}">{{ mod_label }}</span>
                         {% endif %}
                     {% else %}
                         <span style="color:var(--text-muted);font-size:12px;">Sin acceso</span>
@@ -148,13 +161,40 @@
                 </select>
             </div>
             <div class="form-group-block" id="nuevosPermisos">
-                <label>Módulos Permitidos</label>
-                <div class="permisos-group">
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="clientes" checked><span>Clientes</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="productos" checked><span>Productos</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="tareas" checked><span>Tareas</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="cotizaciones" checked><span>Cotizaciones</span></label>
+                <label>Permisos Granulares</label>
+                <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th style="padding:8px 10px;font-size:11px;">Módulo</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Ver</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Editar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Agregar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Eliminar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Subir</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Gestionar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Crear</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mod_key, mod_accs in modulos_acciones.items() %}
+                            <tr>
+                                <td style="padding:6px 10px;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;">{{ mod_key|capitalize }}</td>
+                                {% for acc in mod_accs %}
+                                <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;">
+                                    <input type="checkbox" name="perm_{{ mod_key }}_{{ acc }}" value="{{ mod_key }}:{{ acc }}"
+                                           class="nuevo-perm" {% if acc == 'ver' %}checked{% endif %}>
+                                </td>
+                                {% endfor %}
+                                {% for _ in range(8 - mod_accs|length) %}
+                                <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;color:#cbd5e1;">—</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                <input type="hidden" name="permisos" id="nuevoPermisosHidden" value="">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalNuevo')">Cancelar</button>
@@ -188,13 +228,40 @@
                 </select>
             </div>
             <div class="form-group-block" id="editPermisos">
-                <label>Módulos Permitidos</label>
-                <div class="permisos-group">
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="clientes" id="eck_clientes"><span>Clientes</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="productos" id="eck_productos"><span>Productos</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="tareas" id="eck_tareas"><span>Tareas</span></label>
-                    <label class="permiso-check"><input type="checkbox" name="permisos" value="cotizaciones" id="eck_cotizaciones"><span>Cotizaciones</span></label>
+                <label>Permisos Granulares</label>
+                <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th style="padding:8px 10px;font-size:11px;">Módulo</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Ver</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Editar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Agregar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Eliminar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Subir</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Gestionar</th>
+                                <th style="padding:8px 4px;font-size:11px;text-align:center;">Crear</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mod_key, mod_accs in modulos_acciones.items() %}
+                            <tr>
+                                <td style="padding:6px 10px;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;">{{ mod_key|capitalize }}</td>
+                                {% for acc in mod_accs %}
+                                <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;">
+                                    <input type="checkbox" name="perm_{{ mod_key }}_{{ acc }}" value="{{ mod_key }}:{{ acc }}"
+                                           class="edit-perm" id="eperm_{{ mod_key }}_{{ acc }}">
+                                </td>
+                                {% endfor %}
+                                {% for _ in range(8 - mod_accs|length) %}
+                                <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;color:#cbd5e1;">—</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                <input type="hidden" name="permisos" id="editPermisosHidden" value="">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalEditar')">Cancelar</button>
@@ -230,7 +297,41 @@
 {% endblock %}
 {% block scripts %}
 <script>
-    function abrirModalNuevo() { document.getElementById('modalNuevo').classList.add('open'); }
+    function permisosToStr(prefix) {
+        const checks = document.querySelectorAll('.' + prefix + '-perm:checked');
+        const modMap = {};
+        checks.forEach(cb => {
+            const parts = cb.value.split(':');
+            if (parts.length === 2) {
+                if (!modMap[parts[0]]) modMap[parts[0]] = [];
+                modMap[parts[0]].push(parts[1]);
+            }
+        });
+        return Object.entries(modMap).map(([m, accs]) => m + ':' + accs.join(',')).join('|');
+    }
+
+    function permisosFromStr(str) {
+        const modMap = {};
+        if (str && str.includes(':')) {
+            str.split('|').forEach(seg => {
+                const parts = seg.split(':', 1);
+                const actions = seg.substring(parts[0].length + 1).split(',');
+                if (parts.length === 1) modMap[parts[0]] = actions;
+            });
+        } else if (str) {
+            str.split(',').forEach(m => { modMap[m.trim()] = ['ver','editar','agregar','eliminar']; });
+        }
+        return modMap;
+    }
+
+    function abrirModalNuevo() {
+        document.getElementById('modalNuevo').classList.add('open');
+    }
+
+    document.getElementById('modalNuevo')?.querySelector('form')?.addEventListener('submit', function() {
+        document.getElementById('nuevoPermisosHidden').value = permisosToStr('nuevo');
+    });
+
     function abrirModalEditar(username, rol, permisosStr, email) {
         const modal = document.getElementById('modalEditar');
         const form = document.getElementById('formEditar');
@@ -238,14 +339,24 @@
         document.getElementById('editUsername').value = username;
         document.getElementById('editEmail').value = email || '';
         document.getElementById('editRol').value = rol;
-        const modulos = permisosStr ? permisosStr.split(',').map(m => m.trim()) : [];
-        ['clientes','productos','tareas','cotizaciones'].forEach(m => {
-            const cb = document.getElementById('eck_' + m);
-            if (cb) cb.checked = modulos.includes(m);
+        // Parse permisos y marcar checkboxes
+        const modMap = permisosFromStr(permisosStr);
+        document.querySelectorAll('.edit-perm').forEach(cb => {
+            const parts = cb.value.split(':');
+            if (parts.length === 2 && modMap[parts[0]] && modMap[parts[0]].includes(parts[1])) {
+                cb.checked = true;
+            } else {
+                cb.checked = false;
+            }
         });
         togglePermisos('editRol', 'editPermisos');
         modal.classList.add('open');
     }
+
+    document.getElementById('modalEditar')?.querySelector('form')?.addEventListener('submit', function() {
+        document.getElementById('editPermisosHidden').value = permisosToStr('edit');
+    });
+
     function abrirModalPass(username) {
         const modal = document.getElementById('modalPass');
         document.getElementById('formPass').action = '/admin/usuario/' + encodeURIComponent(username) + '/pass';

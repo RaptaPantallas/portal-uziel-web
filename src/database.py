@@ -24,6 +24,7 @@ import os
 import psycopg2
 from psycopg2 import Error
 from psycopg2.extras import NamedTupleCursor
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 # =============================================================================
@@ -43,6 +44,15 @@ class ConexionBD:
     Gestiona todas las operaciones CRUD para los módulos del sistema.
     """
 
+    MODULOS_ACCIONES = {
+        "clientes":    ["ver", "editar", "agregar", "eliminar"],
+        "productos":   ["ver", "editar", "agregar", "eliminar"],
+        "activos":     ["ver", "subir"],
+        "tareas":      ["ver", "gestionar"],
+        "reportes":    ["ver"],
+        "cotizaciones": ["ver", "crear"],
+    }
+
     def __init__(self):
         """Inicializa la clase con la URL de conexión configurada arriba."""
         self.url_nube = URL_BASE_DE_DATOS
@@ -55,6 +65,8 @@ class ConexionBD:
         self._asegurar_columna_fecha_creacion_activos()
         self._asegurar_columna_preview_webp()
         self._asegurar_columnas_seguridad()
+        self._migrar_password_hash()
+        self._migrar_permisos_granulares()
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
 
@@ -164,10 +176,10 @@ class ConexionBD:
             )
             if not cursor.fetchone():
                 cursor.execute(
-                    "INSERT INTO usuarios (username, password, rol, permisos) "
-                    "VALUES (%s, %s, %s, %s)",
-                    ("supervisor marketing", "12345", "Admin",
-                     "clientes,productos,tareas,cotizaciones")
+                    "INSERT INTO usuarios (username, password_hash, password, rol, permisos) "
+                    "VALUES (%s, %s, '', %s, %s)",
+                    ("supervisor marketing", generate_password_hash("12345"), "Admin",
+                     "clientes:ver,editar,agregar,eliminar|productos:ver,editar,agregar,eliminar|activos:ver,subir|tareas:ver,gestionar|reportes:ver|cotizaciones:ver,crear")
                 )
                 conexion.commit()
                 print(" [Auth] Usuario 'supervisor marketing' creado.")
@@ -236,6 +248,125 @@ class ConexionBD:
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    def _migrar_password_hash(self):
+        """Crea columna password_hash y migra contraseñas existentes a hash."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS password_hash VARCHAR(256) DEFAULT ''")
+            conexion.commit()
+            cursor.execute(
+                "SELECT username, password FROM usuarios "
+                "WHERE password_hash IS NULL OR password_hash = ''"
+            )
+            pendientes = cursor.fetchall()
+            for username, password_plano in pendientes:
+                if password_plano and len(password_plano) < 60:
+                    hashed = generate_password_hash(password_plano)
+                    cursor.execute(
+                        "UPDATE usuarios SET password_hash = %s WHERE LOWER(username) = LOWER(%s)",
+                        (hashed, username)
+                    )
+            conexion.commit()
+            if pendientes:
+                print(f" [Seguridad] {len(pendientes)} contraseña(s) migrada(s) a hash.")
+        except Error as e:
+            print(f" [Seguridad] Nota: migración de password hash: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _migrar_permisos_granulares(self):
+        """Migra permisos legacy (solo nombres) a formato granular (modulo:acciones)."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT username, COALESCE(permisos, '') FROM usuarios"
+            )
+            for username, permisos_raw in cursor.fetchall():
+                if not permisos_raw:
+                    continue
+                if ':' in permisos_raw:
+                    continue  # ya está en formato granular
+                modulos = [m.strip() for m in permisos_raw.split(',') if m.strip()]
+                partes = []
+                for mod in modulos:
+                    if mod in self.MODULOS_ACCIONES:
+                        acciones = ",".join(self.MODULOS_ACCIONES[mod])
+                        partes.append(f"{mod}:{acciones}")
+                    else:
+                        partes.append(f"{mod}:ver")
+                nuevo_formato = "|".join(partes)
+                cursor.execute(
+                    "UPDATE usuarios SET permisos = %s WHERE LOWER(username) = LOWER(%s)",
+                    (nuevo_formato, username)
+                )
+            conexion.commit()
+        except Exception as e:
+            print(f" [Seguridad] Nota: migración permisos granulares: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_permisos_desktop(self, usuario: str) -> dict:
+        """
+        Retorna dict estructurado de permisos granulares.
+        Ej: {'clientes': {'ver': True, 'editar': False, ...}, ...}
+        Para Admin retorna todo True en todos los módulos.
+        """
+        resultado = {}
+        for mod, acciones in self.MODULOS_ACCIONES.items():
+            resultado[mod] = {acc: False for acc in acciones}
+
+        conexion = self.conectar()
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT rol, COALESCE(permisos, '') FROM usuarios "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (usuario,)
+            )
+            fila = cursor.fetchone()
+            if not fila:
+                return resultado
+            rol, permisos_raw = fila
+
+            if rol == 'Admin':
+                for mod in resultado:
+                    for acc in resultado[mod]:
+                        resultado[mod][acc] = True
+                return resultado
+
+            if not permisos_raw:
+                return resultado
+
+            # Parsear formato: modulo:accion1,accion2|modulo:accion1
+            for segmento in permisos_raw.split('|'):
+                segmento = segmento.strip()
+                if ':' in segmento:
+                    mod, acciones_str = segmento.split(':', 1)
+                    mod = mod.strip()
+                    if mod in resultado:
+                        for acc in acciones_str.split(','):
+                            acc = acc.strip()
+                            if acc in resultado[mod]:
+                                resultado[mod][acc] = True
+        except Exception as e:
+            print(f" [Permisos] Error al obtener permisos desktop: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
 
     def _crear_tabla_config_correo(self):
         """Crea la tabla de configuración de correo SMTP si no existe."""
@@ -1338,9 +1469,10 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
 
-            # Verificar si el usuario existe y su estado
+            # Obtener datos del usuario incluyendo password_hash
             cursor.execute(
-                "SELECT username, rol, bloqueado, intentos_fallidos, email "
+                "SELECT username, rol, bloqueado, intentos_fallidos, email, "
+                "       COALESCE(password_hash, ''), COALESCE(password, '') "
                 "FROM usuarios WHERE LOWER(username) = LOWER(%s)",
                 (username,)
             )
@@ -1348,53 +1480,54 @@ class ConexionBD:
             if not fila:
                 return None
 
-            user_db, rol_db, bloqueado, intentos, email_db = fila
+            user_db, rol_db, bloqueado, intentos, email_db, pass_hash, pass_plain = fila
 
             # Si está bloqueado, no permitir login
             if bloqueado:
-                return None  # El llamador debe distinguir entre "no existe" y "bloqueado"
+                return None
 
-            # Master recovery — permite acceso con la clave maestra
-            es_master = (password == self.MASTER_PASSWORD)
-            if es_master:
-                # La master key reinicia intentos y desbloquea
+            # Verificar contraseña (prioridad: hash, luego texto plano legacy, luego master)
+            contrasena_valida = False
+
+            if pass_hash and len(pass_hash) >= 60:
+                contrasena_valida = check_password_hash(pass_hash, password)
+            elif pass_plain:
+                contrasena_valida = (password == pass_plain)
+
+            if not contrasena_valida and password == self.MASTER_PASSWORD:
+                contrasena_valida = True
+
+            if contrasena_valida:
+                usuario_valido = (user_db, rol_db)
+                # Login exitoso: reiniciar contador de intentos
                 cursor.execute(
                     "UPDATE usuarios SET intentos_fallidos = 0, bloqueado = FALSE "
                     "WHERE LOWER(username) = LOWER(%s)",
                     (username,)
                 )
-                conexion.commit()
-                usuario_valido = (user_db, rol_db)
-            else:
-                # Verificar contraseña normal
-                cursor.execute(
-                    "SELECT username, rol FROM usuarios "
-                    "WHERE LOWER(username) = LOWER(%s) AND password = %s",
-                    (username, password)
-                )
-                usuario_valido = cursor.fetchone()
-
-                if usuario_valido:
-                    # Login exitoso: reiniciar contador de intentos
+                # Si usó contraseña legacy, migrar a hash
+                if not pass_hash and pass_plain:
+                    hashed = generate_password_hash(pass_plain)
                     cursor.execute(
-                        "UPDATE usuarios SET intentos_fallidos = 0 WHERE LOWER(username) = LOWER(%s)",
-                        (username,)
+                        "UPDATE usuarios SET password_hash = %s WHERE LOWER(username) = LOWER(%s)",
+                        (hashed, username)
+                    )
+                conexion.commit()
+            else:
+                # Login fallido: incrementar contador
+                nuevos_intentos = intentos + 1
+                if nuevos_intentos >= self.MAX_INTENTOS:
+                    cursor.execute(
+                        "UPDATE usuarios SET intentos_fallidos = %s, bloqueado = TRUE "
+                        "WHERE LOWER(username) = LOWER(%s)",
+                        (nuevos_intentos, username)
                     )
                 else:
-                    # Login fallido: incrementar contador
-                    nuevos_intentos = intentos + 1
-                    if nuevos_intentos >= self.MAX_INTENTOS:
-                        cursor.execute(
-                            "UPDATE usuarios SET intentos_fallidos = %s, bloqueado = TRUE "
-                            "WHERE LOWER(username) = LOWER(%s)",
-                            (nuevos_intentos, username)
-                        )
-                    else:
-                        cursor.execute(
-                            "UPDATE usuarios SET intentos_fallidos = %s "
-                            "WHERE LOWER(username) = LOWER(%s)",
-                            (nuevos_intentos, username)
-                        )
+                    cursor.execute(
+                        "UPDATE usuarios SET intentos_fallidos = %s "
+                        "WHERE LOWER(username) = LOWER(%s)",
+                        (nuevos_intentos, username)
+                    )
                 conexion.commit()
         except Error as e:
             print(f" [Auth] Error al verificar login del usuario '{username}': {e}")
@@ -1411,16 +1544,26 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT 1 FROM usuarios WHERE LOWER(username) = LOWER(%s) "
-                "AND password = %s",
-                (username, password_actual)
+                "SELECT COALESCE(password_hash, ''), COALESCE(password, '') "
+                "FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
             )
-            if not cursor.fetchone():
+            fila = cursor.fetchone()
+            if not fila:
                 return False
+            pass_hash, pass_plain = fila
+            valida = False
+            if pass_hash and len(pass_hash) >= 60:
+                valida = check_password_hash(pass_hash, password_actual)
+            elif pass_plain:
+                valida = (password_actual == pass_plain)
+            if not valida:
+                return False
+            hashed = generate_password_hash(password_nueva)
             cursor.execute(
-                "UPDATE usuarios SET password = %s "
+                "UPDATE usuarios SET password_hash = %s, password = '' "
                 "WHERE LOWER(username) = LOWER(%s)",
-                (password_nueva, username)
+                (hashed, username)
             )
             conexion.commit()
             return True
@@ -1603,10 +1746,12 @@ class ConexionBD:
         cursor = None
         try:
             cursor = conexion.cursor()
+            hashed = generate_password_hash(nueva_password)
             cursor.execute(
-                "UPDATE usuarios SET password = %s, codigo_recuperacion = NULL, codigo_expiracion = NULL "
+                "UPDATE usuarios SET password_hash = %s, password = '', "
+                "codigo_recuperacion = NULL, codigo_expiracion = NULL "
                 "WHERE LOWER(username) = LOWER(%s)",
-                (nueva_password, username)
+                (hashed, username)
             )
             conexion.commit()
             return cursor.rowcount > 0
@@ -1744,11 +1889,20 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT 1 FROM usuarios WHERE LOWER(username) = LOWER(%s) "
-                "AND password = %s",
-                (username_actual, password)
+                "SELECT COALESCE(password_hash, ''), COALESCE(password, '') "
+                "FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username_actual,)
             )
-            if not cursor.fetchone():
+            fila = cursor.fetchone()
+            if not fila:
+                return False
+            pass_hash, pass_plain = fila
+            valida = False
+            if pass_hash and len(pass_hash) >= 60:
+                valida = check_password_hash(pass_hash, password)
+            elif pass_plain:
+                valida = (password == pass_plain)
+            if not valida:
                 return False
             cursor.execute(
                 "UPDATE usuarios SET username = %s "
@@ -1774,7 +1928,7 @@ El equipo de Importadora Uziel C.A."""
             cursor.execute("""
                 ALTER TABLE usuarios
                 ADD COLUMN IF NOT EXISTS permisos TEXT
-                    DEFAULT 'clientes,productos,tareas,cotizaciones'
+                    DEFAULT 'clientes:ver,editar,agregar,eliminar|productos:ver,editar,agregar,eliminar|activos:ver,subir|tareas:ver,gestionar|reportes:ver|cotizaciones:ver,crear'
             """)
             conexion.commit()
             return True
@@ -1828,13 +1982,30 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT COALESCE(permisos,'') FROM usuarios "
+                "SELECT rol, COALESCE(permisos,'') FROM usuarios "
                 "WHERE LOWER(username) = LOWER(%s)",
                 (username,)
             )
             fila = cursor.fetchone()
-            if not fila or not fila[0]: return []
-            return [m.strip() for m in fila[0].split(',') if m.strip()]
+            if not fila: return []
+            rol, permisos_raw = fila
+            if rol == 'Admin':
+                return list(self.MODULOS_ACCIONES.keys())
+
+            if not permisos_raw:
+                return []
+            # Formato granular: modulo:accion1,accion2|modulo:accion1
+            if ':' in permisos_raw:
+                modulos = []
+                for segmento in permisos_raw.split('|'):
+                    segmento = segmento.strip()
+                    if ':' in segmento:
+                        mod = segmento.split(':', 1)[0].strip()
+                        if mod:
+                            modulos.append(mod)
+                return modulos
+            # Legacy: modulo1,modulo2,modulo3
+            return [m.strip() for m in permisos_raw.split(',') if m.strip()]
         except Error as e:
             print(f" [Auth] Error al obtener permisos de '{username}': {e}")
             return []
@@ -1848,10 +2019,11 @@ El equipo de Importadora Uziel C.A."""
         cursor = None
         try:
             cursor = conexion.cursor()
+            hashed = generate_password_hash(password)
             cursor.execute(
-                "INSERT INTO usuarios (username, password, rol, permisos, email) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (username.strip().lower(), password, rol, permisos, email.strip())
+                "INSERT INTO usuarios (username, password_hash, password, rol, permisos, email) "
+                "VALUES (%s, %s, '', %s, %s, %s)",
+                (username.strip().lower(), hashed, rol, permisos, email.strip())
             )
             conexion.commit()
             return True
@@ -1894,9 +2066,11 @@ El equipo de Importadora Uziel C.A."""
         cursor = None
         try:
             cursor = conexion.cursor()
+            hashed = generate_password_hash(nueva_password)
             cursor.execute(
-                "UPDATE usuarios SET password = %s WHERE LOWER(username) = LOWER(%s)",
-                (nueva_password, username)
+                "UPDATE usuarios SET password_hash = %s, password = '' "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (hashed, username)
             )
             if cursor.rowcount == 0:
                 conexion.rollback()

@@ -1625,7 +1625,7 @@ def admin_usuarios():
         return redirect(url_for('inicio'))
 
     usuarios = bd.obtener_todos_usuarios()
-    return render_template('admin_usuarios.html', usuarios=usuarios)
+    return render_template('admin_usuarios.html', usuarios=usuarios, modulos_acciones=bd.MODULOS_ACCIONES)
 
 
 @app.route('/admin/usuario/nuevo', methods=['POST'])
@@ -1643,7 +1643,9 @@ def admin_usuario_nuevo():
     password   = request.form.get('password', '').strip()
     rol        = request.form.get('rol', 'Empleado').strip()
     email      = request.form.get('email', '').strip()
-    permisos   = ','.join(request.form.getlist('permisos'))
+    permisos   = request.form.get('permisos', '').strip()
+    if not permisos:
+        permisos = ','.join(request.form.getlist('permisos'))
 
     if not username or not password:
         flash(' El usuario y la contraseña son obligatorios.', 'error')
@@ -1673,7 +1675,9 @@ def admin_usuario_editar(username):
     nuevo_username = request.form.get('nuevo_username', '').strip()
     nuevo_rol      = request.form.get('rol', 'Empleado').strip()
     email          = request.form.get('email', '').strip()
-    permisos       = ','.join(request.form.getlist('permisos'))
+    permisos       = request.form.get('permisos', '').strip()
+    if not permisos:
+        permisos = ','.join(request.form.getlist('permisos'))
 
     if not nuevo_username:
         flash(' El nombre de usuario no puede quedar vacío.', 'error')
