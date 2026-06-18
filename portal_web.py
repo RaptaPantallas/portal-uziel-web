@@ -167,6 +167,7 @@ def inyectar_notificaciones():
         Devuelve True si el usuario actual puede acceder al módulo indicado.
         El superadmin siempre tiene acceso total.
         """
+        _refrescar_si_es_antigua()
         if session.get('es_superadmin'):
             return True
         return modulo in session.get('permisos', [])
@@ -182,9 +183,18 @@ def inyectar_notificaciones():
 # DECORADOR DE SEGURIDAD
 # =============================================================================
 
+def _refrescar_si_es_antigua():
+    """Si la sesión no tiene es_superadmin (sesión previa al cambio), refresca permisos."""
+    if 'es_superadmin' not in session and 'usuario' in session:
+        u = session['usuario']
+        session['es_superadmin'] = bd.es_superadmin(u)
+        session['permisos'] = bd.obtener_permisos_usuario(u)
+        session['permisos_dict'] = bd.obtener_permisos_desktop(u)
+
 def _puede(modulo: str, accion: str = "ver") -> bool:
     """Verifica si el usuario en sesión tiene permiso módulo:acción.
     El superadmin siempre tiene acceso total."""
+    _refrescar_si_es_antigua()
     if session.get('es_superadmin'):
         return True
     return session.get('permisos_dict', {}).get(modulo, {}).get(accion, False)
