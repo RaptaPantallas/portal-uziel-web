@@ -214,6 +214,11 @@ def login():
         username = request.form['username'].strip()
         password = request.form['password']
 
+        # Verificar si está bloqueado antes de intentar login
+        if bd.usuario_esta_bloqueado(username):
+            flash(' Cuenta bloqueada por demasiados intentos fallidos. Contacta al administrador.', 'error')
+            return render_template('login.html')
+
         datos_usuario = bd.verificar_login(username, password)
 
         if datos_usuario:
@@ -225,10 +230,143 @@ def login():
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
-            flash(' Usuario o contraseña incorrectos. Inténtalo de nuevo.', 'error')
+            intentos = bd.obtener_intentos_fallidos(username)
+            restantes = max(0, bd.MAX_INTENTOS - intentos)
+            if restantes > 0:
+                flash(f' Usuario o contraseña incorrectos. Te quedan {restantes} intento(s).', 'error')
+            else:
+                flash(' Cuenta bloqueada por demasiados intentos fallidos. Contacta al administrador.', 'error')
 
     return render_template('login.html')
 
+
+# =============================================================================
+# RECUPERACIÓN DE CONTRASEÑA
+# =============================================================================
+
+@app.route('/recuperar', methods=['GET', 'POST'])
+def recuperar():
+    """
+    Paso 1: Solicitar recuperación de contraseña.
+    GET:  Muestra formulario para ingresar usuario.
+    POST: Busca el usuario, si tiene email, envía código de recuperación.
+    """
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        if not username:
+            flash(' Ingresa tu nombre de usuario.', 'error')
+            return render_template('recuperar.html', paso=1)
+
+        email = bd.obtener_email_usuario(username)
+        if not email:
+            flash(' No se encontró un email asociado a esa cuenta. Contacta al administrador.', 'error')
+            return render_template('recuperar.html', paso=1)
+
+        # Generar código de 6 dígitos
+        import random
+        codigo = str(random.randint(100000, 999999))
+
+        if bd.guardar_codigo_recuperacion(username, codigo):
+            exito, msg = bd.enviar_correo_recuperacion(email, codigo)
+            if exito:
+                flash(f' Código enviado a {email}. Revisa tu bandeja de entrada.', 'exito')
+                return render_template('recuperar.html', paso=2, username=username)
+            else:
+                flash(f' {msg}', 'error')
+        else:
+            flash(' Error al generar el código. Intenta de nuevo.', 'error')
+
+    return render_template('recuperar.html', paso=1)
+
+
+@app.route('/recuperar/verificar', methods=['POST'])
+def recuperar_verificar():
+    """
+    Paso 2: Verificar el código de recuperación.
+    POST: Valida el código y permite cambiar la contraseña.
+    """
+    username = request.form.get('username', '').strip()
+    codigo = request.form.get('codigo', '').strip()
+
+    if not username or not codigo:
+        flash(' Datos incompletos.', 'error')
+        return redirect(url_for('recuperar'))
+
+    if bd.verificar_codigo_recuperacion(username, codigo):
+        return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
+    else:
+        flash(' Código inválido o expirado. Solicita uno nuevo.', 'error')
+        return redirect(url_for('recuperar'))
+
+
+@app.route('/recuperar/cambiar', methods=['POST'])
+def recuperar_cambiar():
+    """
+    Paso 3: Cambiar la contraseña con el código verificado.
+    """
+    username = request.form.get('username', '').strip()
+    codigo = request.form.get('codigo', '').strip()
+    password = request.form.get('password', '').strip()
+    confirmar = request.form.get('confirmar', '').strip()
+
+    if not username or not codigo or not password:
+        flash(' Datos incompletos.', 'error')
+        return redirect(url_for('recuperar'))
+
+    if password != confirmar:
+        flash(' Las contraseñas no coinciden.', 'error')
+        return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
+
+    if len(password) < 4:
+        flash(' La contraseña debe tener al menos 4 caracteres.', 'error')
+        return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
+
+    if bd.cambiar_password_con_codigo(username, codigo, password):
+        flash(' Contraseña actualizada correctamente. Ahora puedes iniciar sesión.', 'exito')
+        return redirect(url_for('login'))
+    else:
+        flash(' Error al cambiar la contraseña. El código puede haber expirado.', 'error')
+        return redirect(url_for('recuperar'))
+
+
+# =============================================================================
+# CONFIGURACIÓN DE CORREO SMTP (solo Admin)
+# =============================================================================
+
+@app.route('/admin/config_correo', methods=['GET', 'POST'])
+@login_requerido
+def admin_config_correo():
+    """
+    Página para configurar el servidor SMTP para envío de correos.
+    Solo accesible para Admin.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden configurar el correo.', 'error')
+        return redirect(url_for('inicio'))
+
+    if request.method == 'POST':
+        servidor = request.form.get('servidor', '').strip()
+        puerto = request.form.get('puerto', 587, type=int)
+        usuario = request.form.get('usuario', '').strip()
+        password = request.form.get('password', '').strip()
+        usar_tls = request.form.get('usar_tls', 'true') == 'true'
+        correo_origen = request.form.get('correo_origen', '').strip()
+        nombre_origen = request.form.get('nombre_origen', 'Importadora Uziel').strip()
+
+        if not servidor or not usuario or not correo_origen:
+            flash(' Los campos servidor, usuario y correo origen son obligatorios.', 'error')
+        else:
+            ok = bd.guardar_config_correo(servidor, puerto, usuario, password, usar_tls, correo_origen, nombre_origen)
+            if ok:
+                flash(' Configuración de correo guardada correctamente.', 'success')
+            else:
+                flash(' Error al guardar la configuración.', 'error')
+
+    config = bd.obtener_config_correo()
+    return render_template('admin_config_correo.html', config=config)
+
+
+# =============================================================================
 
 @app.route('/logout')
 def logout():
@@ -1504,14 +1642,14 @@ def admin_usuario_nuevo():
     username   = request.form.get('username', '').strip()
     password   = request.form.get('password', '').strip()
     rol        = request.form.get('rol', 'Empleado').strip()
-    # Los módulos activados vienen como checkboxes: ['clientes', 'tareas', ...]
+    email      = request.form.get('email', '').strip()
     permisos   = ','.join(request.form.getlist('permisos'))
 
     if not username or not password:
         flash(' El usuario y la contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    ok = bd.crear_usuario(username, password, rol, permisos)
+    ok = bd.crear_usuario(username, password, rol, permisos, email)
     if ok:
         flash(f' Usuario "{username}" creado correctamente.', 'success')
     else:
@@ -1525,7 +1663,7 @@ def admin_usuario_nuevo():
 @login_requerido
 def admin_usuario_editar(username):
     """
-    Actualiza nombre de usuario, rol y permisos.
+    Actualiza nombre de usuario, rol, permisos y email.
     Solo Admin puede usar esta ruta.
     """
     if session.get('rol') != 'Admin':
@@ -1534,17 +1672,38 @@ def admin_usuario_editar(username):
 
     nuevo_username = request.form.get('nuevo_username', '').strip()
     nuevo_rol      = request.form.get('rol', 'Empleado').strip()
+    email          = request.form.get('email', '').strip()
     permisos       = ','.join(request.form.getlist('permisos'))
 
     if not nuevo_username:
         flash(' El nombre de usuario no puede quedar vacío.', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos)
+    ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos, email)
     if ok:
         flash(f' Usuario "{username}" actualizado correctamente.', 'success')
     else:
         flash(f' No se pudo actualizar el usuario "{username}".', 'error')
+
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/usuario/<username>/desbloquear', methods=['POST'])
+@login_requerido
+def admin_usuario_desbloquear(username):
+    """
+    Desbloquea un usuario bloqueado por intentos fallidos.
+    Solo Admin puede usar esta ruta.
+    """
+    if session.get('rol') != 'Admin':
+        flash(' Solo los administradores pueden desbloquear usuarios.', 'error')
+        return redirect(url_for('inicio'))
+
+    ok = bd.desbloquear_usuario(username)
+    if ok:
+        flash(f' Usuario "{username}" desbloqueado correctamente.', 'success')
+    else:
+        flash(f' No se pudo desbloquear "{username}".', 'error')
 
     return redirect(url_for('admin_usuarios'))
 

@@ -725,6 +725,9 @@
         <a href="{{ url_for('admin_usuarios') }}" class="nav-item {% if request.endpoint == 'admin_usuarios' %}active{% endif %}">
             <span class="nav-icon"></span> <span>Usuarios</span>
         </a>
+        <a href="{{ url_for('admin_config_correo') }}" class="nav-item {% if request.endpoint == 'admin_config_correo' %}active{% endif %}">
+            <span class="nav-icon"></span> <span>Correo SMTP</span>
+        </a>
         {% endif %}
         {% endblock %}
     </nav>

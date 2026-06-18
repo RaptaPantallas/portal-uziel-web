@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Configuración de Correo — Importadora Uziel{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1> Configuración de Correo SMTP</h1>
+        <p class="subtitulo">Configura el servidor de correo para el envío de códigos de recuperación de contraseña</p>
+    </div>
+    <a href="{{ url_for('admin_usuarios') }}" class="btn btn-ghost">← Volver a Usuarios</a>
+</div>
+
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+        {% for categoria, msg in mensajes %}
+            <div class="flash-msg {% if categoria in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Servidor SMTP</span>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="layout-dos-col">
+                <div>
+                    <div class="form-group">
+                        <label>Servidor SMTP <span class="req">*</span></label>
+                        <input type="text" name="servidor" class="form-control"
+                               value="{{ config.servidor if config else 'smtp.gmail.com' }}"
+                               placeholder="smtp.gmail.com" required>
+                        <small style="color:var(--text-light);font-size:11px;">Ej: smtp.gmail.com, smtp.office365.com, smtp.sendgrid.net</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Puerto <span class="req">*</span></label>
+                        <input type="number" name="puerto" class="form-control"
+                               value="{{ config.puerto if config else 587 }}"
+                               placeholder="587" required>
+                        <small style="color:var(--text-light);font-size:11px;">587 (TLS) o 465 (SSL)</small>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>Usuario <span class="req">*</span></label>
+                        <input type="text" name="usuario" class="form-control"
+                               value="{{ config.usuario if config else '' }}"
+                               placeholder="correo@gmail.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña <span class="req">*</span></label>
+                        <input type="password" name="password" class="form-control"
+                               value="{{ config.password if config else '' }}"
+                               placeholder="Contraseña de aplicación" required>
+                        <small style="color:var(--text-light);font-size:11px;">
+                            Para Gmail, usa una <strong>Contraseña de Aplicación</strong>
+                            (requiere 2FA activado). Ve a tu cuenta Google → Seguridad → Contraseñas de aplicaciones.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;">
+
+            <div class="layout-dos-col">
+                <div>
+                    <div class="form-group">
+                        <label>Correo de Origen <span class="req">*</span></label>
+                        <input type="email" name="correo_origen" class="form-control"
+                               value="{{ config.correo_origen if config else '' }}"
+                               placeholder="no-reply@importadora.com" required>
+                        <small style="color:var(--text-light);font-size:11px;">Dirección desde la que se enviarán los correos</small>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label>Nombre de Origen</label>
+                        <input type="text" name="nombre_origen" class="form-control"
+                               value="{{ config.nombre_origen if config else 'Importadora Uziel' }}"
+                               placeholder="Importadora Uziel">
+                        <small style="color:var(--text-light);font-size:11px;">Nombre que verá el destinatario</small>
+                    </div>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="checkbox" name="usar_tls" value="true"
+                                   {% if not config or config.usar_tls %}checked{% endif %}>
+                            <span>Usar TLS (STARTTLS)</span>
+                        </label>
+                        <small style="color:var(--text-light);font-size:11px;">Desmarca esta opción para usar SSL directo (puerto 465)</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="{{ url_for('admin_usuarios') }}" class="btn btn-ghost">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">¿Cómo obtener una Contraseña de Aplicación?</span>
+    </div>
+    <div class="card-body" style="font-size:14px;color:var(--text);line-height:1.7;">
+        <p>Si usas <strong>Gmail</strong>, sigue estos pasos:</p>
+        <ol style="margin:12px 0 0 20px;padding-left:20px;">
+            <li>Ve a tu <a href="https://myaccount.google.com/security" target="_blank" style="color:var(--primary);">Cuenta de Google</a></li>
+            <li>Activa la <strong>Verificación en dos pasos</strong> (2FA) si no la tienes activada</li>
+            <li>Ve a <strong>Seguridad</strong> → <strong>Contraseñas de aplicaciones</strong></li>
+            <li>Selecciona "Correo" y "Windows Computer" (o "Otra")</li>
+            <li>Genera la contraseña y <strong>cópiala</strong> (tendrá 16 caracteres sin espacios)</li>
+            <li>Pega esa contraseña en el campo de arriba</li>
+        </ol>
+        <p style="margin-top:12px;color:var(--text-muted);font-size:13px;">
+            El usuario SMTP es tu dirección de correo completa (ej: <code>tucorreo@gmail.com</code>).
+        </p>
+    </div>
+</div>
+{% endblock %}

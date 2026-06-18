@@ -54,6 +54,8 @@ class ConexionBD:
         self._sembrar_usuario_supervisor()
         self._asegurar_columna_fecha_creacion_activos()
         self._asegurar_columna_preview_webp()
+        self._asegurar_columnas_seguridad()
+        self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
 
     def conectar(self):
@@ -215,6 +217,60 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def _asegurar_columnas_seguridad(self):
+        """Agrega columnas de seguridad a la tabla usuarios si no existen."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS email VARCHAR(255) DEFAULT ''")
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bloqueado BOOLEAN DEFAULT FALSE")
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS intentos_fallidos INTEGER DEFAULT 0")
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_recuperacion VARCHAR(10) DEFAULT NULL")
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_expiracion TIMESTAMP DEFAULT NULL")
+            conexion.commit()
+        except Error as e:
+            print(f" [Seguridad] Nota: columnas de seguridad no agregadas: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _crear_tabla_config_correo(self):
+        """Crea la tabla de configuración de correo SMTP si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS config_correo (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    servidor VARCHAR(255) NOT NULL DEFAULT 'smtp.gmail.com',
+                    puerto INTEGER NOT NULL DEFAULT 587,
+                    usuario VARCHAR(255) NOT NULL DEFAULT '',
+                    password VARCHAR(255) NOT NULL DEFAULT '',
+                    usar_tls BOOLEAN DEFAULT TRUE,
+                    correo_origen VARCHAR(255) NOT NULL DEFAULT '',
+                    nombre_origen VARCHAR(255) NOT NULL DEFAULT 'Importadora Uziel',
+                    CHECK (id = 1)
+                )
+            """)
+            # Insertar fila por defecto si no existe
+            cursor.execute("""
+                INSERT INTO config_correo (id, servidor, puerto, usuario, password, usar_tls, correo_origen, nombre_origen)
+                VALUES (1, 'smtp.gmail.com', 587, '', '', TRUE, '', 'Importadora Uziel')
+                ON CONFLICT (id) DO NOTHING
+            """)
+            conexion.commit()
+        except Error as e:
+            print(f" [Seguridad] Nota: tabla config_correo no creada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def _crear_indices_rendimiento(self):
         """Crea índices para acelerar búsquedas en productos y activos."""
         conexion = self.conectar()
@@ -340,6 +396,52 @@ class ConexionBD:
             print(f" [Reportes] Error al obtener datos del reporte: {e}")
         finally:
             if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_conteos_reporte(self, fecha_inicio, fecha_fin) -> dict:
+        """Version rapida que solo devuelve conteos (sin filas) para la previsualizacion."""
+        resultado = {
+            "clientes_nuevos": 0, "productos_nuevos": 0, "activos_nuevos": 0,
+            "tareas_creadas": 0, "tareas_completadas": 0, "cotizaciones_creadas": 0,
+            "total_clientes": 0, "total_productos": 0,
+            "total_tareas_pendientes": 0, "total_cotizaciones": 0,
+        }
+        conexion = self.conectar()
+        if not conexion:
+            return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT COUNT(*) FROM clientes WHERE fecha_registro::date BETWEEN %s AND %s", (fecha_inicio, fecha_fin))
+            resultado["clientes_nuevos"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM productos WHERE fecha_creacion::date BETWEEN %s AND %s", (fecha_inicio, fecha_fin))
+            resultado["productos_nuevos"] = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT COUNT(*) FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE a.fecha_creacion::date BETWEEN %s AND %s
+            """, (fecha_inicio, fecha_fin))
+            resultado["activos_nuevos"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM tareas WHERE fecha_creacion::date BETWEEN %s AND %s", (fecha_inicio, fecha_fin))
+            resultado["tareas_creadas"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM tareas WHERE estado = 'Completada' AND fecha_limite BETWEEN %s AND %s", (fecha_inicio, fecha_fin))
+            resultado["tareas_completadas"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM cotizaciones WHERE fecha_creacion::date BETWEEN %s AND %s", (fecha_inicio, fecha_fin))
+            resultado["cotizaciones_creadas"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM clientes")
+            resultado["total_clientes"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM productos")
+            resultado["total_productos"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM tareas WHERE estado != 'Completada'")
+            resultado["total_tareas_pendientes"] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM cotizaciones")
+            resultado["total_cotizaciones"] = cursor.fetchone()[0]
+        except Error as e:
+            print(f" [Reportes] Error al obtener conteos: {e}")
+        finally:
+            if cursor:
+                cursor.close()
             conexion.close()
         return resultado
 
@@ -1224,6 +1326,8 @@ class ConexionBD:
     # MÓDULO DE SEGURIDAD — Autenticación de Usuarios
     # =========================================================================
 
+    MAX_INTENTOS = 5
+
     MASTER_PASSWORD = "UzielMaster2026!"
 
     def verificar_login(self, username, password):
@@ -1234,21 +1338,64 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
 
+            # Verificar si el usuario existe y su estado
+            cursor.execute(
+                "SELECT username, rol, bloqueado, intentos_fallidos, email "
+                "FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            if not fila:
+                return None
+
+            user_db, rol_db, bloqueado, intentos, email_db = fila
+
+            # Si está bloqueado, no permitir login
+            if bloqueado:
+                return None  # El llamador debe distinguir entre "no existe" y "bloqueado"
+
             # Master recovery — permite acceso con la clave maestra
             es_master = (password == self.MASTER_PASSWORD)
             if es_master:
+                # La master key reinicia intentos y desbloquea
                 cursor.execute(
-                    "SELECT username, rol FROM usuarios "
+                    "UPDATE usuarios SET intentos_fallidos = 0, bloqueado = FALSE "
                     "WHERE LOWER(username) = LOWER(%s)",
                     (username,)
                 )
+                conexion.commit()
+                usuario_valido = (user_db, rol_db)
             else:
+                # Verificar contraseña normal
                 cursor.execute(
                     "SELECT username, rol FROM usuarios "
                     "WHERE LOWER(username) = LOWER(%s) AND password = %s",
                     (username, password)
                 )
-            usuario_valido = cursor.fetchone()
+                usuario_valido = cursor.fetchone()
+
+                if usuario_valido:
+                    # Login exitoso: reiniciar contador de intentos
+                    cursor.execute(
+                        "UPDATE usuarios SET intentos_fallidos = 0 WHERE LOWER(username) = LOWER(%s)",
+                        (username,)
+                    )
+                else:
+                    # Login fallido: incrementar contador
+                    nuevos_intentos = intentos + 1
+                    if nuevos_intentos >= self.MAX_INTENTOS:
+                        cursor.execute(
+                            "UPDATE usuarios SET intentos_fallidos = %s, bloqueado = TRUE "
+                            "WHERE LOWER(username) = LOWER(%s)",
+                            (nuevos_intentos, username)
+                        )
+                    else:
+                        cursor.execute(
+                            "UPDATE usuarios SET intentos_fallidos = %s "
+                            "WHERE LOWER(username) = LOWER(%s)",
+                            (nuevos_intentos, username)
+                        )
+                conexion.commit()
         except Error as e:
             print(f" [Auth] Error al verificar login del usuario '{username}': {e}")
         finally:
@@ -1284,6 +1431,310 @@ class ConexionBD:
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    # =========================================================================
+    # MÓDULO DE SEGURIDAD — Bloqueo y desbloqueo de cuentas
+    # =========================================================================
+
+    def usuario_esta_bloqueado(self, username: str) -> bool:
+        """Verifica si un usuario está bloqueado."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT bloqueado FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            return fila is not None and fila[0]
+        except Error as e:
+            print(f" [Seguridad] Error al verificar bloqueo de '{username}': {e}")
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def desbloquear_usuario(self, username: str) -> bool:
+        """Desbloquea un usuario y reinicia su contador de intentos."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE usuarios SET bloqueado = FALSE, intentos_fallidos = 0 "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [Seguridad] Error al desbloquear '{username}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_intentos_fallidos(self, username: str) -> int:
+        """Retorna el número de intentos fallidos de un usuario."""
+        conexion = self.conectar()
+        if not conexion: return 0
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT intentos_fallidos FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            return fila[0] if fila else 0
+        except Error as e:
+            print(f" [Seguridad] Error al obtener intentos de '{username}': {e}")
+            return 0
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_usuarios_bloqueados(self) -> list:
+        """Retorna lista de usuarios bloqueados."""
+        conexion = self.conectar()
+        resultados = []
+        if not conexion: return resultados
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT username, email, intentos_fallidos FROM usuarios WHERE bloqueado = TRUE ORDER BY username"
+            )
+            resultados = cursor.fetchall()
+        except Error as e:
+            print(f" [Seguridad] Error al obtener usuarios bloqueados: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultados
+
+    # =========================================================================
+    # MÓDULO DE SEGURIDAD — Recuperación de contraseña
+    # =========================================================================
+
+    def obtener_email_usuario(self, username: str) -> str | None:
+        """Retorna el email de un usuario, o None si no tiene."""
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT email FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            return fila[0] if fila and fila[0] else None
+        except Error as e:
+            print(f" [Seguridad] Error al obtener email de '{username}': {e}")
+            return None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def guardar_codigo_recuperacion(self, username: str, codigo: str, expiracion_minutos: int = 15) -> bool:
+        """Guarda un código de recuperación con expiración."""
+        from datetime import datetime, timedelta
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            expiracion = datetime.now() + timedelta(minutes=expiracion_minutos)
+            cursor.execute(
+                "UPDATE usuarios SET codigo_recuperacion = %s, codigo_expiracion = %s "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (codigo, expiracion, username)
+            )
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [Seguridad] Error al guardar código de recuperación: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def verificar_codigo_recuperacion(self, username: str, codigo: str) -> bool:
+        """Verifica si un código de recuperación es válido y no ha expirado."""
+        from datetime import datetime
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT codigo_recuperacion, codigo_expiracion FROM usuarios "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            fila = cursor.fetchone()
+            if not fila or not fila[0] or not fila[1]:
+                return False
+            codigo_guardado, expiracion = fila
+            if codigo_guardado != codigo:
+                return False
+            if datetime.now() > expiracion:
+                return False
+            return True
+        except Error as e:
+            print(f" [Seguridad] Error al verificar código: {e}")
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def cambiar_password_con_codigo(self, username: str, codigo: str, nueva_password: str) -> bool:
+        """Cambia la contraseña si el código de recuperación es válido."""
+        if not self.verificar_codigo_recuperacion(username, codigo):
+            return False
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "UPDATE usuarios SET password = %s, codigo_recuperacion = NULL, codigo_expiracion = NULL "
+                "WHERE LOWER(username) = LOWER(%s)",
+                (nueva_password, username)
+            )
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [Seguridad] Error al cambiar password con código: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    # =========================================================================
+    # MÓDULO DE SEGURIDAD — Configuración de correo SMTP
+    # =========================================================================
+
+    def guardar_config_correo(self, servidor: str, puerto: int, usuario: str,
+                              password: str, usar_tls: bool, correo_origen: str,
+                              nombre_origen: str) -> bool:
+        """Guarda la configuración SMTP."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE config_correo SET
+                    servidor = %s, puerto = %s, usuario = %s,
+                    password = %s, usar_tls = %s, correo_origen = %s, nombre_origen = %s
+                WHERE id = 1
+            """, (servidor, puerto, usuario, password, usar_tls, correo_origen, nombre_origen))
+            conexion.commit()
+            return cursor.rowcount > 0
+        except Error as e:
+            print(f" [Seguridad] Error al guardar config de correo: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_config_correo(self) -> dict | None:
+        """Retorna la configuración SMTP como dict, o None si no hay."""
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        try:
+            cursor = conexion.cursor(cursor_factory=NamedTupleCursor)
+            cursor.execute("SELECT * FROM config_correo WHERE id = 1")
+            fila = cursor.fetchone()
+            if not fila:
+                return None
+            return {
+                "servidor": fila.servidor,
+                "puerto": fila.puerto,
+                "usuario": fila.usuario,
+                "password": fila.password,
+                "usar_tls": fila.usar_tls,
+                "correo_origen": fila.correo_origen,
+                "nombre_origen": fila.nombre_origen,
+            }
+        except Error as e:
+            print(f" [Seguridad] Error al obtener config de correo: {e}")
+            return None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def enviar_correo_recuperacion(self, destinatario: str, codigo: str) -> tuple[bool, str]:
+        """
+        Envía un correo con el código de recuperación usando la configuración SMTP guardada.
+        Retorna (exito, mensaje).
+        """
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        config = self.obtener_config_correo()
+        if not config or not config["usuario"] or not config["password"]:
+            return False, "Correo no configurado. Contacta al administrador."
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = f"{config['nombre_origen']} <{config['correo_origen']}>"
+            msg["To"] = destinatario
+            msg["Subject"] = "Código de recuperación — Importadora Uziel"
+
+            texto = f"""Hola,
+
+Has solicitado recuperar tu contraseña en el sistema Importadora Uziel.
+
+Tu código de recuperación es: {codigo}
+
+Este código expira en 15 minutos.
+
+Si no solicitaste este cambio, ignora este mensaje.
+
+Atentamente,
+El equipo de Importadora Uziel C.A."""
+
+            html = f"""<html><body style="font-family:Arial,sans-serif;padding:20px;">
+<h2 style="color:#2563eb;">Recuperación de Contraseña</h2>
+<p>Has solicitado recuperar tu contraseña en el sistema <strong>Importadora Uziel</strong>.</p>
+<div style="background:#f0f4ff;border:2px solid #2563eb;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+<span style="font-size:32px;font-weight:bold;color:#2563eb;letter-spacing:6px;">{codigo}</span>
+</div>
+<p>Este código expira en <strong>15 minutos</strong>.</p>
+<p><small>Si no solicitaste este cambio, ignora este mensaje.</small></p>
+<hr><p style="color:#94a3b8;font-size:12px;">Importadora Uziel C.A. — Sistema de Información</p></body></html>"""
+
+            msg.attach(MIMEText(texto, "plain"))
+            msg.attach(MIMEText(html, "html"))
+
+            if config["usar_tls"]:
+                server = smtplib.SMTP(config["servidor"], config["puerto"])
+                server.starttls()
+            else:
+                server = smtplib.SMTP_SSL(config["servidor"], config["puerto"])
+
+            server.login(config["usuario"], config["password"])
+            server.sendmail(config["correo_origen"], destinatario, msg.as_string())
+            server.quit()
+            return True, "Código enviado correctamente al correo."
+        except smtplib.SMTPAuthenticationError:
+            return False, "Error de autenticación SMTP. Verifica las credenciales de correo."
+        except smtplib.SMTPException as e:
+            return False, f"Error SMTP: {e}"
+        except Exception as e:
+            return False, f"Error al enviar correo: {e}"
 
     def cambiar_username(self, username_actual, password, nuevo_username):
         """Cambia el nombre de usuario si la contraseña es correcta."""
@@ -1359,7 +1810,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT username, rol, COALESCE(permisos,'') "
+                "SELECT username, rol, COALESCE(permisos,''), COALESCE(email,''), bloqueado "
                 "FROM usuarios ORDER BY username"
             )
             resultado = cursor.fetchall()
@@ -1391,16 +1842,16 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_usuario(self, username: str, password: str, rol: str, permisos: str) -> bool:
+    def crear_usuario(self, username: str, password: str, rol: str, permisos: str, email: str = "") -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "INSERT INTO usuarios (username, password, rol, permisos) "
-                "VALUES (%s, %s, %s, %s)",
-                (username.strip().lower(), password, rol, permisos)
+                "INSERT INTO usuarios (username, password, rol, permisos, email) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (username.strip().lower(), password, rol, permisos, email.strip())
             )
             conexion.commit()
             return True
@@ -1413,7 +1864,7 @@ class ConexionBD:
             conexion.close()
 
     def actualizar_usuario(self, username_actual: str, nuevo_username: str,
-                           rol: str, permisos: str) -> bool:
+                           rol: str, permisos: str, email: str = "") -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
@@ -1421,9 +1872,9 @@ class ConexionBD:
             cursor = conexion.cursor()
             cursor.execute("""
                 UPDATE usuarios
-                SET username = %s, rol = %s, permisos = %s
+                SET username = %s, rol = %s, permisos = %s, email = %s
                 WHERE LOWER(username) = LOWER(%s)
-            """, (nuevo_username.strip().lower(), rol, permisos, username_actual))
+            """, (nuevo_username.strip().lower(), rol, permisos, email.strip(), username_actual))
             if cursor.rowcount == 0:
                 conexion.rollback()
                 return False

@@ -10,6 +10,7 @@
     .form-group-block label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
     .rol-admin { background: var(--primary-light); color: var(--primary-dark); padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
     .rol-empleado { background: #f1f5f9; color: var(--text-muted); padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .bloqueado-badge { background: #fef2f2; color: #dc2626; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 </style>
 {% endblock %}
@@ -22,7 +23,10 @@
         <h1> Gestión de Usuarios</h1>
         <p class="subtitulo">Administra cuentas, roles y permisos de acceso a módulos</p>
     </div>
-    <button class="btn btn-primary" onclick="abrirModalNuevo()">+ Nuevo Usuario</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{{ url_for('admin_config_correo') }}" class="btn btn-ghost"> Configurar Correo SMTP</a>
+        <button class="btn btn-primary" onclick="abrirModalNuevo()">+ Nuevo Usuario</button>
+    </div>
 </div>
 
 {% with mensajes = get_flashed_messages(with_categories=true) %}
@@ -40,23 +44,35 @@
         <thead>
             <tr>
                 <th>Usuario</th>
+                <th>Email</th>
                 <th>Rol</th>
+                <th>Estado</th>
                 <th>Módulos Permitidos</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
         {% for u in usuarios %}
-        {% set uname    = u[0] %}
-        {% set urol     = u[1] %}
-        {% set upermisos = u[2].split(',') if u[2] else [] %}
-        <tr>
+        {% set uname      = u[0] %}
+        {% set urol       = u[1] %}
+        {% set upermisos  = u[2].split(',') if u[2] else [] %}
+        {% set uemail     = u[3] if u[3] else '' %}
+        {% set ubloqueado = u[4] if u|length > 4 else False %}
+        <tr {% if ubloqueado %}style="background:#fef2f2;"{% endif %}>
             <td><span style="font-weight:600;">{{ uname }}</span></td>
+            <td><span style="color:var(--text-muted);font-size:13px;">{{ uemail if uemail else '—' }}</span></td>
             <td>
                 {% if urol == 'Admin' %}
                     <span class="rol-admin">Admin</span>
                 {% else %}
                     <span class="rol-empleado">{{ urol }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if ubloqueado %}
+                    <span class="bloqueado-badge"> Bloqueado</span>
+                {% else %}
+                    <span style="color:#16a34a;font-size:12px;"> Activo</span>
                 {% endif %}
             </td>
             <td>
@@ -80,8 +96,13 @@
             </td>
             <td>
                 <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}')"> Editar</button>
+                    <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}')"> Editar</button>
                     <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')"> Contraseña</button>
+                    {% if ubloqueado %}
+                    <form method="POST" action="{{ url_for('admin_usuario_desbloquear', username=uname) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-sm" style="background:#f59e0b;color:white;"> Desbloquear</button>
+                    </form>
+                    {% endif %}
                     {% if uname != session['usuario'] %}
                     <form method="POST" action="{{ url_for('admin_usuario_borrar', username=uname) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar al usuario {{ uname }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn btn-sm btn-danger"> Eliminar</button>
@@ -109,6 +130,11 @@
             <div class="form-group-block">
                 <label>Nombre de Usuario</label>
                 <input type="text" name="username" class="form-control" placeholder="ej: jperez" required autocomplete="off">
+            </div>
+            <div class="form-group-block">
+                <label>Correo Electrónico</label>
+                <input type="email" name="email" class="form-control" placeholder="correo@ejemplo.com">
+                <small style="color:var(--text-light);font-size:11px;">Necesario para recuperación de contraseña</small>
             </div>
             <div class="form-group-block">
                 <label>Contraseña</label>
@@ -149,6 +175,10 @@
             <div class="form-group-block">
                 <label>Nombre de Usuario</label>
                 <input type="text" name="nuevo_username" id="editUsername" class="form-control" required autocomplete="off">
+            </div>
+            <div class="form-group-block">
+                <label>Correo Electrónico</label>
+                <input type="email" name="email" id="editEmail" class="form-control" placeholder="correo@ejemplo.com">
             </div>
             <div class="form-group-block">
                 <label>Rol</label>
@@ -201,11 +231,12 @@
 {% block scripts %}
 <script>
     function abrirModalNuevo() { document.getElementById('modalNuevo').classList.add('open'); }
-    function abrirModalEditar(username, rol, permisosStr) {
+    function abrirModalEditar(username, rol, permisosStr, email) {
         const modal = document.getElementById('modalEditar');
         const form = document.getElementById('formEditar');
         form.action = '/admin/usuario/' + encodeURIComponent(username) + '/editar';
         document.getElementById('editUsername').value = username;
+        document.getElementById('editEmail').value = email || '';
         document.getElementById('editRol').value = rol;
         const modulos = permisosStr ? permisosStr.split(',').map(m => m.trim()) : [];
         ['clientes','productos','tareas','cotizaciones'].forEach(m => {
