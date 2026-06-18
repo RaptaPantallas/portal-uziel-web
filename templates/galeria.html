@@ -128,7 +128,13 @@
     <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off">
     <button class="btn-limpiar" id="btn-limpiar-galeria" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
-<p class="galeria-contador" id="contador-galeria">{{ total }} producto(s) con fotos</p>
+<p class="galeria-contador" id="contador-galeria">
+    {% if query %}
+        {{ total }} producto(s) encontrado(s) para "{{ query }}"
+    {% else %}
+        Mostrando {{ total }} producto(s) recientes — <strong>usa el buscador para encontrar productos específicos</strong>
+    {% endif %}
+</p>
 
 <div class="galeria-grid" id="galeria-grid">
     {% for p in productos %}
@@ -172,20 +178,9 @@
     }
 
     function filtrarLocal() {
-        const texto = normalizar(buscador.value);
-        const cards = grid.querySelectorAll('.galeria-card');
-        let visibles = 0;
-        cards.forEach(function (card) {
-            const coincide = !texto
-                || normalizar(card.dataset.sku).includes(texto)
-                || normalizar(card.dataset.nombre).includes(texto);
-            card.style.display = coincide ? '' : 'none';
-            if (coincide) visibles++;
-        });
-        const total = cards.length;
-        contador.textContent = texto
-            ? visibles + ' de ' + total + ' producto(s) con fotos'
-            : total + ' producto(s) con fotos';
+        // No hacemos filtrado local — la búsqueda siempre va al servidor
+        // para obtener todos los resultados sin límite
+        const texto = buscador.value.trim();
         limpiarBtn.classList.toggle('visible', texto.length > 0);
     }
 
@@ -217,7 +212,7 @@
                         + '</a>';
                 });
                 grid.innerHTML = html;
-                contador.textContent = data.total + ' producto(s) para "' + texto + '"';
+                contador.textContent = data.total + ' producto(s) encontrado(s) para "' + texto + '"';
             });
     }
 

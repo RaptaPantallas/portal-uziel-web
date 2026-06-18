@@ -470,14 +470,16 @@ def catalogo():
 def galeria():
     """
     Galería visual de productos con fotos.
-    Muestra todos los productos que tienen al menos una imagen vinculada
-    en activos_digitales, con buscador inteligente por SKU o nombre.
+    Sin búsqueda: muestra los últimos 10 productos con foto.
+    Con búsqueda: muestra todos los resultados coincidentes sin límite.
     """
     query = request.args.get('q', '').strip()
     if query:
-        resultados = bd.buscar_banco_completo(query, limite=200)
+        # Búsqueda activa: devolver TODOS los resultados que coincidan
+        resultados = bd.buscar_banco_completo(query, limite=1000)
     else:
-        resultados = bd.obtener_banco_completo()
+        # Vista inicial: solo los 10 primeros
+        resultados = bd.obtener_banco_completo()[:10]
 
     productos_galeria = []
     for r in resultados:
@@ -501,11 +503,12 @@ def galeria():
 @app.route('/api/galeria/buscar')
 @login_requerido
 def api_galeria_buscar():
-    """API AJAX para búsqueda en galería — retorna JSON."""
+    """API AJAX para búsqueda en galería — retorna JSON con TODOS los resultados."""
     query = request.args.get('q', '').strip()
     if not query:
         return {'results': [], 'total': 0}
-    resultados = bd.buscar_banco_completo(query, limite=50)
+    # Sin límite artificial: devolver todos los productos que coincidan
+    resultados = bd.buscar_banco_completo(query, limite=1000)
     items = []
     for r in resultados:
         items.append({
