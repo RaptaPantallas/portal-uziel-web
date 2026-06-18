@@ -178,17 +178,19 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% set cols_acc = ['ver','editar','agregar','eliminar','subir','gestionar','crear'] %}
                             {% for mod_key, mod_accs in modulos_acciones.items() %}
                             <tr>
                                 <td style="padding:6px 10px;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;">{{ mod_key|capitalize }}</td>
-                                {% for acc in mod_accs %}
+                                {% for acc in cols_acc %}
+                                {% if acc in mod_accs %}
                                 <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;">
                                     <input type="checkbox" name="perm_{{ mod_key }}_{{ acc }}" value="{{ mod_key }}:{{ acc }}"
                                            class="nuevo-perm" {% if acc == 'ver' %}checked{% endif %}>
                                 </td>
-                                {% endfor %}
-                                {% for _ in range(8 - mod_accs|length) %}
+                                {% else %}
                                 <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;color:#cbd5e1;">—</td>
+                                {% endif %}
                                 {% endfor %}
                             </tr>
                             {% endfor %}
@@ -245,17 +247,19 @@
                             </tr>
                         </thead>
                         <tbody>
+                            {% set cols_acc = ['ver','editar','agregar','eliminar','subir','gestionar','crear'] %}
                             {% for mod_key, mod_accs in modulos_acciones.items() %}
                             <tr>
                                 <td style="padding:6px 10px;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;">{{ mod_key|capitalize }}</td>
-                                {% for acc in mod_accs %}
+                                {% for acc in cols_acc %}
+                                {% if acc in mod_accs %}
                                 <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;">
                                     <input type="checkbox" name="perm_{{ mod_key }}_{{ acc }}" value="{{ mod_key }}:{{ acc }}"
                                            class="edit-perm" id="eperm_{{ mod_key }}_{{ acc }}">
                                 </td>
-                                {% endfor %}
-                                {% for _ in range(8 - mod_accs|length) %}
+                                {% else %}
                                 <td style="padding:6px 4px;text-align:center;border-bottom:1px solid #f1f5f9;color:#cbd5e1;">—</td>
+                                {% endif %}
                                 {% endfor %}
                             </tr>
                             {% endfor %}
