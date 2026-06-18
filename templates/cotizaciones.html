@@ -16,7 +16,7 @@
             {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
         </p>
     </div>
-    {% if session['rol'] == 'Admin' %}
+    {% if puede('cotizaciones', 'crear') %}
     <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Nueva Cotización</a>
     {% endif %}
 </div>
@@ -67,7 +67,7 @@
     <div class="empty-state">
         <span class="icon"></span>
         <p>No hay cotizaciones{% if estado_activo %} con estado <strong>{{ estado_activo }}</strong>{% endif %} registradas.</p>
-        {% if session['rol'] == 'Admin' %}
+        {% if puede('cotizaciones', 'crear') %}
         <br>
         <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Crear primera cotización</a>
         {% endif %}

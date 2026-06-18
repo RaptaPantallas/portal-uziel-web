@@ -152,7 +152,7 @@
     <div class="galeria-vacio" style="grid-column:1/-1;">
         <div class="icono"></div>
         <p>No hay productos con fotos vinculadas.</p>
-        {% if session['rol'] == 'Admin' %}
+        {% if puede('activos', 'subir') %}
         <p style="margin-top:8px;font-size:13px;">Ve a la ficha de un producto y sube imágenes desde la sección "Subir nueva imagen".</p>
         {% endif %}
     </div>

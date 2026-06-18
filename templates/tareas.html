@@ -10,14 +10,14 @@
     <div>
         <h1> Gestión de Tareas</h1>
         <p class="subtitulo">
-            {% if session['rol'] == 'Admin' %}
+            {% if puede('tareas', 'gestionar') %}
                 Asigna trabajo al equipo y monitorea el avance de cada tarea.
             {% else %}
                 Tus tareas asignadas — mantén el estado actualizado.
             {% endif %}
         </p>
     </div>
-    {% if session['rol'] == 'Admin' %}
+    {% if puede('tareas', 'gestionar') %}
         <button class="btn btn-primary" onclick="abrirModalTarea()">+ Nueva Tarea</button>
     {% endif %}
 </div>
@@ -45,7 +45,7 @@
                 <th>#</th>
                 <th>Cliente</th>
                 <th>Tipo</th>
-                {% if session['rol'] == 'Admin' %}
+                {% if puede('tareas', 'gestionar') %}
                 <th>Asignado a</th>
                 {% endif %}
                 <th>Fecha Límite</th>
@@ -56,7 +56,7 @@
         </thead>
         <tbody>
             {% for t in lista_tareas %}
-            {% if session['rol'] == 'Admin' %}
+            {% if puede('tareas', 'gestionar') %}
                 {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = t[3] %}{% set t_tipo = t[4] %}{% set t_desc = t[5] %}{% set t_limite = t[6] %}{% set t_estado = t[7] %}{% set t_creador = t[8] %}
             {% else %}
                 {% set t_id = t[0] %}{% set t_nombre = t[2] %}{% set t_rif = t[1] %}{% set t_asig = session['usuario'] %}{% set t_tipo = t[3] %}{% set t_desc = t[4] %}{% set t_limite = t[5] %}{% set t_estado = t[6] %}{% set t_creador = t[7] %}
@@ -74,7 +74,7 @@
                     {% endif %}
                 </td>
                 <td><span class="tipo-badge">{{ t_tipo }}</span></td>
-                {% if session['rol'] == 'Admin' %}
+                {% if puede('tareas', 'gestionar') %}
                 <td>{{ t_asig.capitalize() }}</td>
                 {% endif %}
                 <td style="font-weight:600;white-space:nowrap;">{{ t_limite }}</td>
@@ -109,7 +109,7 @@
     {% else %}
     <div class="empty-state">
         <span class="icon"></span>
-        <p>{% if session['rol'] == 'Admin' %}No hay tareas registradas aún. ¡Crea la primera!{% else %}No tienes tareas asignadas en este momento.{% endif %}</p>
+        <p>No hay tareas registradas.</p>
     </div>
     {% endif %}
 </div>

@@ -171,12 +171,23 @@ def inyectar_notificaciones():
             return True
         return modulo in session.get('permisos', [])
 
-    return {'total_notif': total, 'puede_ver': puede_ver}
+    def puede(modulo: str, accion: str = "ver") -> bool:
+        """Permiso granular: True si el usuario tiene módulo:acción."""
+        return _puede(modulo, accion)
+
+    return {'total_notif': total, 'puede_ver': puede_ver, 'puede': puede}
 
 
 # =============================================================================
 # DECORADOR DE SEGURIDAD
 # =============================================================================
+
+def _puede(modulo: str, accion: str = "ver") -> bool:
+    """Verifica si el usuario en sesión tiene permiso módulo:acción."""
+    if session.get('rol') == 'Admin':
+        return True
+    return session.get('permisos_dict', {}).get(modulo, {}).get(accion, False)
+
 
 def login_requerido(f):
     """
@@ -227,6 +238,7 @@ def login():
             session['rol'] = datos_usuario[1]
             # Cargar permisos del usuario en la sesión para el sidebar dinámico
             session['permisos'] = bd.obtener_permisos_usuario(datos_usuario[0])
+            session['permisos_dict'] = bd.obtener_permisos_desktop(datos_usuario[0])
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
             return redirect(url_for('inicio'))
         else:
@@ -552,8 +564,8 @@ def subir_imagen(sku):
     en el filesystem y almacena una previsualización WebP comprimida en la BD.
     Solo accesible para usuarios con rol 'Admin'.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden subir imágenes.', 'error')
+    if not _puede("activos", "subir"):
+        flash(' No tienes permisos para subir imágenes.', 'error')
         return redirect(url_for('detalle_producto', sku=sku))
 
     # Validar que el producto existe
@@ -840,8 +852,8 @@ def sincronizar_previews(sku):
     CORREGIDO: Resuelve la ruta relativa a almacen_activos/ para que funcione
     tanto con rutas absolutas (Windows/Linux) como con rutas relativas.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden sincronizar.', 'error')
+    if not _puede("activos", "subir"):
+        flash(' No tienes permisos para sincronizar.', 'error')
         return redirect(url_for('detalle_producto', sku=sku))
 
     activos_sin_preview = bd.obtener_activos_sin_preview(sku)
@@ -942,8 +954,8 @@ def cliente_editar(rif):
     Args:
         rif (str): RIF del cliente a actualizar.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden editar clientes.', 'error')
+    if not _puede("clientes", "editar"):
+        flash(' No tienes permisos para editar clientes.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
     nombre_empresa = request.form.get('nombre_empresa', '').strip()
@@ -975,7 +987,7 @@ def nuevo_producto():
     POST: Valida y guarda el nuevo producto. Si el SKU ya existe,
           muestra un error sin perder los datos del formulario.
     """
-    if session.get('rol') != 'Admin':
+    if not _puede("productos", "agregar"):
         flash(' No tienes permisos para agregar productos.', 'error')
         return redirect(url_for('inicio'))
 
@@ -1006,7 +1018,7 @@ def nuevo_cliente():
     GET:  Muestra el formulario vacío.
     POST: Valida y guarda el nuevo cliente. Si el RIF ya existe, muestra un error.
     """
-    if session.get('rol') != 'Admin':
+    if not _puede("clientes", "agregar"):
         flash(' No tienes permisos para agregar clientes.', 'error')
         return redirect(url_for('inicio'))
 
@@ -1036,7 +1048,7 @@ def editar_producto(sku):
     GET:  Carga el formulario con los datos actuales del producto.
     POST: Guarda los cambios y redirige al catálogo.
     """
-    if session.get('rol') != 'Admin':
+    if not _puede("productos", "editar"):
         flash(' No tienes permisos para editar productos.', 'error')
         return redirect(url_for('inicio'))
 
@@ -1069,7 +1081,7 @@ def eliminar_producto(sku):
     Solo accesible para usuarios con rol 'Admin'.
     La confirmación visual se maneja con un onclick en el HTML.
     """
-    if session.get('rol') != 'Admin':
+    if not _puede("productos", "eliminar"):
         flash(' No tienes permisos para eliminar productos.', 'error')
         return redirect(url_for('inicio'))
 
@@ -1129,9 +1141,8 @@ def asignar_tarea():
         descripcion    — Descripción libre
         fecha_limite   — Fecha tope (YYYY-MM-DD)
     """
-    # Verificar que el usuario tenga permiso de crear tareas
-    if session.get('rol') != 'Admin':
-        flash(' Solo los supervisores pueden asignar tareas.', 'error')
+    if not _puede("tareas", "gestionar"):
+        flash(' No tienes permisos para asignar tareas.', 'error')
         return redirect(url_for('inicio'))
 
     # Leer y limpiar campos del formulario
@@ -1443,8 +1454,8 @@ def cotizaciones():
     Permite filtrar por estado mediante el parámetro GET ?estado=...
     Solo accesible para usuarios con rol 'Admin'.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden acceder a las cotizaciones.', 'error')
+    if not _puede("cotizaciones", "ver"):
+        flash(' No tienes permisos para acceder a cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     estado_filtro = request.args.get('estado', '')
     lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
@@ -1467,8 +1478,8 @@ def cotizacion_nueva():
     POST: Valida los datos, guarda la cotización y redirige al detalle.
     Solo permite rol Admin.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden crear cotizaciones.', 'error')
+    if not _puede("cotizaciones", "crear"):
+        flash(' No tienes permisos para crear cotizaciones.', 'error')
         return redirect(url_for('cotizaciones'))
 
     if request.method == 'POST':
@@ -1541,15 +1552,14 @@ def cotizacion_detalle(cotizacion_id):
     Muestra la cotización completa con todos sus ítems, estado y opciones de acción.
     Solo accesible para usuarios con rol 'Admin'.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden ver cotizaciones.', 'error')
+    if not _puede("cotizaciones", "ver"):
+        flash(' No tienes permisos para ver cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
         flash(' Cotización no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
     estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
-    # El template usa 'cab' e 'items' directamente (desestructurado del dict)
     return render_template(
         'cotizacion_detalle.html',
         cab=datos['cabecera'],
@@ -1565,8 +1575,8 @@ def cotizacion_estado(cotizacion_id):
     Cambia el estado de una cotización (solo Admin).
     POST param: nuevo_estado
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden cambiar el estado.', 'error')
+    if not _puede("cotizaciones", "crear"):
+        flash(' No tienes permisos para cambiar el estado.', 'error')
         return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
@@ -1590,8 +1600,8 @@ def cotizacion_pdf(cotizacion_id):
     Genera y descarga el PDF de la cotización indicada.
     Solo accesible para usuarios con rol 'Admin'.
     """
-    if session.get('rol') != 'Admin':
-        flash(' Solo los administradores pueden descargar cotizaciones.', 'error')
+    if not _puede("cotizaciones", "ver"):
+        flash(' No tienes permisos para descargar cotizaciones.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:

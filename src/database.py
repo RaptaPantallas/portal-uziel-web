@@ -2218,12 +2218,21 @@ El equipo de Importadora Uziel C.A."""
                     asignado_a     VARCHAR(100) NOT NULL,
                     tipo_tarea     VARCHAR(60)  NOT NULL,
                     descripcion    TEXT,
-                    fecha_limite   DATE         NOT NULL,
+                    fecha_limite   TIMESTAMP    NOT NULL,
                     estado         VARCHAR(20)  DEFAULT 'Pendiente',
                     creado_por     VARCHAR(100) NOT NULL,
                     fecha_creacion TIMESTAMP    DEFAULT NOW()
                 )
             """)
+            # Migrar columna DATE → TIMESTAMP si la tabla ya existía con DATE
+            try:
+                cursor.execute("""
+                    ALTER TABLE tareas ALTER COLUMN fecha_limite TYPE TIMESTAMP
+                    USING fecha_limite::TIMESTAMP
+                """)
+                conexion.commit()
+            except Exception:
+                conexion.rollback()  # ya está en TIMESTAMP o no necesita cambio
             conexion.commit()
             return True
         except Error as e:

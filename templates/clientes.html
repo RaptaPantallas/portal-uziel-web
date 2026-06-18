@@ -13,7 +13,7 @@
         <h1>Clientes</h1>
         <p class="subtitulo">Gestión de cartera de clientes</p>
     </div>
-    {% if session['rol'] == 'Admin' %}
+    {% if puede('clientes', 'agregar') %}
         <button class="btn btn-primary" onclick="abrirModalCliente()">+ Nuevo Cliente</button>
     {% endif %}
 </div>

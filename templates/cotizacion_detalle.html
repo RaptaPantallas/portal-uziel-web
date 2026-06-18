@@ -96,7 +96,7 @@
 </div>
 {% endif %}
 
-{% if session['rol'] == 'Admin' %}
+{% if puede('cotizaciones', 'crear') %}
 <div class="card">
     <div class="card-title"> Cambiar Estado</div>
     <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" class="estado-form">

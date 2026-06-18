@@ -17,7 +17,7 @@
         <h1>Productos</h1>
         <p class="subtitulo">Catálogo de partes y repuestos</p>
     </div>
-    {% if session['rol'] == 'Admin' %}
+    {% if puede('productos', 'agregar') %}
         <button class="btn btn-primary" onclick="abrirModalProducto()">+ Nuevo Producto</button>
     {% endif %}
 </div>
@@ -74,12 +74,12 @@
                     <td>{{ producto[3] }}</td>
                     <td class="precio">${{ producto[5] }}</td>
                     <td>
-                        {% if session['rol'] == 'Admin' %}
-                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Galería</a>
+                        <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Galería</a>
+                        {% if puede('productos', 'editar') %}
                             <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Editar</a>
+                        {% endif %}
+                        {% if puede('productos', 'eliminar') %}
                             <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
-                        {% else %}
-                            <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Ver galería</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -167,7 +167,7 @@
             </div>
             <div style="display:flex;gap:10px;margin-top:24px;">
                 <button class="btn btn-ghost" onclick="cerrarDetalle()">← Cerrar</button>
-                {% if session['rol'] == 'Admin' %}
+                {% if puede('productos', 'editar') %}
                 <a id="detalle-editar-link" href="" class="btn btn-primary"> Editar</a>
                 {% endif %}
             </div>
