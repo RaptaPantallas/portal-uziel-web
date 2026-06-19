@@ -109,18 +109,22 @@
                 {% endif %}
             </td>
             <td>
-                <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}')"> Editar</button>
-                    <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')"> Contraseña</button>
-                    {% if ubloqueado %}
-                    <form method="POST" action="{{ url_for('admin_usuario_desbloquear', username=uname) }}" style="display:inline;">
-                        <button type="submit" class="btn btn-sm" style="background:#f59e0b;color:white;"> Desbloquear</button>
-                    </form>
-                    {% endif %}
-                    {% if uname != session['usuario'] %}
-                    <form method="POST" action="{{ url_for('admin_usuario_borrar', username=uname) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar al usuario {{ uname }}? Esta acción no se puede deshacer.');">
-                        <button type="submit" class="btn btn-sm btn-danger"> Eliminar</button>
-                    </form>
+                <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    {% if not usuperadmin or session.get('es_superadmin') %}
+                        <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}')"> Editar</button>
+                        <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')"> Contraseña</button>
+                        {% if ubloqueado %}
+                        <form method="POST" action="{{ url_for('admin_usuario_desbloquear', username=uname) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm" style="background:#f59e0b;color:white;"> Desbloquear</button>
+                        </form>
+                        {% endif %}
+                        {% if uname != session['usuario'] %}
+                        <form method="POST" action="{{ url_for('admin_usuario_borrar', username=uname) }}" style="display:inline;" onsubmit="return confirm('¿Eliminar al usuario {{ uname }}? Esta acción no se puede deshacer.');">
+                            <button type="submit" class="btn btn-sm btn-danger"> Eliminar</button>
+                        </form>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: #ef4444; font-size: 11px; font-weight: 700; background: #fee2e2; border-radius: 20px; padding: 3px 10px; display: inline-block;">Protegido</span>
                     {% endif %}
                 </div>
             </td>

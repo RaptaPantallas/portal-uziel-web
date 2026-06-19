@@ -1707,6 +1707,11 @@ def admin_usuario_editar(username):
         flash(' No tienes permiso para editar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
+    # Evitar que no-superadmins modifiquen a un superadmin
+    if bd.es_superadmin(username) and not session.get('es_superadmin'):
+        flash(' Solo el superadmin puede modificar a otro superadmin.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
     nuevo_username = request.form.get('nuevo_username', '').strip()
     nuevo_rol      = request.form.get('rol', 'Empleado').strip()
     email          = request.form.get('email', '').strip()
@@ -1758,6 +1763,11 @@ def admin_usuario_pass(username):
         flash(' No tienes permiso para cambiar contraseñas.', 'error')
         return redirect(url_for('inicio'))
 
+    # Evitar que no-superadmins cambien la contraseña de un superadmin
+    if bd.es_superadmin(username) and not session.get('es_superadmin'):
+        flash(' Solo el superadmin puede cambiar la contraseña de otro superadmin.', 'error')
+        return redirect(url_for('admin_usuarios'))
+
     nueva_pass   = request.form.get('nueva_password', '').strip()
     confirmar    = request.form.get('confirmar_password', '').strip()
 
@@ -1788,6 +1798,11 @@ def admin_usuario_borrar(username):
     if not _puede("usuarios", "gestionar"):
         flash(' No tienes permiso para eliminar usuarios.', 'error')
         return redirect(url_for('inicio'))
+
+    # Evitar que no-superadmins eliminen a un superadmin
+    if bd.es_superadmin(username) and not session.get('es_superadmin'):
+        flash(' Solo el superadmin puede eliminar a otro superadmin.', 'error')
+        return redirect(url_for('admin_usuarios'))
 
     ok = bd.eliminar_usuario(username)
     if ok:
