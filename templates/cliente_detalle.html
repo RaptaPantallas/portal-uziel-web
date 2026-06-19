@@ -115,6 +115,18 @@
                 {% if cliente[3] %}<a href="mailto:{{ cliente[3] }}" style="color:var(--primary);text-decoration:none;">{{ cliente[3] }}</a>{% else %}Sin registrar{% endif %}
             </div>
         </div>
+        <div class="info-item">
+            <label>País</label>
+            <div class="valor {% if not cliente[6] %}vacio{% endif %}">{{ cliente[6] or 'Sin registrar' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Estado</label>
+            <div class="valor {% if not cliente[7] %}vacio{% endif %}">{{ cliente[7] or 'Sin registrar' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Municipio</label>
+            <div class="valor {% if not cliente[8] %}vacio{% endif %}">{{ cliente[8] or 'Sin registrar' }}</div>
+        </div>
         <div class="info-item" style="grid-column: 1 / -1;">
             <label>Dirección</label>
             <div class="valor {% if not cliente[4] %}vacio{% endif %}">{{ cliente[4] or 'Sin registrar' }}</div>
@@ -218,9 +230,23 @@
                 <label>Correo electrónico</label>
                 <input type="email" name="correo" class="form-control" value="{{ cliente[3] or '' }}" placeholder="correo@empresa.com">
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>País</label>
+                    <input type="text" name="pais" class="form-control" value="{{ cliente[6] or 'Venezuela' }}" placeholder="País">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Estado</label>
+                    <input type="text" name="estado" class="form-control" value="{{ cliente[7] or '' }}" placeholder="Estado">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Municipio</label>
+                    <input type="text" name="municipio" class="form-control" value="{{ cliente[8] or '' }}" placeholder="Municipio">
+                </div>
+            </div>
             <div class="form-group">
                 <label>Dirección</label>
-                <textarea name="direccion" class="form-control" placeholder="Calle, Ciudad, Estado">{{ cliente[4] or '' }}</textarea>
+                <textarea name="direccion" class="form-control" placeholder="Calle, Avenida, Casa/Local">{{ cliente[4] or '' }}</textarea>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>

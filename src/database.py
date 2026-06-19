@@ -108,6 +108,7 @@ class ConexionBD:
             ConexionBD._inicializar_pool(self.url_nube)
         # Ejecutamos una actualización rápida para asegurar que las nuevas columnas existen
         self.actualizar_esquema_productos()
+        self.actualizar_esquema_clientes()
         self._asegurar_columna_es_principal()
         self._descubrir_pk_activos()
         self._sembrar_usuario_supervisor()
@@ -161,6 +162,29 @@ class ConexionBD:
             conexion.commit()
         except Error as e:
             print(f" [BD] Nota: No se pudo verificar el esquema de productos: {e}")
+            conexion.rollback()
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def actualizar_esquema_clientes(self):
+        """
+        Asegura que la tabla 'clientes' tenga las columnas 'pais', 'estado' y 'municipio'.
+        Usa comandos IF NOT EXISTS que son 100% seguros de ejecutar múltiples veces.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS pais VARCHAR(100) DEFAULT 'Venezuela'")
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado VARCHAR(100) DEFAULT ''")
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS municipio VARCHAR(100) DEFAULT ''")
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: No se pudo verificar el esquema de clientes: {e}")
             conexion.rollback()
         finally:
             if cursor:
@@ -723,17 +747,17 @@ class ConexionBD:
     # MÓDULO CRM — Gestión de Clientes
     # =========================================================================
 
-    def registrar_cliente(self, rif, nombre_empresa, telefono, correo, direccion):
+    def registrar_cliente(self, rif, nombre_empresa, telefono, correo, direccion, pais='Venezuela', estado='', municipio=''):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             consulta_sql = """
-                INSERT INTO clientes (rif, nombre_empresa, telefono, correo, direccion)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO clientes (rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(consulta_sql, (rif, nombre_empresa, telefono, correo, direccion))
+            cursor.execute(consulta_sql, (rif, nombre_empresa, telefono, correo, direccion, pais or 'Venezuela', estado or '', municipio or ''))
             conexion.commit()
             return True
         except Error as e:
@@ -752,7 +776,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT rif, nombre_empresa, telefono, correo, direccion, fecha_registro "
+                "SELECT rif, nombre_empresa, telefono, correo, direccion, fecha_registro, pais, estado, municipio "
                 "FROM clientes WHERE UPPER(rif) = UPPER(%s)",
                 (rif,)
             )
@@ -765,7 +789,8 @@ class ConexionBD:
         return cliente
 
     def actualizar_cliente(self, rif: str, nombre_empresa: str, telefono: str,
-                           correo: str, direccion: str) -> bool:
+                           correo: str, direccion: str, pais: str = 'Venezuela',
+                           estado: str = '', municipio: str = '') -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
@@ -773,9 +798,9 @@ class ConexionBD:
             cursor = conexion.cursor()
             cursor.execute("""
                 UPDATE clientes
-                SET nombre_empresa = %s, telefono = %s, correo = %s, direccion = %s
+                SET nombre_empresa = %s, telefono = %s, correo = %s, direccion = %s, pais = %s, estado = %s, municipio = %s
                 WHERE UPPER(rif) = UPPER(%s)
-            """, (nombre_empresa, telefono, correo, direccion, rif))
+            """, (nombre_empresa, telefono, correo, direccion, pais or 'Venezuela', estado or '', municipio or '', rif))
             if cursor.rowcount == 0:
                 conexion.rollback()
                 return False
@@ -819,7 +844,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT rif, nombre_empresa, telefono, correo, direccion "
+                "SELECT rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio "
                 "FROM clientes ORDER BY fecha_registro DESC"
             )
             lista_clientes = cursor.fetchall()

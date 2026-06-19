@@ -610,17 +610,18 @@ def detalle_producto(sku):
 
 
 @app.route('/activos/<path:nombre_archivo>')
-@login_requerido
 def servir_activo(nombre_archivo):
     """
     Sirve archivos estáticos desde la carpeta 'almacen_activos/'.
 
     Esta ruta permite que el portal web acceda a las fotografías copiadas
-    por la app de escritorio DAM. Solo accesible para usuarios autenticados.
-
-    Args:
-        nombre_archivo (str): Nombre del archivo (con extensión) dentro de almacen_activos/.
+    por la app de escritorio DAM.
+    El logotipo de la empresa en Logo/ es público, el resto requiere iniciar sesión.
     """
+    nombre_normalizado = nombre_archivo.replace('\\', '/')
+    if not nombre_normalizado.startswith('Logo/') and 'usuario' not in session:
+        return redirect(url_for('login'))
+
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
     return send_from_directory(carpeta_activos, nombre_archivo)
 
@@ -1016,7 +1017,7 @@ def cliente_detalle(rif):
 @login_requerido
 def cliente_editar(rif):
     """
-    Actualiza los datos de contacto de un cliente.
+    Actualiza los datos de contacto y ubicación de un cliente.
     Solo accesible para usuarios con rol 'Admin'.
 
     Args:
@@ -1030,12 +1031,15 @@ def cliente_editar(rif):
     telefono       = request.form.get('telefono', '').strip()
     correo         = request.form.get('correo', '').strip()
     direccion      = request.form.get('direccion', '').strip()
+    pais           = request.form.get('pais', '').strip()
+    estado         = request.form.get('estado', '').strip()
+    municipio      = request.form.get('municipio', '').strip()
 
     if not nombre_empresa:
         flash(' El nombre de la empresa es obligatorio.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
-    ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion)
+    ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio)
     if ok:
         flash(' Datos del cliente actualizados correctamente.', 'success')
     else:
@@ -1096,8 +1100,11 @@ def nuevo_cliente():
         telefono = request.form['telefono'].strip()
         correo = request.form['correo'].strip()
         direccion = request.form['direccion'].strip()
+        pais = request.form.get('pais', '').strip()
+        estado = request.form.get('estado', '').strip()
+        municipio = request.form.get('municipio', '').strip()
 
-        if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion):
+        if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio):
             flash(f' ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
             return redirect(url_for('clientes'))
         else:
