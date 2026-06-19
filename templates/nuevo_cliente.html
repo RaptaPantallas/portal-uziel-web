@@ -40,15 +40,21 @@
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
             <div class="form-group" style="margin-bottom:0;">
                 <label>País</label>
-                <input type="text" name="pais" class="form-control" value="Venezuela" placeholder="País">
+                <select id="pais-select" class="form-control" onchange="actualizarPaisForm(this.value)">
+                    <option value="Venezuela" selected>Venezuela</option>
+                    <option value="Otro">Otro (Escribir)...</option>
+                </select>
+                <input type="text" id="pais-input" name="pais" class="form-control" value="Venezuela" style="display:none; margin-top:6px;" placeholder="Escribe el país">
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label>Estado</label>
-                <input type="text" name="estado" class="form-control" placeholder="Estado">
+                <select id="estado-select" class="form-control" onchange="actualizarEstadoForm(this.value)"></select>
+                <input type="text" id="estado-input" name="estado" class="form-control" style="display:none;" placeholder="Estado">
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label>Municipio</label>
-                <input type="text" name="municipio" class="form-control" placeholder="Municipio">
+                <select id="municipio-select" class="form-control"></select>
+                <input type="text" id="municipio-input" name="municipio" class="form-control" style="display:none;" placeholder="Municipio">
             </div>
         </div>
         <div class="form-group">
@@ -61,4 +67,88 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const VENEZUELA_DATA = {{ venezuela_data_js | safe }};
+
+    function poblarEstados() {
+        const estadoSelect = document.getElementById("estado-select");
+        estadoSelect.innerHTML = "";
+        
+        const estados = Object.keys(VENEZUELA_DATA).sort();
+        estados.forEach(est => {
+            const opt = document.createElement("option");
+            opt.value = est;
+            opt.textContent = est;
+            estadoSelect.appendChild(opt);
+        });
+        
+        if (estados.length > 0) {
+            actualizarEstadoForm(estadoSelect.value);
+        }
+    }
+
+    function actualizarEstadoForm(estado) {
+        const municipioSelect = document.getElementById("municipio-select");
+        municipioSelect.innerHTML = "";
+        
+        const municipios = VENEZUELA_DATA[estado] || [];
+        municipios.forEach(mun => {
+            const opt = document.createElement("option");
+            opt.value = mun;
+            opt.textContent = mun;
+            municipioSelect.appendChild(opt);
+        });
+    }
+
+    function actualizarPaisForm(pais) {
+        const isVzla = (pais === "Venezuela");
+        
+        const paisInput = document.getElementById("pais-input");
+        const estadoSelect = document.getElementById("estado-select");
+        const estadoInput = document.getElementById("estado-input");
+        const municipioSelect = document.getElementById("municipio-select");
+        const municipioInput = document.getElementById("municipio-input");
+        
+        if (isVzla) {
+            paisInput.style.display = "none";
+            paisInput.value = "Venezuela";
+            paisInput.name = "pais";
+            
+            estadoInput.style.display = "none";
+            estadoInput.name = "";
+            estadoSelect.style.display = "block";
+            estadoSelect.name = "estado";
+            
+            municipioInput.style.display = "none";
+            municipioInput.name = "";
+            municipioSelect.style.display = "block";
+            municipioSelect.name = "municipio";
+            
+            poblarEstados();
+        } else {
+            paisInput.style.display = "block";
+            if (paisInput.value === "Venezuela") {
+                paisInput.value = "";
+            }
+            paisInput.name = "pais";
+            
+            estadoSelect.style.display = "none";
+            estadoSelect.name = "";
+            estadoInput.style.display = "block";
+            estadoInput.name = "estado";
+            
+            municipioSelect.style.display = "none";
+            municipioSelect.name = "";
+            municipioInput.style.display = "block";
+            municipioInput.name = "municipio";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        actualizarPaisForm("Venezuela");
+    });
+</script>
 {% endblock %}

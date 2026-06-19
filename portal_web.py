@@ -191,6 +191,21 @@ def inyectar_csrf():
     return {'csrf_token': session.get('csrf_token', '')}
 
 
+@app.context_processor
+def inyectar_datos_vzla():
+    """Inyecta la base de datos de estados y municipios de Venezuela en las plantillas."""
+    import json
+    try:
+        ruta_vzla = os.path.join(os.path.dirname(__file__), 'src', 'venezuela.json')
+        with open(ruta_vzla, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {'venezuela_data_js': json.dumps(data)}
+    except Exception as e:
+        print(f"Error al cargar venezuela.json: {e}")
+        return {'venezuela_data_js': '{}'}
+
+
+
 # =============================================================================
 # UTILIDAD — Extraer ruta relativa a almacen_activos/
 # =============================================================================

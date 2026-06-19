@@ -233,15 +233,21 @@
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
                 <div class="form-group" style="margin-bottom:0;">
                     <label>País</label>
-                    <input type="text" name="pais" class="form-control" value="{{ cliente[6] or 'Venezuela' }}" placeholder="País">
+                    <select id="edit-pais-select" class="form-control" onchange="actualizarPaisEdit(this.value)">
+                        <option value="Venezuela" {% if cliente[6] == 'Venezuela' or not cliente[6] %}selected{% endif %}>Venezuela</option>
+                        <option value="Otro" {% if cliente[6] and cliente[6] != 'Venezuela' %}selected{% endif %}>Otro (Escribir)...</option>
+                    </select>
+                    <input type="text" id="edit-pais-input" name="pais" class="form-control" value="{{ cliente[6] or 'Venezuela' }}" style="{% if cliente[6] == 'Venezuela' or not cliente[6] %}display:none;{% endif %} margin-top:6px;" placeholder="Escribe el país">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Estado</label>
-                    <input type="text" name="estado" class="form-control" value="{{ cliente[7] or '' }}" placeholder="Estado">
+                    <select id="edit-estado-select" class="form-control" onchange="actualizarEstadoEdit(this.value)"></select>
+                    <input type="text" id="edit-estado-input" name="estado" class="form-control" value="{{ cliente[7] or '' }}" style="display:none;" placeholder="Estado">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Municipio</label>
-                    <input type="text" name="municipio" class="form-control" value="{{ cliente[8] or '' }}" placeholder="Municipio">
+                    <select id="edit-municipio-select" class="form-control"></select>
+                    <input type="text" id="edit-municipio-input" name="municipio" class="form-control" value="{{ cliente[8] or '' }}" style="display:none;" placeholder="Municipio">
                 </div>
             </div>
             <div class="form-group">
@@ -263,5 +269,93 @@ function abrirModal() { document.getElementById('modal-editar').classList.add('o
 function cerrarModal() { document.getElementById('modal-editar').classList.remove('open'); document.body.style.overflow = ''; }
 document.getElementById('modal-editar')?.addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 if (document.getElementById('modal-editar')) { document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarModal(); }); }
+
+const VENEZUELA_DATA = {{ venezuela_data_js | safe }};
+const currentCountry = "{{ cliente[6] or 'Venezuela' }}";
+const currentState = "{{ cliente[7] or '' }}";
+const currentMunicipio = "{{ cliente[8] or '' }}";
+
+function poblarEstadosEdit() {
+    const estadoSelect = document.getElementById("edit-estado-select");
+    estadoSelect.innerHTML = "";
+    
+    const estados = Object.keys(VENEZUELA_DATA).sort();
+    estados.forEach(est => {
+        const opt = document.createElement("option");
+        opt.value = est;
+        opt.textContent = est;
+        if (est === currentState) {
+            opt.selected = true;
+        }
+        estadoSelect.appendChild(opt);
+    });
+    
+    actualizarEstadoEdit(estadoSelect.value || estados[0]);
+}
+
+function actualizarEstadoEdit(estado) {
+    const municipioSelect = document.getElementById("edit-municipio-select");
+    municipioSelect.innerHTML = "";
+    
+    const municipios = VENEZUELA_DATA[estado] || [];
+    municipios.forEach(mun => {
+        const opt = document.createElement("option");
+        opt.value = mun;
+        opt.textContent = mun;
+        if (mun === currentMunicipio) {
+            opt.selected = true;
+        }
+        municipioSelect.appendChild(opt);
+    });
+}
+
+function actualizarPaisEdit(pais) {
+    const isVzla = (pais === "Venezuela");
+    
+    const paisInput = document.getElementById("edit-pais-input");
+    const estadoSelect = document.getElementById("edit-estado-select");
+    const estadoInput = document.getElementById("edit-estado-input");
+    const municipioSelect = document.getElementById("edit-municipio-select");
+    const municipioInput = document.getElementById("edit-municipio-input");
+    
+    if (isVzla) {
+        paisInput.style.display = "none";
+        paisInput.value = "Venezuela";
+        paisInput.name = "pais";
+        
+        estadoInput.style.display = "none";
+        estadoInput.name = "";
+        estadoSelect.style.display = "block";
+        estadoSelect.name = "estado";
+        
+        municipioInput.style.display = "none";
+        municipioInput.name = "";
+        municipioSelect.style.display = "block";
+        municipioSelect.name = "municipio";
+        
+        poblarEstadosEdit();
+    } else {
+        paisInput.style.display = "block";
+        if (paisInput.value === "Venezuela") {
+            paisInput.value = currentCountry !== "Venezuela" ? currentCountry : "";
+        }
+        paisInput.name = "pais";
+        
+        estadoSelect.style.display = "none";
+        estadoSelect.name = "";
+        estadoInput.style.display = "block";
+        estadoInput.name = "estado";
+        estadoInput.value = currentState;
+        
+        municipioSelect.style.display = "none";
+        municipioSelect.name = "";
+        municipioInput.style.display = "block";
+        municipioInput.name = "municipio";
+        municipioInput.value = currentMunicipio;
+    }
+}
+
+// Initial call
+actualizarPaisEdit(currentCountry === "Venezuela" ? "Venezuela" : "Otro");
 </script>
 {% endblock %}

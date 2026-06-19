@@ -395,6 +395,26 @@
                 <label>Correo Electrónico <span style="font-size:11px;color:var(--text-light);font-weight:400;">(opcional)</span></label>
                 <input type="email" name="correo" class="form-control" placeholder="correo@empresa.com">
             </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>País</label>
+                    <select id="modal-pais-select" class="form-control" onchange="actualizarPaisModal(this.value)">
+                        <option value="Venezuela" selected>Venezuela</option>
+                        <option value="Otro">Otro (Escribir)...</option>
+                    </select>
+                    <input type="text" id="modal-pais-input" name="pais" class="form-control" value="Venezuela" style="display:none; margin-top:6px;" placeholder="Escribe el país">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Estado</label>
+                    <select id="modal-estado-select" class="form-control" onchange="actualizarEstadoModal(this.value)"></select>
+                    <input type="text" id="modal-estado-input" name="estado" class="form-control" style="display:none;" placeholder="Estado">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Municipio</label>
+                    <select id="modal-municipio-select" class="form-control"></select>
+                    <input type="text" id="modal-municipio-input" name="municipio" class="form-control" style="display:none;" placeholder="Municipio">
+                </div>
+            </div>
             <div class="form-group">
                 <label>Dirección Física <span style="font-size:11px;color:var(--text-light);font-weight:400;">(opcional)</span></label>
                 <input type="text" name="direccion" class="form-control" placeholder="Dirección completa">
@@ -409,6 +429,97 @@
 {% endblock %}
 {% block scripts %}
 <script>
+    const VENEZUELA_DATA = {{ venezuela_data_js | safe }};
+
+    function poblarEstadosModal() {
+        const estadoSelect = document.getElementById("modal-estado-select");
+        estadoSelect.innerHTML = "";
+        
+        const estados = Object.keys(VENEZUELA_DATA).sort();
+        estados.forEach(est => {
+            const opt = document.createElement("option");
+            opt.value = est;
+            opt.textContent = est;
+            estadoSelect.appendChild(opt);
+        });
+        
+        if (estados.length > 0) {
+            actualizarEstadoModal(estadoSelect.value);
+        }
+    }
+
+    function actualizarEstadoModal(estado) {
+        const municipioSelect = document.getElementById("modal-municipio-select");
+        municipioSelect.innerHTML = "";
+        
+        const municipios = VENEZUELA_DATA[estado] || [];
+        municipios.forEach(mun => {
+            const opt = document.createElement("option");
+            opt.value = mun;
+            opt.textContent = mun;
+            municipioSelect.appendChild(opt);
+        });
+    }
+
+    function actualizarPaisModal(pais) {
+        const isVzla = (pais === "Venezuela");
+        
+        const paisInput = document.getElementById("modal-pais-input");
+        const estadoSelect = document.getElementById("modal-estado-select");
+        const estadoInput = document.getElementById("modal-estado-input");
+        const municipioSelect = document.getElementById("modal-municipio-select");
+        const municipioInput = document.getElementById("modal-municipio-input");
+        
+        if (isVzla) {
+            paisInput.style.display = "none";
+            paisInput.value = "Venezuela";
+            paisInput.name = "pais";
+            
+            estadoInput.style.display = "none";
+            estadoInput.name = "";
+            estadoSelect.style.display = "block";
+            estadoSelect.name = "estado";
+            
+            municipioInput.style.display = "none";
+            municipioInput.name = "";
+            municipioSelect.style.display = "block";
+            municipioSelect.name = "municipio";
+            
+            poblarEstadosModal();
+        } else {
+            paisInput.style.display = "block";
+            if (paisInput.value === "Venezuela") {
+                paisInput.value = "";
+            }
+            paisInput.name = "pais";
+            
+            estadoSelect.style.display = "none";
+            estadoSelect.name = "";
+            estadoInput.style.display = "block";
+            estadoInput.name = "estado";
+            
+            municipioSelect.style.display = "none";
+            municipioSelect.name = "";
+            municipioInput.style.display = "block";
+            municipioInput.name = "municipio";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        actualizarPaisModal("Venezuela");
+    });
+
+    // Enlazar también a la función de abrir modal para reiniciar el estado
+    const originalAbrirModalNuevoCliente = abrirModalNuevoCliente;
+    abrirModalNuevoCliente = function() {
+        originalAbrirModalNuevoCliente();
+        const pSel = document.getElementById("modal-pais-select");
+        if (pSel) {
+            pSel.value = "Venezuela";
+            actualizarPaisModal("Venezuela");
+        }
+    };
+
     function abrirModalTarea() { document.getElementById('modalTarea').classList.add('open'); }
     function cerrarModalTarea() { document.getElementById('modalTarea').classList.remove('open'); }
     function abrirModalNuevoProducto() { document.getElementById('modalNuevoProducto').classList.add('open'); }
