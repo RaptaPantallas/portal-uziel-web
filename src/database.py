@@ -1559,6 +1559,7 @@ class ConexionBD:
         QUERY ÚNICA optimizada para búsqueda en el banco de fotos.
         Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo)
         filtrado por SKU o nombre del producto, con UNA SOLA llamada a la BD.
+        Soporta búsqueda multitérmino (inteligente).
         """
         if not query or not query.strip():
             return []
@@ -1570,8 +1571,19 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             pk = self._pk_activos
-            termino = f"%{query.strip()}%"
-            cursor.execute("""
+            words = [w.strip() for w in query.strip().split() if w.strip()]
+            if not words:
+                return []
+            
+            conditions = []
+            params = []
+            for w in words:
+                conditions.append("(p.sku ILIKE %s OR p.nombre ILIKE %s)")
+                params.extend([f"%{w}%", f"%{w}%"])
+            
+            where_clause = " AND ".join(conditions)
+            
+            sql = """
                 SELECT DISTINCT ON (p.sku)
                     p.sku,
                     p.nombre,
@@ -1580,13 +1592,16 @@ class ConexionBD:
                     a.{pk} AS id_activo
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
-                WHERE p.sku ILIKE %s OR p.nombre ILIKE %s
+                WHERE {where_clause}
                 ORDER BY p.sku,
                     CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
                     CASE WHEN a.es_principal THEN 0 ELSE 1 END,
                     a.{pk}
                 LIMIT %s
-            """.format(pk=pk), (termino, termino, query.strip() + "%", limite))
+            """.format(pk=pk, where_clause=where_clause)
+            
+            args = tuple(params) + (query.strip() + "%", limite)
+            cursor.execute(sql, args)
             resultados = cursor.fetchall()
         except Error as e:
             print(f" [DAM] Error al buscar en banco: {e}")

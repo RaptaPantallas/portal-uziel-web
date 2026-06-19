@@ -544,9 +544,14 @@ def api_galeria_buscar():
     """API AJAX para búsqueda en galería — retorna JSON con TODOS los resultados."""
     query = request.args.get('q', '').strip()
     if not query:
-        return {'results': [], 'total': 0}
-    # Sin límite artificial: devolver todos los productos que coincidan
-    resultados = bd.buscar_banco_completo(query, limite=1000)
+        # Si la consulta es vacía, retornamos los últimos 10 de la vista inicial por defecto
+        resultados = bd.obtener_banco_completo()[:10]
+        es_reciente = True
+    else:
+        # Sin límite artificial: devolver todos los productos que coincidan
+        resultados = bd.buscar_banco_completo(query, limite=1000)
+        es_reciente = False
+
     items = []
     for r in resultados:
         items.append({
@@ -556,7 +561,7 @@ def api_galeria_buscar():
             'id_activo': r[4] if len(r) > 4 else None,
             'url': url_for('detalle_producto', sku=r[0])
         })
-    return {'results': items, 'total': len(items)}
+    return {'results': items, 'total': len(items), 'es_reciente': es_reciente}
 
 
 @app.route('/producto/<sku>')
