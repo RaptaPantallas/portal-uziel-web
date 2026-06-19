@@ -122,6 +122,7 @@
             <div class="paso-dot"></div>
         </div>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="campo">
                 <label for="username">Nombre de usuario</label>
                 <input type="text" id="username" name="username" placeholder="Tu usuario en el sistema" required autofocus>
@@ -138,6 +139,7 @@
         </div>
         <div class="info-email">Se envió un código al correo asociado a tu cuenta. Revisa tu bandeja de entrada y también la carpeta de spam.</div>
         <form method="POST" action="{{ url_for('recuperar_verificar') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="username" value="{{ username }}">
             <div class="campo">
                 <label for="codigo">Código de 6 dígitos</label>
@@ -158,6 +160,7 @@
         </div>
         <div class="info-email">Código verificado. Ahora puedes establecer una nueva contraseña.</div>
         <form method="POST" action="{{ url_for('recuperar_cambiar') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="hidden" name="username" value="{{ username }}">
             <input type="hidden" name="codigo" value="{{ codigo }}">
             <div class="campo">

@@ -44,9 +44,10 @@
 # =============================================================================
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, abort
 from functools import wraps
 import io
+import secrets
 from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
@@ -103,8 +104,45 @@ NOMBRE_ARCHIVO_PDF = "Catalogo_Uziel.pdf"
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
+# Configurar propiedades seguras para cookies de sesión
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=True
+)
+
 # Instancia global del módulo de base de datos
 bd = ConexionBD()
+
+# =============================================================================
+# PROTECCIÓN CSRF MANUAL
+# =============================================================================
+
+@app.before_request
+def asegurar_csrf_token():
+    """Genera un token CSRF si no existe en la sesión."""
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(32)
+
+@app.before_request
+def validar_csrf_token():
+    """Valida el token CSRF en peticiones POST, excepto para endpoints de la API del Desktop."""
+    if request.method == 'POST':
+        # Los endpoints del Desktop (/api/...) usan X-API-Key en vez de cookies de sesión
+        if request.path.startswith('/api/'):
+            return
+        
+        token = request.form.get('csrf_token') or request.headers.get('X-CSRF-Token')
+        expected = session.get('csrf_token')
+        
+        if not expected or token != expected:
+            print(f"[CSRF] Validación fallida para ruta: {request.path}")
+            abort(400, "Token CSRF inválido o ausente.")
+
+@app.context_processor
+def inyectar_csrf():
+    """Inyecta el token CSRF en el contexto de todos los templates."""
+    return {'csrf_token': session.get('csrf_token', '')}
 
 
 # =============================================================================
@@ -1468,43 +1506,41 @@ def reporte_pdf(tipo=None):
 
 
 # =============================================================================
-# MÓDULO COTIZACIONES
+# MÓDULO ALIANZAS COMERCIALES (GAAE)
 # =============================================================================
 
-@app.route('/cotizaciones')
+@app.route('/alianzas')
 @login_requerido
 def cotizaciones():
     """
-    Lista todas las cotizaciones registradas.
+    Lista todas las alianzas registradas.
     Permite filtrar por estado mediante el parámetro GET ?estado=...
-    Solo accesible para usuarios con rol 'Admin'.
     """
     if not _puede("cotizaciones", "ver"):
-        flash(' No tienes permisos para acceder a cotizaciones.', 'error')
+        flash(' No tienes permisos para acceder a alianzas.', 'error')
         return redirect(url_for('inicio'))
     estado_filtro = request.args.get('estado', '')
     lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
-    estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    estados = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     return render_template(
-        'cotizaciones.html',
+        'alianzas.html',
         cotizaciones=lista,
         estados=estados,
         estado_activo=estado_filtro
     )
 
 
-@app.route('/cotizacion/nueva', methods=['GET', 'POST'])
+@app.route('/alianza/nueva', methods=['GET', 'POST'])
 @login_requerido
 def cotizacion_nueva():
     """
-    Crear una nueva cotización.
+    Crear una nueva alianza.
 
-    GET:  Muestra el formulario con selector de cliente y buscador de productos.
-    POST: Valida los datos, guarda la cotización y redirige al detalle.
-    Solo permite rol Admin.
+    GET:  Muestra el formulario con selector de aliado y buscador de activos.
+    POST: Valida los datos, guarda la alianza y redirige al detalle.
     """
     if not _puede("cotizaciones", "crear"):
-        flash(' No tienes permisos para crear cotizaciones.', 'error')
+        flash(' No tienes permisos para registrar alianzas.', 'error')
         return redirect(url_for('cotizaciones'))
 
     if request.method == 'POST':
@@ -1519,7 +1555,7 @@ def cotizacion_nueva():
         precios    = request.form.getlist('precio_unitario[]')
 
         if not cliente_rif or not cliente_nombre or not skus:
-            flash(' Debes seleccionar un cliente y agregar al menos un producto.', 'error')
+            flash(' Debes seleccionar un aliado y agregar al menos un activo.', 'error')
         else:
             # Parseo completo primero — si algo falla, no se guarda nada
             items = []
@@ -1533,7 +1569,7 @@ def cotizacion_nueva():
                     if cant <= 0 or prec < 0:
                         raise ValueError("Valores fuera de rango")
                 except (ValueError, IndexError):
-                    flash(' Cantidad o precio inválido en uno de los productos.', 'error')
+                    flash(' Cantidad o valor unitario inválido.', 'error')
                     error_validacion = True
                     break
                 items.append({
@@ -1550,12 +1586,12 @@ def cotizacion_nueva():
                     session['usuario'], items, notas
                 )
                 if cot_id:
-                    flash(' Cotización creada exitosamente.', 'success')
+                    flash(' Alianza comercial registrada exitosamente.', 'success')
                     return redirect(url_for('cotizacion_detalle', cotizacion_id=cot_id))
                 else:
-                    flash(' Error al guardar la cotización. Intenta de nuevo.', 'error')
+                    flash(' Error al guardar la alianza. Intenta de nuevo.', 'error')
             elif not error_validacion:
-                flash(' Debes agregar al menos un producto válido.', 'error')
+                flash(' Debes agregar al menos un activo válido.', 'error')
 
     # GET — cargar clientes y productos para los selectores.
     # Si viene ?cliente_rif=<rif>, pre-seleccionar ese cliente.
@@ -1563,41 +1599,41 @@ def cotizacion_nueva():
     clientes_lista  = bd.obtener_clientes()
     productos_lista = bd.obtener_productos()
     return render_template(
-        'cotizacion_nueva.html',
+        'alianza_nueva.html',
         clientes=clientes_lista,
         productos=productos_lista,
         cliente_preseleccionado=cliente_preseleccionado
     )
 
 
-@app.route('/cotizacion/<int:cotizacion_id>')
+@app.route('/alianza/<int:cotizacion_id>')
 @login_requerido
 def cotizacion_detalle(cotizacion_id):
     """
-    Muestra la cotización completa con todos sus ítems, estado y opciones de acción.
-    Solo accesible para usuarios con rol 'Admin'.
+    Muestra la alianza completa con todos sus ítems, estado y opciones de acción.
     """
     if not _puede("cotizaciones", "ver"):
-        flash(' No tienes permisos para ver cotizaciones.', 'error')
+        flash(' No tienes permisos para ver alianzas.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash(' Cotización no encontrada.', 'error')
+        flash(' Alianza comercial no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
-    estados = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    estados = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     return render_template(
-        'cotizacion_detalle.html',
+        'alianza_detalle.html',
         cab=datos['cabecera'],
         items=datos['items'],
+        auditoria=datos['auditoria'],
         estados=estados
     )
 
 
-@app.route('/cotizacion/<int:cotizacion_id>/estado', methods=['POST'])
+@app.route('/alianza/<int:cotizacion_id>/estado', methods=['POST'])
 @login_requerido
 def cotizacion_estado(cotizacion_id):
     """
-    Cambia el estado de una cotización (solo Admin).
+    Cambia el estado de una alianza.
     POST param: nuevo_estado
     """
     if not _puede("cotizaciones", "crear"):
@@ -1605,7 +1641,7 @@ def cotizacion_estado(cotizacion_id):
         return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
-    estados_validos = ['Borrador', 'Enviada', 'Aceptada', 'Rechazada']
+    estados_validos = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     if nuevo_estado not in estados_validos:
         flash(' Estado no válido.', 'error')
     else:
@@ -1618,19 +1654,18 @@ def cotizacion_estado(cotizacion_id):
     return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
 
 
-@app.route('/cotizacion/<int:cotizacion_id>/pdf')
+@app.route('/alianza/<int:cotizacion_id>/pdf')
 @login_requerido
 def cotizacion_pdf(cotizacion_id):
     """
-    Genera y descarga el PDF de la cotización indicada.
-    Solo accesible para usuarios con rol 'Admin'.
+    Genera y descarga el PDF de la alianza indicada.
     """
     if not _puede("cotizaciones", "ver"):
-        flash(' No tienes permisos para descargar cotizaciones.', 'error')
+        flash(' No tienes permisos para descargar la alianza.', 'error')
         return redirect(url_for('inicio'))
     datos = bd.obtener_cotizacion_con_items(cotizacion_id)
     if not datos:
-        flash(' Cotización no encontrada.', 'error')
+        flash(' Alianza comercial no encontrada.', 'error')
         return redirect(url_for('cotizaciones'))
 
     buffer = generar_pdf_cotizacion(datos)

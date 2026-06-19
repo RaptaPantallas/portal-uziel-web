@@ -714,7 +714,7 @@
         {% endif %}
         {% if puede_ver('cotizaciones') %}
         <a href="{{ url_for('cotizaciones') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cotizacion') %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Cotizaciones</span>
+            <span class="nav-icon"></span> <span>Alianzas Comerciales</span>
         </a>
         {% endif %}
         <hr class="nav-divider">
@@ -867,8 +867,8 @@ function actualizarSidebar(url) {
             if (path.startsWith('/catalogo') || path.startsWith('/producto') || path.startsWith('/nuevo_producto') || path.startsWith('/editar')) {
                 link.classList.add('active');
             }
-        } else if (linkPath.includes('/cotizaciones')) {
-            if (path.startsWith('/cotizacion')) {
+        } else if (linkPath.includes('/alianzas')) {
+            if (path.startsWith('/alianza')) {
                 link.classList.add('active');
             }
         } else if (path.startsWith(linkPath)) {
@@ -905,6 +905,7 @@ function cargarContenido(url, pushState = true) {
             contentArea.innerHTML = html;
             ejecutarScripts(contentArea);
             actualizarSidebar(window.location.href);
+            injectCsrfTokens();
         }
         hideProgress();
         window.scrollTo({ top: 0 });
@@ -946,10 +947,40 @@ document.addEventListener('click', function(e) {
     cargarContenido(link.href, true);
 });
 
+// --- AUTO-INYECCIÓN DE TOKENS CSRF EN FORMULARIOS POST ---
+function injectCsrfTokens() {
+    document.querySelectorAll('form').forEach(form => {
+        if ((form.getAttribute('method') || '').toUpperCase() === 'POST') {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = '{{ csrf_token }}';
+                form.appendChild(input);
+            }
+        }
+    });
+}
+
+// Ejecutar al cargar la página inicialmente
+document.addEventListener('DOMContentLoaded', injectCsrfTokens);
+
 // --- INTERCEPTAR ENVÍO DE FORMULARIOS ---
 document.addEventListener('submit', function(e) {
     const form = e.target;
     if (form.target === '_blank') return;
+
+    // Asegurar que tenga el token CSRF antes de construir FormData o enviar
+    if ((form.getAttribute('method') || '').toUpperCase() === 'POST') {
+        let csrfInput = form.querySelector('input[name="csrf_token"]');
+        if (!csrfInput) {
+            csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = '{{ csrf_token }}';
+            form.appendChild(csrfInput);
+        }
+    }
 
     const action = form.getAttribute('action') || window.location.pathname;
     const actionUrl = new URL(action, window.location.href);

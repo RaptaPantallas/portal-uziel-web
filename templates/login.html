@@ -115,6 +115,7 @@
           {% endif %}
         {% endwith %}
         <form method="POST" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="campo">
                 <label for="username">Usuario</label>
                 <input type="text" id="username" name="username" placeholder="admin" autocomplete="username" required autofocus>

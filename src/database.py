@@ -37,6 +37,37 @@ URL_BASE_DE_DATOS = os.getenv("DATABASE_URL", DATABASE_URL_DEFAULT)
 
 # =============================================================================
 
+class ConnectionWrapper:
+    """Wrapper para interceptar el método close() de las conexiones del pool."""
+    def __init__(self, conexion, pool):
+        self._conn = conexion
+        self._pool = pool
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._conn.__exit__(exc_type, exc_val, exc_tb)
+
+    def close(self):
+        if self._pool:
+            try:
+                self._pool.putconn(self._conn)
+            except Exception:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+        else:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+
 
 class ConexionBD:
     """
@@ -54,10 +85,27 @@ class ConexionBD:
         "usuarios":    ["gestionar"],
     }
 
+    # Pool estático de conexiones (se inicializa una sola vez para toda la aplicación)
+    _pool = None
+
+    @classmethod
+    def _inicializar_pool(cls, url):
+        if cls._pool is None:
+            try:
+                from psycopg2.pool import ThreadedConnectionPool
+                # Pool con un rango de 2 a 20 conexiones simultáneas
+                cls._pool = ThreadedConnectionPool(2, 20, url)
+                print(" [BD] Pool de conexiones a PostgreSQL inicializado con éxito.")
+            except Exception as e:
+                print(f" [BD] Error crítico al inicializar pool de conexiones: {e}")
+
     def __init__(self):
         """Inicializa la clase con la URL de conexión configurada arriba."""
         self.url_nube = URL_BASE_DE_DATOS
         self._pk_activos = "id"
+        # Aseguramos la existencia del pool de conexiones
+        if ConexionBD._pool is None:
+            ConexionBD._inicializar_pool(self.url_nube)
         # Ejecutamos una actualización rápida para asegurar que las nuevas columnas existen
         self.actualizar_esquema_productos()
         self._asegurar_columna_es_principal()
@@ -72,15 +120,30 @@ class ConexionBD:
         self._sembrar_usuario_jefe()
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
+        self.inicializar_alianzas()
 
     def conectar(self):
-        """Establece y retorna una conexión activa a PostgreSQL."""
-        try:
-            conexion = psycopg2.connect(self.url_nube)
-            return conexion
-        except Error as e:
-            print(f" [BD] Error al conectar a PostgreSQL: {e}")
-            return None
+        """Establece y retorna una conexión activa a PostgreSQL desde el pool, envuelta para liberación segura."""
+        if ConexionBD._pool is None:
+            ConexionBD._inicializar_pool(self.url_nube)
+        
+        conexion = None
+        usando_pool = False
+        if ConexionBD._pool:
+            try:
+                conexion = ConexionBD._pool.getconn()
+                usando_pool = True
+            except Exception as e:
+                print(f" [BD] Error al obtener conexión del pool: {e}")
+        
+        if not conexion:
+            try:
+                conexion = psycopg2.connect(self.url_nube)
+            except Exception as e:
+                print(f" [BD] Error en fallback de conexión a PostgreSQL: {e}")
+                return None
+
+        return ConnectionWrapper(conexion, ConexionBD._pool if usando_pool else None)
 
     def actualizar_esquema_productos(self):
         """
@@ -2615,6 +2678,337 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
 
     def obtener_cotizaciones_por_cliente(self, cliente_rif: str) -> list:
+        return self.obtener_alianzas_por_aliado_rif(cliente_rif)
+
+    def obtener_cotizaciones(self, estado: str = None) -> list:
+        return self.obtener_alianzas(estado)
+
+    def obtener_cotizacion_con_items(self, cotizacion_id: int) -> dict | None:
+        return self.obtener_alianza_con_items(cotizacion_id)
+
+    def actualizar_estado_cotizacion(self, cotizacion_id: int, nuevo_estado: str) -> bool:
+        return self.actualizar_estado_alianza(cotizacion_id, nuevo_estado)
+
+    # =========================================================================
+    # MÓDULO GAAE — Gestión de Alianzas y Activos Estratégicos
+    # =========================================================================
+
+    def inicializar_alianzas(self):
+        """Inicializa las tablas para la Gestión de Alianzas y Activos Estratégicos (GAAE)."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # 1. Tabla de aliados
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS aliados (
+                    id SERIAL PRIMARY KEY,
+                    rif VARCHAR(30) UNIQUE NOT NULL,
+                    nombre_aliado VARCHAR(200) NOT NULL,
+                    tipo VARCHAR(50) NOT NULL DEFAULT 'Taller', -- 'Creador Contenido', 'Taller', 'Medio'
+                    redes_sociales JSONB DEFAULT '{}'::jsonb,
+                    contacto_nombre VARCHAR(150),
+                    telefono VARCHAR(50),
+                    email VARCHAR(150),
+                    estado VARCHAR(20) DEFAULT 'Activo',
+                    fecha_creacion TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            # 2. Tabla de órdenes de intercambio
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ordenes_intercambio (
+                    id SERIAL PRIMARY KEY,
+                    numero_orden VARCHAR(25) UNIQUE NOT NULL,
+                    aliado_id INTEGER NOT NULL REFERENCES aliados(id) ON DELETE RESTRICT,
+                    estado VARCHAR(30) DEFAULT 'Borrador', -- 'Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada'
+                    descripcion_contraprestacion TEXT NOT NULL DEFAULT 'Contraprestación publicitaria',
+                    fecha_entrega_mercancia DATE,
+                    fecha_compromiso_publicacion DATE NOT NULL,
+                    notas TEXT,
+                    valor_total_referencial NUMERIC(12,2) DEFAULT 0,
+                    creado_por VARCHAR(100) NOT NULL,
+                    fecha_creacion TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            # 3. Items de la orden
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS orden_intercambio_items (
+                    id SERIAL PRIMARY KEY,
+                    orden_id INTEGER NOT NULL REFERENCES ordenes_intercambio(id) ON DELETE CASCADE,
+                    sku VARCHAR(100) NOT NULL,
+                    nombre_producto VARCHAR(300) NOT NULL,
+                    cantidad INTEGER NOT NULL DEFAULT 1,
+                    valor_unitario_referencial NUMERIC(12,2) NOT NULL,
+                    subtotal_referencial NUMERIC(12,2) NOT NULL
+                )
+            """)
+            # 4. Auditoría de alianzas (Alertas a 60 días/2 meses)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auditoria_alianzas (
+                    id SERIAL PRIMARY KEY,
+                    orden_id INTEGER UNIQUE NOT NULL REFERENCES ordenes_intercambio(id) ON DELETE CASCADE,
+                    fecha_limite_auditoria DATE NOT NULL,
+                    enlace_evidencia VARCHAR(500),
+                    estado_cumplimiento VARCHAR(30) DEFAULT 'Pendiente', -- 'Pendiente', 'Aprobado', 'Incumplido', 'Prorroga'
+                    comentarios_auditor TEXT,
+                    fecha_verificacion TIMESTAMP,
+                    verificado_por VARCHAR(100)
+                )
+            """)
+            conexion.commit()
+            
+            # Ejecutar migración de datos si las tablas están vacías pero cotizaciones tiene datos
+            self._migrar_datos_a_alianzas(cursor)
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [GAAE] Error al inicializar tablas de alianzas: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _migrar_datos_a_alianzas(self, cursor):
+        # 1. Migrar clientes a aliados
+        cursor.execute("SELECT COUNT(*) FROM aliados")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("SELECT COUNT(*) FROM clientes")
+            if cursor.fetchone()[0] > 0:
+                print(" [Migración] Migrando clientes a aliados comerciales...")
+                cursor.execute("SELECT rif, nombre_empresa, telefono, correo, direccion FROM clientes")
+                clientes = cursor.fetchall()
+                for cli in clientes:
+                    rif, nombre, tel, correo, dir_ex = cli
+                    cursor.execute("""
+                        INSERT INTO aliados (rif, nombre_aliado, tipo, contacto_nombre, telefono, email)
+                        VALUES (%s, %s, 'Taller', %s, %s, %s)
+                        ON CONFLICT (rif) DO NOTHING
+                    """, (rif, nombre, nombre, tel, correo))
+
+        # 2. Migrar cotizaciones a ordenes_intercambio
+        cursor.execute("SELECT COUNT(*) FROM ordenes_intercambio")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("SELECT COUNT(*) FROM cotizaciones")
+            if cursor.fetchone()[0] > 0:
+                print(" [Migración] Migrando cotizaciones a órdenes de intercambio...")
+                cursor.execute("""
+                    SELECT id, numero, cliente_rif, estado, notas, total_usd, creado_por, fecha_creacion
+                    FROM cotizaciones
+                """)
+                cotizaciones = cursor.fetchall()
+                for cot in cotizaciones:
+                    c_id, numero, cliente_rif, estado, notas, total, creado, fecha = cot
+                    
+                    # Buscar o crear aliado
+                    cursor.execute("SELECT id FROM aliados WHERE LOWER(rif) = LOWER(%s)", (cliente_rif.strip(),))
+                    aliado_row = cursor.fetchone()
+                    if not aliado_row:
+                        cursor.execute("""
+                            INSERT INTO aliados (rif, nombre_aliado, tipo)
+                            VALUES (%s, %s, 'Taller')
+                            RETURNING id
+                        """, (cliente_rif.strip(), cliente_rif.strip()))
+                        aliado_id = cursor.fetchone()[0]
+                    else:
+                        aliado_id = aliado_row[0]
+                    
+                    estado_map = {
+                        'Borrador': 'Borrador',
+                        'Enviada': 'Autorizada',
+                        'Aceptada': 'Entregada',
+                        'Rechazada': 'Incumplida'
+                    }
+                    nuevo_estado = estado_map.get(estado, 'Borrador')
+                    
+                    # Insertar orden
+                    cursor.execute("""
+                        INSERT INTO ordenes_intercambio 
+                            (id, numero_orden, aliado_id, estado, descripcion_contraprestacion, fecha_compromiso_publicacion, notas, valor_total_referencial, creado_por, fecha_creacion)
+                        VALUES (%s, %s, %s, %s, 'Contraprestación publicitaria', %s::date + 15, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
+                    """, (c_id, numero, aliado_id, nuevo_estado, fecha, notas, total, creado, fecha))
+                    
+                    # Insertar ítems
+                    cursor.execute("""
+                        SELECT sku, nombre_producto, cantidad, precio_unitario, subtotal
+                        FROM cotizacion_items
+                        WHERE cotizacion_id = %s
+                    """, (c_id,))
+                    items = cursor.fetchall()
+                    for it in items:
+                        sku, nombre, cant, prec, sub = it
+                        cursor.execute("""
+                            INSERT INTO orden_intercambio_items
+                                (orden_id, sku, nombre_producto, cantidad, valor_unitario_referencial, subtotal_referencial)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (c_id, sku, nombre, cant, prec, sub))
+                    
+                    # Crear auditoría (fecha compromiso + 60 días)
+                    cursor.execute("""
+                        INSERT INTO auditoria_alianzas (orden_id, fecha_limite_auditoria, estado_cumplimiento)
+                        VALUES (%s, (%s::date + 15) + 60, 'Pendiente')
+                        ON CONFLICT (orden_id) DO NOTHING
+                    """, (c_id, fecha))
+                
+                # Ajustar secuencia de ID
+                cursor.execute("SELECT setval('ordenes_intercambio_id_seq', COALESCE((SELECT MAX(id)+1 FROM ordenes_intercambio), 1), false)")
+
+    def registrar_aliado(self, rif, nombre_aliado, tipo, contacto_nombre=None, telefono=None, email=None, redes=None) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            import json
+            cursor = conexion.cursor()
+            redes_str = json.dumps(redes) if redes else "{}"
+            cursor.execute("""
+                INSERT INTO aliados (rif, nombre_aliado, tipo, contacto_nombre, telefono, email, redes_sociales)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (rif) DO UPDATE
+                SET nombre_aliado = EXCLUDED.nombre_aliado,
+                    tipo = EXCLUDED.tipo,
+                    contacto_nombre = EXCLUDED.contacto_nombre,
+                    telefono = EXCLUDED.telefono,
+                    email = EXCLUDED.email,
+                    redes_sociales = EXCLUDED.redes_sociales
+            """, (rif.strip(), nombre_aliado.strip(), tipo.strip(), contacto_nombre, telefono, email, redes_str))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [GAAE] Error al registrar aliado: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_todos_aliados(self) -> list:
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id, rif, nombre_aliado, tipo, contacto_nombre, telefono, email, redes_sociales, estado FROM aliados ORDER BY nombre_aliado ASC")
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [GAAE] Error al listar aliados: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_aliado(self, aliado_id: int) -> tuple | None:
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id, rif, nombre_aliado, tipo, contacto_nombre, telefono, email, redes_sociales, estado FROM aliados WHERE id = %s", (aliado_id,))
+            return cursor.fetchone()
+        except Error as e:
+            print(f" [GAAE] Error al obtener aliado #{aliado_id}: {e}")
+            return None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def crear_alianza(self, aliado_rif, creado_por, items: list[dict], notas: str = "") -> int | None:
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        try:
+            from datetime import datetime, date, timedelta
+            cursor = conexion.cursor()
+            
+            cursor.execute("SELECT id, nombre_aliado FROM aliados WHERE LOWER(rif) = LOWER(%s)", (aliado_rif.strip(),))
+            aliado_row = cursor.fetchone()
+            if not aliado_row:
+                cursor.execute("""
+                    INSERT INTO aliados (rif, nombre_aliado, tipo)
+                    VALUES (%s, %s, 'Taller')
+                    RETURNING id
+                """, (aliado_rif.strip(), aliado_rif.strip()))
+                aliado_id = cursor.fetchone()[0]
+            else:
+                aliado_id = aliado_row[0]
+                
+            anio = datetime.now().year
+            cursor.execute(
+                "SELECT COUNT(*) FROM ordenes_intercambio WHERE numero_orden LIKE %s",
+                (f"ALN-{anio}-%",)
+            )
+            n = cursor.fetchone()[0] + 1
+            numero = f"ALN-{anio}-{n:04d}"
+
+            total = sum(float(it['cantidad']) * float(it['precio_unitario']) for it in items)
+            fecha_compromiso = date.today() + timedelta(days=15)
+
+            cursor.execute("""
+                INSERT INTO ordenes_intercambio
+                    (numero_orden, aliado_id, estado, descripcion_contraprestacion, fecha_compromiso_publicacion, notas, valor_total_referencial, creado_por)
+                VALUES (%s, %s, 'Borrador', 'Publicar mención/taller', %s, %s, %s, %s)
+                RETURNING id
+            """, (numero, aliado_id, fecha_compromiso, notas, total, creado_por))
+            orden_id = cursor.fetchone()[0]
+
+            for it in items:
+                subtotal = float(it['cantidad']) * float(it['precio_unitario'])
+                cursor.execute("""
+                    INSERT INTO orden_intercambio_items
+                        (orden_id, sku, nombre_producto, cantidad, valor_unitario_referencial, subtotal_referencial)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    orden_id, it['sku'], it['nombre'],
+                    int(it['cantidad']), float(it['precio_unitario']), subtotal
+                ))
+
+            # Insertar auditoría inicial (fecha compromiso + 60 días)
+            cursor.execute("""
+                INSERT INTO auditoria_alianzas (orden_id, fecha_limite_auditoria, estado_cumplimiento)
+                VALUES (%s, %s + 60, 'Pendiente')
+            """, (orden_id, fecha_compromiso))
+
+            conexion.commit()
+            return orden_id
+        except Error as e:
+            print(f" [GAAE] Error al crear alianza: {e}")
+            conexion.rollback()
+            return None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_alianzas(self, estado: str = None) -> list:
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            query = """
+                SELECT oi.id, oi.numero_orden, a.nombre_aliado, oi.estado,
+                       oi.valor_total_referencial, oi.creado_por, oi.fecha_creacion
+                FROM ordenes_intercambio oi
+                JOIN aliados a ON oi.aliado_id = a.id
+            """
+            if estado:
+                query += " WHERE oi.estado = %s ORDER BY oi.fecha_creacion DESC"
+                cursor.execute(query, (estado,))
+            else:
+                query += " ORDER BY oi.fecha_creacion DESC"
+                cursor.execute(query)
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [GAAE] Error al listar alianzas: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def obtener_alianzas_por_aliado_rif(self, aliado_rif: str) -> list:
         conexion = self.conectar()
         resultado = []
         if not conexion: return resultado
@@ -2622,99 +3016,147 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT id, numero, estado, total_usd, creado_por, fecha_creacion
-                FROM cotizaciones
-                WHERE UPPER(cliente_rif) = UPPER(%s)
-                ORDER BY fecha_creacion DESC
-            """, (cliente_rif,))
+                SELECT oi.id, oi.numero_orden, oi.estado, oi.valor_total_referencial, oi.creado_por, oi.fecha_creacion
+                FROM ordenes_intercambio oi
+                JOIN aliados a ON oi.aliado_id = a.id
+                WHERE UPPER(a.rif) = UPPER(%s)
+                ORDER BY oi.fecha_creacion DESC
+            """, (aliado_rif,))
             resultado = cursor.fetchall()
         except Error as e:
-            print(f" [Cotiz] Error al obtener cotizaciones del cliente '{cliente_rif}': {e}")
+            print(f" [GAAE] Error al obtener alianzas de aliado '{aliado_rif}': {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
         return resultado
 
-    def obtener_cotizaciones(self, estado: str = None) -> list:
-        conexion = self.conectar()
-        resultado = []
-        if not conexion: return resultado
-        cursor = None
-        try:
-            cursor = conexion.cursor()
-            if estado:
-                cursor.execute("""
-                    SELECT id, numero, cliente_nombre, estado,
-                           total_usd, creado_por, fecha_creacion
-                    FROM cotizaciones
-                    WHERE estado = %s
-                    ORDER BY fecha_creacion DESC
-                """, (estado,))
-            else:
-                cursor.execute("""
-                    SELECT id, numero, cliente_nombre, estado,
-                           total_usd, creado_por, fecha_creacion
-                    FROM cotizaciones
-                    ORDER BY fecha_creacion DESC
-                """)
-            resultado = cursor.fetchall()
-        except Error as e:
-            print(f" [Cotiz] Error al listar cotizaciones: {e}")
-        finally:
-            if cursor: cursor.close()
-            conexion.close()
-        return resultado
-
-    def obtener_cotizacion_con_items(self, cotizacion_id: int) -> dict | None:
+    def obtener_alianza_con_items(self, orden_id: int) -> dict | None:
         conexion = self.conectar()
         if not conexion: return None
         cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT id, numero, cliente_rif, cliente_nombre,
-                       estado, notas, total_usd, creado_por, fecha_creacion
-                FROM cotizaciones
-                WHERE id = %s
-            """, (cotizacion_id,))
+                SELECT oi.id, oi.numero_orden, a.rif, a.nombre_aliado,
+                       oi.estado, oi.notas, oi.valor_total_referencial, oi.creado_por, oi.fecha_creacion,
+                       oi.descripcion_contraprestacion, oi.fecha_entrega_mercancia, oi.fecha_compromiso_publicacion
+                FROM ordenes_intercambio oi
+                JOIN aliados a ON oi.aliado_id = a.id
+                WHERE oi.id = %s
+            """, (orden_id,))
             cabecera = cursor.fetchone()
             if not cabecera: return None
 
             cursor.execute("""
                 SELECT id, sku, nombre_producto, cantidad,
-                       precio_unitario, subtotal
-                FROM cotizacion_items
-                WHERE cotizacion_id = %s
+                       valor_unitario_referencial, subtotal_referencial
+                FROM orden_intercambio_items
+                WHERE orden_id = %s
                 ORDER BY id
-            """, (cotizacion_id,))
+            """, (orden_id,))
             items = cursor.fetchall()
-            return {'cabecera': cabecera, 'items': items}
+            
+            # Obtener datos de auditoría
+            cursor.execute("""
+                SELECT enlace_evidencia, estado_cumplimiento, comentarios_auditor, fecha_verificacion, verificado_por
+                FROM auditoria_alianzas
+                WHERE orden_id = %s
+            """, (orden_id,))
+            auditoria = cursor.fetchone()
+            
+            return {'cabecera': cabecera, 'items': items, 'auditoria': auditoria}
         except Error as e:
-            print(f" [Cotiz] Error al obtener cotización #{cotizacion_id}: {e}")
+            print(f" [GAAE] Error al obtener alianza #{orden_id}: {e}")
             return None
         finally:
             if cursor: cursor.close()
             conexion.close()
 
-    def actualizar_estado_cotizacion(self, cotizacion_id: int, nuevo_estado: str) -> bool:
+    def actualizar_estado_alianza(self, orden_id: int, nuevo_estado: str) -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute(
-                "UPDATE cotizaciones SET estado = %s WHERE id = %s",
-                (nuevo_estado, cotizacion_id)
-            )
+            from datetime import date
+            if nuevo_estado == 'Entregada':
+                cursor.execute(
+                    "UPDATE ordenes_intercambio SET estado = %s, fecha_entrega_mercancia = %s WHERE id = %s",
+                    (nuevo_estado, date.today(), orden_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE ordenes_intercambio SET estado = %s WHERE id = %s",
+                    (nuevo_estado, orden_id)
+                )
             if cursor.rowcount == 0:
                 conexion.rollback()
                 return False
             conexion.commit()
             return True
         except Error as e:
-            print(f" [Cotiz] Error al actualizar cotización #{cotizacion_id}: {e}")
+            print(f" [GAAE] Error al actualizar estado de alianza #{orden_id}: {e}")
             conexion.rollback()
             return False
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    def registrar_auditoria_alianza(self, orden_id: int, enlace: str, estado: str, comentarios: str, verificado_por: str) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            from datetime import datetime
+            cursor.execute("""
+                UPDATE auditoria_alianzas
+                SET enlace_evidencia = %s,
+                    estado_cumplimiento = %s,
+                    comentarios_auditor = %s,
+                    fecha_verificacion = %s,
+                    verificado_por = %s
+                WHERE orden_id = %s
+            """, (enlace.strip(), estado, comentarios.strip(), datetime.now(), verificado_por, orden_id))
+            
+            # Si el contenido está aprobado, cerramos la orden como completada
+            if estado == 'Aprobado':
+                cursor.execute("UPDATE ordenes_intercambio SET estado = 'Completada' WHERE id = %s", (orden_id,))
+            elif estado == 'Incumplido':
+                cursor.execute("UPDATE ordenes_intercambio SET estado = 'Incumplida' WHERE id = %s", (orden_id,))
+                
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [GAAE] Error al registrar auditoría de alianza #{orden_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_alertas_auditoria(self) -> list:
+        """Retorna alianzas pendientes de auditoría con alerta a 2 meses."""
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT oi.id, oi.numero_orden, a.nombre_aliado, aa.fecha_limite_auditoria,
+                       (aa.fecha_limite_auditoria - CURRENT_DATE) as dias_restantes,
+                       aa.estado_cumplimiento
+                FROM ordenes_intercambio oi
+                JOIN aliados a ON oi.aliado_id = a.id
+                JOIN auditoria_alianzas aa ON aa.orden_id = oi.id
+                WHERE aa.estado_cumplimiento = 'Pendiente'
+                ORDER BY aa.fecha_limite_auditoria ASC
+            """)
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [GAAE] Error al obtener alertas de auditoría: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado

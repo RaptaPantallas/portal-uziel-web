@@ -1,0 +1,76 @@
+{% extends base_template %}
+{% block title %}Alianzas Comerciales — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .link-detalle { text-decoration: none; font-weight: 600; }
+    .link-detalle:hover { text-decoration: underline; }
+    .monto { font-weight: 700; color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Alianzas Comerciales (GAAE)</h1>
+        <p class="subtitulo">
+            {{ cotizaciones|length }} alianza{{ 's' if cotizaciones|length != 1 else '' }} encontrada{{ 's' if cotizaciones|length != 1 else '' }}
+            {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
+        </p>
+    </div>
+    {% if puede('cotizaciones', 'crear') %}
+    <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Registrar Alianza</a>
+    {% endif %}
+</div>
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}
+        <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endwith %}
+
+<div class="filtros">
+    <a href="{{ url_for('cotizaciones') }}" class="filtro-btn {% if not estado_activo %}activo{% endif %}">Todos</a>
+    {% for estado in estados %}
+    <a href="{{ url_for('cotizaciones', estado=estado) }}" class="filtro-btn {% if estado_activo == estado %}activo{% endif %}">{{ estado }}</a>
+    {% endfor %}
+</div>
+
+<div class="card">
+    {% if cotizaciones %}
+    <div class="table-responsive"><table>
+        <thead>
+            <tr>
+                <th>Número</th>
+                <th>Aliado</th>
+                <th>Estado</th>
+                <th>Valor Ref. USD</th>
+                <th>Creado por</th>
+                <th>Fecha Registro</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in cotizaciones %}
+            <tr>
+                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="link-detalle">{{ c[1] }}</a></td>
+                <td>{{ c[2] }}</td>
+                <td><span class="badge badge-{{ c[3] | lower }}">{{ c[3] }}</span></td>
+                <td class="monto">$ {{ "%.2f"|format(c[4]|float) }}</td>
+                <td>{{ c[5] }}</td>
+                <td>{{ c[6].strftime('%d/%m/%Y') if c[6] else '—' }}</td>
+                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver Detalle</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table></div>
+    {% else %}
+    <div class="empty-state">
+        <span class="icon"></span>
+        <p>No hay alianzas comerciales{% if estado_activo %} con estado <strong>{{ estado_activo }}</strong>{% endif %} registradas.</p>
+        {% if puede('cotizaciones', 'crear') %}
+        <br>
+        <a href="{{ url_for('cotizacion_nueva') }}" class="btn btn-primary">+ Crear primera alianza</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

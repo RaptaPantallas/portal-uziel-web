@@ -138,7 +138,7 @@
                 <div class="stat-col">{{ datos.tareas_completadas|length }} completadas</div>
             </div>
             <div class="stat-card" style="background:#fef2f2;border-left:4px solid #dc2626;">
-                <div class="stat-label"><span class="stat-icon">Cotizaciones</span><span class="icon">+</span></div>
+                <div class="stat-label"><span class="stat-icon">Alianzas Comerciales</span><span class="icon">+</span></div>
                 <div class="stat-value" style="color:#dc2626;">{{ datos.cotizaciones_creadas|length }}</div>
             </div>
         </div>
@@ -175,7 +175,7 @@
             <div class="bar-track"><div class="bar-fill" style="width:{{ pct_tareas }}%;background:#9333ea;"></div></div>
         </div>
         <div class="bar-chart">
-            <div class="bar-label"><span>Cotizaciones</span><span>{{ pct_cotizaciones }}%</span></div>
+            <div class="bar-label"><span>Alianzas Comerciales</span><span>{{ pct_cotizaciones }}%</span></div>
             <div class="bar-track"><div class="bar-fill" style="width:{{ pct_cotizaciones }}%;background:#dc2626;"></div></div>
         </div>
         {% else %}
@@ -213,9 +213,9 @@
                 </ul>
                 {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
             </div>
-            <!-- Cotizaciones -->
+            <!-- Alianzas -->
             <div>
-                <h3 style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:8px;">Cotizaciones ({{ datos.cotizaciones_creadas|length }})</h3>
+                <h3 style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:8px;">Alianzas ({{ datos.cotizaciones_creadas|length }})</h3>
                 {% if datos.cotizaciones_creadas %}
                 <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
                     {% for cot in datos.cotizaciones_creadas %}

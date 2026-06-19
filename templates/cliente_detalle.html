@@ -22,7 +22,7 @@
     .monto { font-weight: 700; color: var(--primary); }
     .empty-row { text-align: center; color: var(--text-muted); padding: 28px 14px !important; }
     /* Modal de edición */
-    .modal-overlay { /* override for page-specific modal position */
+    .modal-overlay {
         display: none; position: fixed; inset: 0; background: rgba(15,20,40,0.55); z-index: 1000;
         align-items: center; justify-content: center;
     }
@@ -58,7 +58,9 @@
     </div>
     <div class="acciones">
         {% if puede_cotizaciones %}
-        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Nueva Cotización para este cliente</a>
+        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Registrar Alianza para este aliado</a>
+        {% endif %}
+        {% if puede('clientes', 'editar') %}
         <button class="btn btn-primary" onclick="abrirModal()"> Editar Datos</button>
         {% endif %}
         <a href="{{ url_for('clientes') }}" class="btn btn-ghost">← Volver</a>
@@ -75,13 +77,13 @@
         {% if puede_cotizaciones %}
         <div class="resumen-card">
             <div class="resumen-num">{{ cotizaciones | length }}</div>
-            <div class="resumen-lbl">Cotización{{ 'es' if cotizaciones|length != 1 else '' }}</div>
+            <div class="resumen-lbl">Alianza{{ 's' if cotizaciones|length != 1 else '' }} registrada{{ 's' if cotizaciones|length != 1 else '' }}</div>
         </div>
         <div class="resumen-card">
             {% set ns = namespace(total_acept=0) %}
-            {% for c in cotizaciones %}{% if c[2] == 'Aceptada' %}{% set ns.total_acept = ns.total_acept + 1 %}{% endif %}{% endfor %}
+            {% for c in cotizaciones %}{% if c[2] == 'Completada' %}{% set ns.total_acept = ns.total_acept + 1 %}{% endif %}{% endfor %}
             <div class="resumen-num">{{ ns.total_acept }}</div>
-            <div class="resumen-lbl">Cotización{{ 'es' if ns.total_acept != 1 else '' }} aceptada{{ 's' if ns.total_acept != 1 else '' }}</div>
+            <div class="resumen-lbl">Alianza{{ 's' if ns.total_acept != 1 else '' }} completada{{ 's' if ns.total_acept != 1 else '' }}</div>
         </div>
         {% endif %}
     </div>
@@ -156,15 +158,15 @@
 {% if puede_cotizaciones %}
 <div class="card">
     <div class="card-title">
-        <span> Cotizaciones</span>
-        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Nueva</a>
+        <span> Alianzas Comerciales</span>
+        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Nueva Alianza</a>
     </div>
     <div class="table-responsive"><table>
         <thead>
             <tr>
                 <th>Número</th>
                 <th>Estado</th>
-                <th style="text-align:right;">Total USD</th>
+                <th style="text-align:right;">Total Ref. USD</th>
                 <th>Creado por</th>
                 <th>Fecha</th>
                 <th></th>
@@ -176,7 +178,7 @@
                 <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="link-cotiz">{{ c[1] }}</a></td>
                 <td>
                     {% set est = c[2] | lower %}
-                    <span class="badge badge-{{ 'borrador' if est == 'borrador' else 'enviada' if est == 'enviada' else 'aceptada' if est == 'aceptada' else 'rechazada' }}">{{ c[2] }}</span>
+                    <span class="badge badge-{{ est }}">{{ c[2] }}</span>
                 </td>
                 <td class="monto" style="text-align:right;">$ {{ "%.2f"|format(c[3]|float) }}</td>
                 <td>{{ c[4] }}</td>
@@ -184,7 +186,7 @@
                 <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver</a></td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="empty-row">Sin cotizaciones para este cliente.</td></tr>
+            <tr><td colspan="6" class="empty-row">Sin alianzas registradas para este aliado.</td></tr>
             {% endfor %}
         </tbody>
         </table></div>
@@ -199,6 +201,7 @@
             <button class="modal-close" onclick="cerrarModal()">×</button>
         </div>
         <form method="POST" action="{{ url_for('cliente_editar', rif=cliente[0]) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="form-group">
                 <label>RIF (no editable)</label>
                 <input type="text" value="{{ cliente[0] }}" disabled style="background:var(--bg);color:var(--text-muted);" class="form-control">
