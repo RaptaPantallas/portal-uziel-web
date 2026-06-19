@@ -43,6 +43,20 @@
     {% endif %}
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="alianzas">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'alianzas')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">🤝 Guía de Uso: Alianzas Comerciales (GAAE)</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este módulo (Gestión de Activos y Alianzas Estratégicas - GAAE) te permite registrar y controlar los intercambios con talleres aliados:</p>
+        <ul>
+            <li><strong>Registrar Alianza:</strong> Haz clic en <em>"+ Registrar Alianza"</em>. Selecciona un aliado del CRM, busca y añade los activos estratégicos (productos de catálogo) que se le entregarán, e ingresa las condiciones de publicidad acordadas.</li>
+            <li><strong>Filtrar por Estado:</strong> Utiliza los botones superiores (Borrador, Activa, Entregada, Completada, Incumplida) para filtrar rápidamente los convenios.</li>
+            <li><strong>Ficha de Detalle y Auditoría:</strong> Haz clic en <em>"Ver Detalle"</em> en cualquier alianza para ver los ítems entregados, descargar el PDF formal o auditar el cumplimiento de la contraprestación publicitaria.</li>
+        </ul>
+    </div>
+</div>
+
 {% with msgs = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in msgs %}
         <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>

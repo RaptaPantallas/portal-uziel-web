@@ -122,6 +122,7 @@ class ConexionBD:
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
         self.inicializar_alianzas()
+        self._crear_tabla_auditoria_acciones()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL desde el pool, envuelta para liberación segura."""
@@ -591,6 +592,129 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def _crear_tabla_auditoria_acciones(self):
+        """Crea la tabla de auditoria_acciones si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auditoria_acciones (
+                    id SERIAL PRIMARY KEY,
+                    usuario VARCHAR(100) NOT NULL,
+                    accion VARCHAR(255) NOT NULL,
+                    detalle TEXT,
+                    fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: no se pudo crear la tabla auditoria_acciones: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def registrar_accion_auditoria(self, usuario, accion, detalle):
+        """Registra una acción de usuario en la bitácora de auditoría."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO auditoria_acciones (usuario, accion, detalle)
+                VALUES (%s, %s, %s)
+            """, (usuario or 'invitado', accion, detalle))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al registrar acción de auditoría: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_logs_auditoria(self, fecha_inicio, fecha_fin):
+        """Obtiene la bitácora de auditoría en un rango de fechas."""
+        conexion = self.conectar()
+        if not conexion: return []
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, usuario, accion, detalle, fecha_hora
+                FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+                ORDER BY fecha_hora DESC
+            """, (fecha_inicio, fecha_fin))
+            return cursor.fetchall()
+        except Error as e:
+            print(f" [BD] Error al obtener logs de auditoría: {e}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_ultimos_eventos_especiales(self):
+        """Obtiene el último registro de importación de Excel y de carga de fotos."""
+        conexion = self.conectar()
+        resultado = {
+            "ultimo_excel": None,
+            "ultima_foto": None
+        }
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Última importación de Excel
+            cursor.execute("""
+                SELECT usuario, fecha_hora, detalle
+                FROM auditoria_acciones
+                WHERE accion = 'Importación Excel'
+                ORDER BY fecha_hora DESC
+                LIMIT 1
+            """)
+            resultado["ultimo_excel"] = cursor.fetchone()
+
+            # Fallback para Último Excel si no hay log: ver último producto creado
+            if not resultado["ultimo_excel"]:
+                cursor.execute("""
+                    SELECT 'Sistema', fecha_creacion, 'Creado desde base de datos'
+                    FROM productos
+                    ORDER BY fecha_creacion DESC
+                    LIMIT 1
+                """)
+                resultado["ultimo_excel"] = cursor.fetchone()
+
+            # Última subida de foto
+            cursor.execute("""
+                SELECT usuario, fecha_hora, detalle
+                FROM auditoria_acciones
+                WHERE accion = 'Subida Foto' OR accion = 'Vinculación Foto'
+                ORDER BY fecha_hora DESC
+                LIMIT 1
+            """)
+            resultado["ultima_foto"] = cursor.fetchone()
+
+            # Fallback para Última Foto si no hay log: ver último activo digital creado
+            if not resultado["ultima_foto"]:
+                cursor.execute("""
+                    SELECT 'Sistema', fecha_creacion, ruta_archivo
+                    FROM activos_digitales
+                    ORDER BY fecha_creacion DESC
+                    LIMIT 1
+                """)
+                resultado["ultima_foto"] = cursor.fetchone()
+        except Error as e:
+            print(f" [BD] Error al obtener últimos eventos especiales: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
     # =========================================================================
     # MÓDULO REPORTES — Datos para generación de informes
     # =========================================================================
@@ -608,6 +732,7 @@ class ConexionBD:
             "tareas_creadas": [],
             "tareas_completadas": [],
             "cotizaciones_creadas": [],
+            "logs_auditoria": [],
             "total_clientes": 0,
             "total_productos": 0,
             "total_tareas_pendientes": 0,
@@ -676,6 +801,15 @@ class ConexionBD:
                 ORDER BY fecha_creacion DESC
             """, (fecha_inicio, fecha_fin))
             resultado["cotizaciones_creadas"] = cursor.fetchall()
+
+            # Logs de auditoria en el rango
+            cursor.execute("""
+                SELECT id, usuario, accion, detalle, fecha_hora
+                FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+                ORDER BY fecha_hora DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["logs_auditoria"] = cursor.fetchall()
 
             # Totales generales
             cursor.execute("SELECT COUNT(*) FROM clientes")

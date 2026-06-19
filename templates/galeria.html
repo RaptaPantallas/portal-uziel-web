@@ -120,6 +120,20 @@
     </div>
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="galeria">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'galeria')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">🖼️ Guía de Uso: DAM Galería Digital</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Esta galería (DAM) centraliza los activos de imagen vinculados a los productos del inventario:</p>
+        <ul>
+            <li><strong>Buscador Inteligente:</strong> Permite buscar por SKU o nombre de producto de manera dinámica. Puedes ingresar palabras en cualquier orden (ej: "pcv fox") y se filtrarán los resultados inmediatamente.</li>
+            <li><strong>Limpieza de Búsqueda:</strong> Presiona el botón de limpieza (✕) para reestablecer la vista por defecto (muestra las 10 imágenes agregadas más recientemente).</li>
+            <li><strong>Previsualización y Detalles:</strong> Cada tarjeta muestra la imagen principal del producto y el total de fotos vinculadas. Haz clic en la tarjeta para ir directamente a la ficha detallada del producto.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for category, message in messages %}
     <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>

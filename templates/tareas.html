@@ -22,6 +22,21 @@
     {% endif %}
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="tareas">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'tareas')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">📋 Guía de Uso: Tablero de Tareas</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este tablero permite organizar las actividades operativas asociadas a los clientes del CRM:</p>
+        <ul>
+            <li><strong>Filtros rápidos:</strong> Usa las pestañas <em>"Pendientes"</em>, <em>"En Progreso"</em> o <em>"Completadas"</em> para filtrar los registros en la tabla.</li>
+            <li><strong>Gestión del Tiempo:</strong> El sistema calcula automáticamente los días restantes. Las tareas vencidas se resaltarán en color rojo para priorizar su atención.</li>
+            <li><strong>Actualizar Estado:</strong> Si tienes una tarea asignada, pulsa el botón <em>"▶ Iniciar"</em> para cambiar su estado, o <em>"✓ Completar"</em> para marcarla como finalizada.</li>
+            <li><strong>Asignar Tarea:</strong> Si eres administrador, puedes pulsar <em>"+ Nueva Tarea"</em> para seleccionar un cliente, el responsable del trabajo, el tipo de actividad y su fecha límite.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}

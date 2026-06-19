@@ -99,6 +99,29 @@ SUBTITULO_PDF = "Generado automáticamente desde el Portal B2B"
 # Nombre del archivo PDF descargado por el usuario
 NOMBRE_ARCHIVO_PDF = "Catalogo_Uziel.pdf"
 
+import re
+
+def validar_complejidad_password(password):
+    """
+    Valida que la contraseña cumpla con los requisitos mínimos de seguridad:
+    - Al menos 8 caracteres de longitud.
+    - Al menos una letra mayúscula.
+    - Al menos una letra minúscula.
+    - Al menos un número.
+    - Al menos un carácter especial.
+    """
+    if len(password) < 8:
+        return False
+    if not re.search(r'[A-Z]', password):
+        return False
+    if not re.search(r'[a-z]', password):
+        return False
+    if not re.search(r'[0-9]', password):
+        return False
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return False
+    return True
+
 # =============================================================================
 
 app = Flask(__name__)
@@ -301,6 +324,7 @@ def login():
             session['permisos_dict'] = bd.obtener_permisos_desktop(datos_usuario[0])
             session['es_superadmin'] = bd.es_superadmin(datos_usuario[0])
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
+            bd.registrar_accion_auditoria(datos_usuario[0], 'Inicio Sesión', 'Inició sesión en el portal web')
             return redirect(url_for('inicio'))
         else:
             intentos = bd.obtener_intentos_fallidos(username)
@@ -543,6 +567,8 @@ def galeria():
 def api_galeria_buscar():
     """API AJAX para búsqueda en galería — retorna JSON con TODOS los resultados."""
     query = request.args.get('q', '').strip()
+    if query:
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Búsqueda en Galería', f"Buscó: '{query}'")
     if not query:
         # Si la consulta es vacía, retornamos los últimos 10 de la vista inicial por defecto
         resultados = bd.obtener_banco_completo()[:10]
@@ -699,6 +725,7 @@ def subir_imagen(sku):
         # Guardar en BD con preview
         if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
             flash(f' Imagen subida correctamente para SKU "{sku}".', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Subida Foto', f"Subió foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
         else:
             flash(f' La imagen se guardó en disco pero no se pudo registrar en la BD.', 'error')
 
@@ -733,6 +760,7 @@ def api_subir_imagen(sku):
 
     angulo = request.form.get('angulo', 'Principal').strip()
     ruta_relativa = request.form.get('ruta_relativa', '').strip()
+    usuario = request.form.get('usuario', 'Desktop Sync').strip()
 
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
 
@@ -778,6 +806,7 @@ def api_subir_imagen(sku):
         # Actualizar preview en el registro existente (no duplicar)
         actualizado = bd.actualizar_preview_por_ruta(ruta_relativa, preview_binary)
         if actualizado:
+            bd.registrar_accion_auditoria(usuario, 'Subida Foto', f"Sincronizó foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
             return {
                 "ok": True,
                 "sku": sku,
@@ -788,6 +817,7 @@ def api_subir_imagen(sku):
 
         # Fallback: si no existía el registro, crearlo con ruta relativa
         if bd.registrar_activo_con_preview(sku, ruta_relativa, preview_binary, "Imagen", angulo):
+            bd.registrar_accion_auditoria(usuario, 'Subida Foto', f"Sincronizó foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
             return {
                 "ok": True,
                 "sku": sku,
@@ -1042,6 +1072,7 @@ def cliente_editar(rif):
     ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio)
     if ok:
         flash(' Datos del cliente actualizados correctamente.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Edición Cliente', f"Editó cliente '{nombre_empresa}' (RIF: {rif})")
     else:
         flash(' Error al actualizar el cliente. Intenta de nuevo.', 'error')
 
@@ -1073,6 +1104,7 @@ def nuevo_producto():
 
         if bd.registrar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
             flash(f' ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Producto', f"Creó producto '{nombre}' (SKU: {sku})")
             return redirect(url_for('catalogo'))
         else:
             flash(f' Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
@@ -1106,6 +1138,7 @@ def nuevo_cliente():
 
         if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio):
             flash(f' ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Cliente', f"Creó cliente '{nombre_empresa}' (RIF: {rif})")
             return redirect(url_for('clientes'))
         else:
             flash(' Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
@@ -1136,6 +1169,7 @@ def editar_producto(sku):
 
         if bd.actualizar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
             flash(f' Producto {sku} actualizado correctamente.', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Edición Producto', f"Editó producto '{nombre}' (SKU: {sku})")
             return redirect(url_for('catalogo'))
         else:
             flash(f' No se pudo actualizar el producto {sku}.', 'error')
@@ -1414,6 +1448,7 @@ def reportes():
     # Datos del reporte
     datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
     datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=10)
+    eventos_especiales = bd.obtener_ultimos_eventos_especiales()
 
     # Semana actual para referencia rapida
     diasem = hoy.weekday()
@@ -1426,6 +1461,7 @@ def reportes():
         hasta=fecha_hasta,
         datos=datos,
         productos_pag=datos_productos,
+        eventos_especiales=eventos_especiales,
         semana_inicio=domingo_pasado.strftime("%d/%m/%Y"),
         semana_fin=domingo_siguiente.strftime("%d/%m/%Y")
     )
@@ -1786,12 +1822,16 @@ def admin_usuario_nuevo():
         flash(' El usuario y la contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
+    if not validar_complejidad_password(password):
+        flash(' La contraseña no cumple con los requisitos de seguridad (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales).', 'error')
+        return redirect(url_for('admin_usuarios'))
+
     ok = bd.crear_usuario(username, password, rol, permisos, email)
     if ok:
         flash(f' Usuario "{username}" creado correctamente.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Usuario', f"Creó usuario '{username}' (Rol: {rol})")
     else:
-        flash(f' No se pudo crear el usuario "{username}". '
-              'Es posible que ya exista.', 'error')
+        flash(f' No se pudo crear el usuario "{username}". Es posible que ya exista.', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1879,9 +1919,14 @@ def admin_usuario_pass(username):
         flash(' Las contraseñas no coinciden.', 'error')
         return redirect(url_for('admin_usuarios'))
 
+    if not validar_complejidad_password(nueva_pass):
+        flash(' La nueva contraseña no cumple con los requisitos de seguridad (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales).', 'error')
+        return redirect(url_for('admin_usuarios'))
+
     ok = bd.actualizar_password_usuario(username, nueva_pass)
     if ok:
         flash(f' Contraseña de "{username}" actualizada.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Cambio Contraseña', f"Cambió contraseña del usuario '{username}'")
     else:
         flash(f' No se pudo cambiar la contraseña de "{username}".', 'error')
 

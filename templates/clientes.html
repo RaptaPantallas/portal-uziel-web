@@ -18,6 +18,20 @@
     {% endif %}
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="clientes">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'clientes')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">👥 Guía de Uso: CRM Clientes</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este módulo centraliza la administración de tus relaciones comerciales. Aquí puedes realizar las siguientes acciones:</p>
+        <ul>
+            <li><strong>Directorio Completo:</strong> Busca clientes instantáneamente escribiendo su RIF, Nombre de empresa o Correo en la barra de búsqueda rápida.</li>
+            <li><strong>Registrar Cliente:</strong> Si tienes permisos de administrador, pulsa en <em>"+ Nuevo Cliente"</em> para ingresar RIF, Nombre, Teléfono, Correo, Dirección y su ubicación geográfica (País, Estado, Municipio).</li>
+            <li><strong>Ficha de Detalle:</strong> Haz clic sobre la fila de cualquier cliente para acceder a su ficha técnica, ver su historial completo de tareas asignadas y cotizaciones generadas.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for category, message in messages %}
     <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>

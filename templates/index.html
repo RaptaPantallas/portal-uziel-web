@@ -63,6 +63,21 @@
     </div>
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="dashboard">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'dashboard')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">⊞ Guía Rápida: Dashboard Principal</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Bienvenido al Panel de Control de <strong>EDJ7 Autoparts</strong>. Aquí puedes monitorear y gestionar las operaciones principales del sistema:</p>
+        <ul>
+            <li><strong>Indicadores Estadísticos:</strong> Conoce al instante el número total de clientes registrados, productos en catálogo y tus tareas activas pendientes.</li>
+            <li><strong>Asignación de Tareas:</strong> Haz clic en <em>"Asignar Nueva Tarea"</em> para delegar un trabajo (ej: diseño de catálogo, fotografía) a un miembro del equipo asociado a un cliente específico.</li>
+            <li><strong>Catálogo Rápido:</strong> Visualiza los últimos productos agregados. Puedes seleccionar varios usando las casillas de verificación y presionar <em>"Generar PDF"</em> para descargar un catálogo rápido personalizado.</li>
+            <li><strong>Mis Tareas Activas:</strong> Si tienes tareas asignadas, las verás aquí. Puedes hacer clic en <em>"Iniciar"</em> para cambiar su estado a <em>"En Progreso"</em>, o <em>"Completar"</em> para finalizarlas.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
