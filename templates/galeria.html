@@ -128,7 +128,7 @@
 
 <div class="search-bar galeria-search">
     <span style="color:var(--text-muted);font-size:16px;"></span>
-    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off">
+    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off" data-initial-query="{{ query or '' }}">
     <button class="btn-limpiar" id="btn-limpiar-galeria" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
 <p class="galeria-contador" id="contador-galeria">
@@ -277,7 +277,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams(window.location.search);
         const urlQuery = params.get('q') || '';
-        const initialQuery = {{ query | tojson | safe }} || urlQuery;
+        const initialQuery = buscador.dataset.initialQuery || urlQuery;
         if (initialQuery) {
             buscador.value = initialQuery;
             limpiarBtn.classList.add('visible');
