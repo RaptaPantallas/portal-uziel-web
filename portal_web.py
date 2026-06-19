@@ -1522,11 +1522,15 @@ def cotizaciones():
     estado_filtro = request.args.get('estado', '')
     lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
     estados = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
+    clientes_lista = bd.obtener_clientes()
+    productos_lista = bd.obtener_productos()
     return render_template(
         'alianzas.html',
         cotizaciones=lista,
         estados=estados,
-        estado_activo=estado_filtro
+        estado_activo=estado_filtro,
+        clientes=clientes_lista,
+        productos=productos_lista
     )
 
 
@@ -1593,17 +1597,7 @@ def cotizacion_nueva():
             elif not error_validacion:
                 flash(' Debes agregar al menos un activo válido.', 'error')
 
-    # GET — cargar clientes y productos para los selectores.
-    # Si viene ?cliente_rif=<rif>, pre-seleccionar ese cliente.
-    cliente_preseleccionado = request.args.get('cliente_rif', '')
-    clientes_lista  = bd.obtener_clientes()
-    productos_lista = bd.obtener_productos()
-    return render_template(
-        'alianza_nueva.html',
-        clientes=clientes_lista,
-        productos=productos_lista,
-        cliente_preseleccionado=cliente_preseleccionado
-    )
+    return redirect(url_for('cotizaciones'))
 
 
 @app.route('/alianza/<int:cotizacion_id>')
