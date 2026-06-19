@@ -2,175 +2,247 @@
 {% block title %}{{ cab[1] }} — Importadora Uziel{% endblock %}
 {% block head_extra %}
 <style>
-    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .info-item label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
-    .info-item .valor { font-size: 14px; font-weight: 500; }
-    .td-num { color: var(--text-muted); font-size: 12px; }
-    .td-sku { font-size: 12px; color: var(--text-muted); font-style: italic; }
-    .td-right { text-align: right; }
-    .td-total { font-weight: 800; color: var(--primary); text-align: right; }
-    .total-row { display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding-top: 14px; border-top: 2px solid var(--border); margin-top: 4px; }
-    .total-label { font-size: 16px; font-weight: 600; color: var(--text-muted); }
-    .total-valor { font-size: 26px; font-weight: 800; color: var(--primary); }
-    .notas-box { background: var(--bg); border-radius: 8px; padding: 14px 16px; font-size: 14px; white-space: pre-wrap; line-height: 1.6; }
-    .estado-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .estado-form select { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; }
-    .estado-form select:focus { outline: none; border-color: var(--primary); }
-    .auditoria-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; }
-    .aud-pendiente { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-    .aud-aprobado { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-    .aud-incumplido { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .aud-prorroga { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .ficha-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .ficha-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
+        padding: 32px;
+        border: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+    }
+    .ficha-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+    }
+    .ficha-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .ficha-titulo {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--text);
+        margin: 0;
+    }
+    .ficha-fecha {
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 500;
+        background: #f1f5f9;
+        padding: 6px 12px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .ficha-seccion-titulo {
+        font-size: 15px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin: 24px 0 12px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .tabla-productos {
+        width: 100%;
+        margin-top: 8px;
+        border-collapse: collapse;
+    }
+    .tabla-productos th {
+        background: #f8fafc;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        padding: 10px 14px;
+        border-bottom: 1.5px solid var(--border);
+    }
+    .tabla-productos td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+    .tabla-productos tr:last-child td {
+        border-bottom: none;
+    }
+    .td-sku {
+        font-family: monospace;
+        font-weight: 600;
+        color: var(--primary);
+        font-size: 12px;
+    }
+    .td-monto {
+        text-align: right;
+        font-weight: 600;
+    }
+    .td-cant {
+        text-align: center;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+    .total-display-box {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+        padding: 16px 14px 0;
+        border-top: 1.5px solid var(--border);
+    }
+    .total-display-lbl {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+    .total-display-val {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--primary);
+    }
+    .notas-box {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 14px;
+        color: var(--text);
+        line-height: 1.6;
+        border: 1px solid var(--border);
+        white-space: pre-wrap;
+    }
+    .aliado-info {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--primary-light);
+        color: var(--primary-dark);
+        padding: 8px 16px;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 12px;
+    }
 </style>
 {% endblock %}
 {% block content %}
 {# cab = (id, numero_orden, rif, nombre_aliado, estado, notas, valor_total_referencial, creado_por, fecha_creacion, descripcion_contraprestacion, fecha_entrega_mercancia, fecha_compromiso_publicacion) #}
 {# items = (id, sku, nombre_producto, cantidad, valor_unitario_referencial, subtotal_referencial) #}
-{# auditoria = (enlace_evidencia, estado_cumplimiento, comentarios_auditor, fecha_verificacion, verificado_por) #}
 
-<div class="page-header">
-    <div>
-        <nav class="breadcrumb">
-            <a href="{{ url_for('cotizaciones') }}">Alianzas</a>
-            <span class="breadcrumb-sep">›</span>
-            <span>{{ cab[1] }}</span>
-        </nav>
-        <h1>
-            Alianza Comercial {{ cab[1] }}
-            <span class="badge badge-{{ cab[4] | lower }}" style="font-size:13px;margin-left:8px;">{{ cab[4] }}</span>
-        </h1>
-    </div>
-    <div class="acciones" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="{{ url_for('cotizacion_pdf', cotizacion_id=cab[0]) }}" class="btn btn-primary">Descargar PDF / Ficha</a>
-        <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">← Volver</a>
-    </div>
-</div>
-
-{% with msgs = get_flashed_messages(with_categories=true) %}
-    {% for cat, msg in msgs %}
-        <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
-    {% endfor %}
-{% endwith %}
-
-<div class="card">
-    <div class="card-title">Datos del Aliado Comercial</div>
-    <div class="info-grid">
-        <div class="info-item"><label>Aliado Comercial</label><div class="valor">{{ cab[3] }}</div></div>
-        <div class="info-item"><label>RIF</label><div class="valor">{{ cab[2] }}</div></div>
-        <div class="info-item"><label>Fecha Registro</label><div class="valor">{{ cab[8].strftime('%d/%m/%Y %H:%M') if cab[8] else '—' }}</div></div>
-        <div class="info-item"><label>Registrado por</label><div class="valor">{{ cab[7] }}</div></div>
-        <div class="info-item"><label>Estado Alianza</label><div class="valor"><span class="badge badge-{{ cab[4] | lower }}">{{ cab[4] }}</span></div></div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-title">Activos Entregados</div>
-    <div class="table-responsive"><table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Activo Estratégico</th>
-                <th>SKU</th>
-                <th class="td-right">Cantidad</th>
-                <th class="td-right">Valor Ref.</th>
-                <th class="td-right">Valor Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for it in items %}
-            <tr>
-                <td class="td-num">{{ loop.index }}</td>
-                <td>{{ it[2] }}</td>
-                <td class="td-sku">{{ it[1] }}</td>
-                <td class="td-right">{{ it[3] }}</td>
-                <td class="td-right">$ {{ "%.2f"|format(it[4]|float) }}</td>
-                <td class="td-total">$ {{ "%.2f"|format(it[5]|float) }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        </table></div>
-    <div class="total-row">
-        <span class="total-label">VALOR ESTIMADO TOTAL:</span>
-        <span class="total-valor">$ {{ "%.2f"|format(cab[6]|float) }}</span>
-    </div>
-</div>
-
-{% if cab[5] %}
-<div class="card">
-    <div class="card-title">Detalles de Contraprestación / Notas</div>
-    <div class="notas-box">{{ cab[5] }}</div>
-</div>
-{% endif %}
-
-<!-- SECCIÓN DE AUDITORÍA Y COMPROMISO GAAE -->
-<div class="card">
-    <div class="card-title">Seguimiento de Contraprestación Publicitaria (GAAE)</div>
-    <div class="info-grid" style="margin-bottom:20px;">
-        <div class="info-item">
-            <label>Entrega de Mercancía</label>
-            <div class="valor">{{ cab[10] if cab[10] else 'Pendiente por Entregar' }}</div>
+<div class="ficha-container">
+    <div class="page-header" style="margin-bottom: 20px;">
+        <div>
+            <nav class="breadcrumb">
+                <a href="{{ url_for('cotizaciones') }}">Alianzas</a>
+                <span class="breadcrumb-sep">›</span>
+                <span>Ficha {{ cab[1] }}</span>
+            </nav>
+            <h1 style="margin-top: 4px;">Ficha de Alianza</h1>
         </div>
-        <div class="info-item">
-            <label>Límite Publicación Compromiso</label>
-            <div class="valor" style="font-weight:700;">{{ cab[11] }}</div>
+        <div class="acciones" style="display:flex;gap:10px;">
+            {% if puede('cotizaciones', 'crear') %}
+            <a href="{{ url_for('cotizacion_editar', cotizacion_id=cab[0]) }}" class="btn btn-primary">✏️ Editar Alianza</a>
+            {% endif %}
+            <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">← Volver</a>
         </div>
-        {% if auditoria %}
-        <div class="info-item">
-            <label>Estado Auditoría</label>
-            <div class="valor">
-                <span class="auditoria-badge aud-{{ auditoria[1] | lower }}">{{ auditoria[1] }}</span>
+    </div>
+
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in msgs %}
+            <div class="flash-msg {% if cat in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}" style="margin-bottom: 20px;">{{ msg }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="ficha-card">
+        <div class="ficha-meta">
+            <div>
+                <span class="ficha-titulo">{{ cab[1] }}</span>
+                <span class="badge badge-{{ cab[4] | lower }}" style="margin-left: 8px; vertical-align: middle;">{{ cab[4] }}</span>
             </div>
+            <div class="ficha-fecha">
+                📅 <span>Registrado: {{ cab[8].strftime('%d/%m/%Y') if cab[8] else '—' }}</span>
+            </div>
+        </div>
+
+        <div>
+            <span class="ficha-seccion-titulo">Aliado Comercial</span>
+            <div>
+                <div class="aliado-info">
+                    🤝 {{ cab[3] }} <span style="font-weight:400; opacity:0.85; margin-left:8px;">({{ cab[2] }})</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <span class="ficha-seccion-titulo">Vista Previa de Productos</span>
+            <div class="table-responsive">
+                <table class="tabla-productos">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">SKU</th>
+                            <th>Producto</th>
+                            <th style="text-align: center; width: 80px;">Cant.</th>
+                            <th style="text-align: right; width: 120px;">Valor Unit.</th>
+                            <th style="text-align: right; width: 130px;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in items %}
+                        <tr>
+                            <td class="td-sku">{{ it[1] }}</td>
+                            <td style="font-weight: 500;">{{ it[2] }}</td>
+                            <td class="td-cant">{{ it[3] }}</td>
+                            <td class="td-monto" style="color: var(--text-muted); font-size: 13px;">$ {{ "%.2f"|format(it[4]|float) }}</td>
+                            <td class="td-monto" style="color: var(--primary);">$ {{ "%.2f"|format(it[5]|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="total-display-box">
+                <span class="total-display-lbl">VALOR TOTAL DE MARKETING:</span>
+                <span class="total-display-val">$ {{ "%.2f"|format(cab[6]|float) }}</span>
+            </div>
+        </div>
+
+        {% if cab[5] %}
+        <div style="margin-top: 12px;">
+            <span class="ficha-seccion-titulo">Condiciones de Contraprestación / Notas</span>
+            <div class="notas-box">{{ cab[5] }}</div>
+        </div>
+        {% endif %}
+        
+        <!-- Estado de Alianza en base discreta -->
+        {% if puede('cotizaciones', 'crear') %}
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">¿Cambiar estado de entrega/cumplimiento?</span>
+            <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" style="display: flex; gap: 8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <select name="nuevo_estado" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px; height: 32px; border-radius: 6px;">
+                    {% for est in estados %}
+                    <option value="{{ est }}" {% if est == cab[4] %}selected{% endif %}>{{ est }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-ghost" style="padding: 6px 12px; font-size: 12px; height: 32px; border-radius: 6px;">Actualizar</button>
+            </form>
         </div>
         {% endif %}
     </div>
-
-    {% if auditoria %}
-    <hr style="border:none; border-top:1px solid var(--border); margin:16px 0;">
-    <div class="info-grid">
-        <div class="info-item" style="grid-column: 1 / -1;">
-            <label>Enlace de Evidencia Publicitaria (Redes Sociales)</label>
-            <div class="valor">
-                {% if auditoria[0] %}
-                <a href="{{ auditoria[0] }}" target="_blank" style="color:var(--primary); font-weight:600; text-decoration:none;">{{ auditoria[0] }}</a>
-                {% else %}
-                <span style="color:var(--text-muted); font-style:italic;">No se ha registrado ningún enlace de evidencia.</span>
-                {% endif %}
-            </div>
-        </div>
-        {% if auditoria[2] %}
-        <div class="info-item" style="grid-column: 1 / -1;">
-            <label>Comentarios del Auditor</label>
-            <div class="valor" style="padding:10px; background:#f8fafc; border-radius:6px; font-size:13px; color:#475569;">
-                {{ auditoria[2] }}
-            </div>
-        </div>
-        {% endif %}
-        {% if auditoria[4] %}
-        <div class="info-item">
-            <label>Verificado por</label>
-            <div class="valor">{{ auditoria[4] }}</div>
-        </div>
-        <div class="info-item">
-            <label>Fecha Verificación</label>
-            <div class="valor">{{ auditoria[3].strftime('%d/%m/%Y %H:%M') if auditoria[3] else '—' }}</div>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
-
-{% if puede('cotizaciones', 'crear') %}
-<div class="card">
-    <div class="card-title">Administrar Estado de Alianza</div>
-    <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" class="estado-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <select name="nuevo_estado">
-            {% for est in estados %}
-            <option value="{{ est }}" {% if est == cab[4] %}selected{% endif %}>{{ est }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-primary">Actualizar Estado</button>
-    </form>
-</div>
-{% endif %}
 {% endblock %}

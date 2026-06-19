@@ -1585,9 +1585,8 @@ def cotizacion_nueva():
 
             # Solo persistir si NO hubo error y hay al menos un ítem válido
             if not error_validacion and items:
-                cot_id = bd.crear_cotizacion(
-                    cliente_rif, cliente_nombre,
-                    session['usuario'], items, notas
+                cot_id = bd.crear_alianza(
+                    cliente_rif, session['usuario'], items, notas
                 )
                 if cot_id:
                     flash(' Alianza comercial registrada exitosamente.', 'success')
@@ -1620,6 +1619,66 @@ def cotizacion_detalle(cotizacion_id):
         items=datos['items'],
         auditoria=datos['auditoria'],
         estados=estados
+    )
+
+
+@app.route('/alianza/<int:cotizacion_id>/editar', methods=['GET', 'POST'])
+@login_requerido
+def cotizacion_editar(cotizacion_id):
+    if not _puede("cotizaciones", "crear"):
+        flash(' No tienes permisos para editar alianzas.', 'error')
+        return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+    
+    if request.method == 'POST':
+        notas = request.form.get('notas', '').strip()
+        skus = request.form.getlist('sku[]')
+        nombres = request.form.getlist('nombre[]')
+        cantidades = request.form.getlist('cantidad[]')
+        precios = request.form.getlist('precio_unitario[]')
+        
+        if not skus:
+            flash(' Debes agregar al menos un activo.', 'error')
+        else:
+            items = []
+            error_validacion = False
+            for i, sku in enumerate(skus):
+                if not sku:
+                    continue
+                try:
+                    cant = int(cantidades[i])
+                    prec = float(precios[i])
+                    if cant <= 0 or prec < 0:
+                        raise ValueError("Valores fuera de rango")
+                except (ValueError, IndexError):
+                    flash(' Cantidad o valor unitario inválido.', 'error')
+                    error_validacion = True
+                    break
+                items.append({
+                    'sku': sku,
+                    'nombre': nombres[i] if i < len(nombres) else sku,
+                    'cantidad': cant,
+                    'precio_unitario': prec
+                })
+            
+            if not error_validacion and items:
+                ok = bd.actualizar_alianza(cotizacion_id, items, notas)
+                if ok:
+                    flash(' Alianza comercial actualizada correctamente.', 'success')
+                    return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+                else:
+                    flash(' Error al actualizar la alianza.', 'error')
+                    
+    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    if not datos:
+        flash(' Alianza comercial no encontrada.', 'error')
+        return redirect(url_for('cotizaciones'))
+        
+    productos_lista = bd.obtener_productos()
+    return render_template(
+        'alianza_editar.html',
+        cab=datos['cabecera'],
+        items=datos['items'],
+        productos=productos_lista
     )
 
 

@@ -3102,6 +3102,48 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
+    def actualizar_alianza(self, orden_id: int, items: list[dict], notas: str = "") -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            
+            # Recalcular el total
+            total = sum(float(it['cantidad']) * float(it['precio_unitario']) for it in items)
+            
+            # Actualizar cabecera
+            cursor.execute("""
+                UPDATE ordenes_intercambio
+                SET notas = %s, valor_total_referencial = %s
+                WHERE id = %s
+            """, (notas, total, orden_id))
+            
+            # Eliminar ítems anteriores
+            cursor.execute("DELETE FROM orden_intercambio_items WHERE orden_id = %s", (orden_id,))
+            
+            # Insertar nuevos ítems
+            for it in items:
+                subtotal = float(it['cantidad']) * float(it['precio_unitario'])
+                cursor.execute("""
+                    INSERT INTO orden_intercambio_items
+                        (orden_id, sku, nombre_producto, cantidad, valor_unitario_referencial, subtotal_referencial)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    orden_id, it['sku'], it['nombre'],
+                    int(it['cantidad']), float(it['precio_unitario']), subtotal
+                ))
+                
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [GAAE] Error al actualizar alianza #{orden_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def registrar_auditoria_alianza(self, orden_id: int, enlace: str, estado: str, comentarios: str, verificado_por: str) -> bool:
         conexion = self.conectar()
         if not conexion: return False
