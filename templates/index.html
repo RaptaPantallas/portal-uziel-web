@@ -144,7 +144,7 @@
                     <td>
                         {% if puede('cotizaciones', 'crear') %}
                             <a href="{{ url_for('editar_producto', sku=producto[0]) }}" class="btn btn-primary btn-sm">Editar</a>
-                            <a href="{{ url_for('eliminar_producto', sku=producto[0]) }}" class="btn btn-danger btn-sm" onclick="return confirm('¿Eliminar el producto {{ producto[0] }}?');">Borrar</a>
+                            <a href="#" class="btn btn-danger btn-sm" onclick="confirmarEliminarProducto('{{ producto[0] }}'); return false;">Borrar</a>
                         {% else %}
                             <span class="readonly-label">Solo lectura</span>
                         {% endif %}

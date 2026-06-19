@@ -94,7 +94,7 @@
                             <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Editar</a>
                         {% endif %}
                         {% if puede('productos', 'eliminar') %}
-                            <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
+                            <a href="#" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="confirmarEliminarProducto('{{ sku }}'); return false;">Borrar</a>
                         {% endif %}
                     </td>
                 </tr>

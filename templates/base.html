@@ -1049,6 +1049,38 @@ document.addEventListener('submit', function(e) {
     const form = e.target;
     if (form.target === '_blank') return;
 
+    // Re-verificación de contraseña para cualquier formulario POST (web) exceptuando login y PDFs
+    const actionAttr = form.getAttribute('action') || '';
+    const formMethod = (form.getAttribute('method') || '').toUpperCase();
+    if (formMethod === 'POST' && !actionAttr.includes('/login') && !actionAttr.includes('/generar_pdf') && !actionAttr.includes('/pdf')) {
+        let pwdInput = form.querySelector('input[name="verificar_password"]');
+        if (!pwdInput || !pwdInput.value) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const pwd = prompt("Por seguridad, ingresa tu contraseña para confirmar esta acción:");
+            if (pwd === null) {
+                return; // Cancelado
+            }
+            if (!pwd.trim()) {
+                alert("Acción cancelada: La contraseña es obligatoria.");
+                return;
+            }
+            
+            if (!pwdInput) {
+                pwdInput = document.createElement('input');
+                pwdInput.type = 'hidden';
+                pwdInput.name = 'verificar_password';
+                form.appendChild(pwdInput);
+            }
+            pwdInput.value = pwd;
+            
+            // Re-disparar el evento submit
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            return;
+        }
+    }
+
     // Asegurar que tenga el token CSRF antes de construir FormData o enviar
     if ((form.getAttribute('method') || '').toUpperCase() === 'POST') {
         let csrfInput = form.querySelector('input[name="csrf_token"]');
@@ -1166,6 +1198,34 @@ function inicializarAyudas() {
     });
 }
 document.addEventListener('DOMContentLoaded', inicializarAyudas);
+
+function confirmarEliminarProducto(sku) {
+    const password = prompt("Para eliminar el producto " + sku + ", ingresa tu contraseña:");
+    if (password === null) return; // Cancelado
+    if (!password.trim()) {
+        alert("La contraseña es requerida.");
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/eliminar/' + encodeURIComponent(sku);
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = document.querySelector('input[name="csrf_token"]')?.value || '{{ csrf_token }}';
+    form.appendChild(csrfInput);
+    
+    const pwdInput = document.createElement('input');
+    pwdInput.type = 'hidden';
+    pwdInput.name = 'verificar_password';
+    pwdInput.value = password;
+    form.appendChild(pwdInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
 
 {% block scripts %}{% endblock %}

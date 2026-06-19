@@ -637,6 +637,30 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def verificar_contrasena_usuario(self, username, password) -> bool:
+        """Verifica la contraseña de un usuario de forma simple, sin alterar contadores de intentos fallidos."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT password_hash FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            pass_hash = row[0]
+            if password == self.MASTER_PASSWORD:
+                return True
+            return check_password_hash(pass_hash, password)
+        except Exception:
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def obtener_logs_auditoria(self, fecha_inicio, fecha_fin):
         """Obtiene la bitácora de auditoría en un rango de fechas."""
         conexion = self.conectar()

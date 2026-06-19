@@ -162,6 +162,29 @@ def validar_csrf_token():
             print(f"[CSRF] Validación fallida para ruta: {request.path}")
             abort(400, "Token CSRF inválido o ausente.")
 
+@app.before_request
+def validar_password_confirmacion():
+    """Reclama la contraseña para cualquier acción de modificación en peticiones POST (web)."""
+    if request.method == 'POST':
+        # Ignorar rutas que no requieren contraseña (login, generar_pdf, APIs)
+        if request.path.startswith('/api/'):
+            return
+        if request.path == '/login' or request.path == '/generar_pdf':
+            return
+        
+        username = session.get('usuario')
+        if not username:
+            return  # Dejar que el decorador login_requerido o la lógica de la ruta lo maneje
+            
+        pwd = request.form.get('verificar_password')
+        if not pwd:
+            flash(' Por seguridad, debes ingresar tu contraseña para confirmar esta acción.', 'error')
+            return redirect(request.referrer or url_for('inicio'))
+            
+        if not bd.verificar_contrasena_usuario(username, pwd):
+            flash(' La contraseña de verificación es incorrecta. Acción denegada.', 'error')
+            return redirect(request.referrer or url_for('inicio'))
+
 @app.context_processor
 def inyectar_csrf():
     """Inyecta el token CSRF en el contexto de todos los templates."""
@@ -1182,7 +1205,7 @@ def editar_producto(sku):
         return render_template('editar.html', producto=producto)
 
 
-@app.route('/eliminar/<sku>')
+@app.route('/eliminar/<sku>', methods=['POST'])
 @login_requerido
 def eliminar_producto(sku):
     """
