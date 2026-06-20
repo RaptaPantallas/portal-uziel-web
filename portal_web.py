@@ -99,6 +99,29 @@ SUBTITULO_PDF = "Generado automáticamente desde el Portal B2B"
 # Nombre del archivo PDF descargado por el usuario
 NOMBRE_ARCHIVO_PDF = "Catalogo_Uziel.pdf"
 
+import re
+
+def validar_complejidad_password(password):
+    """
+    Valida que la contraseña cumpla con los requisitos mínimos de seguridad:
+    - Al menos 8 caracteres de longitud.
+    - Al menos una letra mayúscula.
+    - Al menos una letra minúscula.
+    - Al menos un número.
+    - Al menos un carácter especial.
+    """
+    if len(password) < 8:
+        return False
+    if not re.search(r'[A-Z]', password):
+        return False
+    if not re.search(r'[a-z]', password):
+        return False
+    if not re.search(r'[0-9]', password):
+        return False
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return False
+    return True
+
 # =============================================================================
 
 app = Flask(__name__)
@@ -139,10 +162,48 @@ def validar_csrf_token():
             print(f"[CSRF] Validación fallida para ruta: {request.path}")
             abort(400, "Token CSRF inválido o ausente.")
 
+@app.before_request
+def validar_password_confirmacion():
+    """Reclama la contraseña para cualquier acción de modificación en peticiones POST (web)."""
+    if request.method == 'POST':
+        # Ignorar rutas que no requieren contraseña (login, generar_pdf, APIs)
+        if request.path.startswith('/api/'):
+            return
+        if request.path == '/login' or request.path == '/generar_pdf':
+            return
+        
+        username = session.get('usuario')
+        if not username:
+            return  # Dejar que el decorador login_requerido o la lógica de la ruta lo maneje
+            
+        pwd = request.form.get('verificar_password')
+        if not pwd:
+            flash(' Por seguridad, debes ingresar tu contraseña para confirmar esta acción.', 'error')
+            return redirect(request.referrer or url_for('inicio'))
+            
+        if not bd.verificar_contrasena_usuario(username, pwd):
+            flash(' La contraseña de verificación es incorrecta. Acción denegada.', 'error')
+            return redirect(request.referrer or url_for('inicio'))
+
 @app.context_processor
 def inyectar_csrf():
     """Inyecta el token CSRF en el contexto de todos los templates."""
     return {'csrf_token': session.get('csrf_token', '')}
+
+
+@app.context_processor
+def inyectar_datos_vzla():
+    """Inyecta la base de datos de estados y municipios de Venezuela en las plantillas."""
+    import json
+    try:
+        ruta_vzla = os.path.join(os.path.dirname(__file__), 'src', 'venezuela.json')
+        with open(ruta_vzla, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {'venezuela_data_js': json.dumps(data)}
+    except Exception as e:
+        print(f"Error al cargar venezuela.json: {e}")
+        return {'venezuela_data_js': '{}'}
+
 
 
 # =============================================================================
@@ -301,6 +362,7 @@ def login():
             session['permisos_dict'] = bd.obtener_permisos_desktop(datos_usuario[0])
             session['es_superadmin'] = bd.es_superadmin(datos_usuario[0])
             flash(f'¡Bienvenido al sistema, {datos_usuario[0].capitalize()}!', 'exito')
+            bd.registrar_accion_auditoria(datos_usuario[0], 'Inicio Sesión', 'Inició sesión en el portal web')
             return redirect(url_for('inicio'))
         else:
             intentos = bd.obtener_intentos_fallidos(username)
@@ -543,10 +605,17 @@ def galeria():
 def api_galeria_buscar():
     """API AJAX para búsqueda en galería — retorna JSON con TODOS los resultados."""
     query = request.args.get('q', '').strip()
+    if query:
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Búsqueda en Galería', f"Buscó: '{query}'")
     if not query:
-        return {'results': [], 'total': 0}
-    # Sin límite artificial: devolver todos los productos que coincidan
-    resultados = bd.buscar_banco_completo(query, limite=1000)
+        # Si la consulta es vacía, retornamos los últimos 10 de la vista inicial por defecto
+        resultados = bd.obtener_banco_completo()[:10]
+        es_reciente = True
+    else:
+        # Sin límite artificial: devolver todos los productos que coincidan
+        resultados = bd.buscar_banco_completo(query, limite=1000)
+        es_reciente = False
+
     items = []
     for r in resultados:
         items.append({
@@ -556,7 +625,7 @@ def api_galeria_buscar():
             'id_activo': r[4] if len(r) > 4 else None,
             'url': url_for('detalle_producto', sku=r[0])
         })
-    return {'results': items, 'total': len(items)}
+    return {'results': items, 'total': len(items), 'es_reciente': es_reciente}
 
 
 @app.route('/producto/<sku>')
@@ -605,17 +674,18 @@ def detalle_producto(sku):
 
 
 @app.route('/activos/<path:nombre_archivo>')
-@login_requerido
 def servir_activo(nombre_archivo):
     """
     Sirve archivos estáticos desde la carpeta 'almacen_activos/'.
 
     Esta ruta permite que el portal web acceda a las fotografías copiadas
-    por la app de escritorio DAM. Solo accesible para usuarios autenticados.
-
-    Args:
-        nombre_archivo (str): Nombre del archivo (con extensión) dentro de almacen_activos/.
+    por la app de escritorio DAM.
+    El logotipo de la empresa en Logo/ es público, el resto requiere iniciar sesión.
     """
+    nombre_normalizado = nombre_archivo.replace('\\', '/')
+    if not nombre_normalizado.startswith('Logo/') and 'usuario' not in session:
+        return redirect(url_for('login'))
+
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
     return send_from_directory(carpeta_activos, nombre_archivo)
 
@@ -693,6 +763,7 @@ def subir_imagen(sku):
         # Guardar en BD con preview
         if bd.registrar_activo_con_preview(sku, ruta_jpg, preview_binary, "Imagen", angulo):
             flash(f' Imagen subida correctamente para SKU "{sku}".', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Subida Foto', f"Subió foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
         else:
             flash(f' La imagen se guardó en disco pero no se pudo registrar en la BD.', 'error')
 
@@ -727,6 +798,7 @@ def api_subir_imagen(sku):
 
     angulo = request.form.get('angulo', 'Principal').strip()
     ruta_relativa = request.form.get('ruta_relativa', '').strip()
+    usuario = request.form.get('usuario', 'Desktop Sync').strip()
 
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
 
@@ -772,6 +844,7 @@ def api_subir_imagen(sku):
         # Actualizar preview en el registro existente (no duplicar)
         actualizado = bd.actualizar_preview_por_ruta(ruta_relativa, preview_binary)
         if actualizado:
+            bd.registrar_accion_auditoria(usuario, 'Subida Foto', f"Sincronizó foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
             return {
                 "ok": True,
                 "sku": sku,
@@ -782,6 +855,7 @@ def api_subir_imagen(sku):
 
         # Fallback: si no existía el registro, crearlo con ruta relativa
         if bd.registrar_activo_con_preview(sku, ruta_relativa, preview_binary, "Imagen", angulo):
+            bd.registrar_accion_auditoria(usuario, 'Subida Foto', f"Sincronizó foto {nombre_jpg} para SKU '{sku}' (Ángulo: {angulo})")
             return {
                 "ok": True,
                 "sku": sku,
@@ -1011,7 +1085,7 @@ def cliente_detalle(rif):
 @login_requerido
 def cliente_editar(rif):
     """
-    Actualiza los datos de contacto de un cliente.
+    Actualiza los datos de contacto y ubicación de un cliente.
     Solo accesible para usuarios con rol 'Admin'.
 
     Args:
@@ -1025,14 +1099,18 @@ def cliente_editar(rif):
     telefono       = request.form.get('telefono', '').strip()
     correo         = request.form.get('correo', '').strip()
     direccion      = request.form.get('direccion', '').strip()
+    pais           = request.form.get('pais', '').strip()
+    estado         = request.form.get('estado', '').strip()
+    municipio      = request.form.get('municipio', '').strip()
 
     if not nombre_empresa:
         flash(' El nombre de la empresa es obligatorio.', 'error')
         return redirect(url_for('cliente_detalle', rif=rif))
 
-    ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion)
+    ok = bd.actualizar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio)
     if ok:
         flash(' Datos del cliente actualizados correctamente.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Edición Cliente', f"Editó cliente '{nombre_empresa}' (RIF: {rif})")
     else:
         flash(' Error al actualizar el cliente. Intenta de nuevo.', 'error')
 
@@ -1064,6 +1142,7 @@ def nuevo_producto():
 
         if bd.registrar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
             flash(f' ¡Producto {sku} agregado exitosamente al inventario!', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Producto', f"Creó producto '{nombre}' (SKU: {sku})")
             return redirect(url_for('catalogo'))
         else:
             flash(f' Error al registrar. El SKU "{sku}" ya podría existir. Verifique.', 'error')
@@ -1091,9 +1170,13 @@ def nuevo_cliente():
         telefono = request.form['telefono'].strip()
         correo = request.form['correo'].strip()
         direccion = request.form['direccion'].strip()
+        pais = request.form.get('pais', '').strip()
+        estado = request.form.get('estado', '').strip()
+        municipio = request.form.get('municipio', '').strip()
 
-        if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion):
+        if bd.registrar_cliente(rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio):
             flash(f' ¡Cliente "{nombre_empresa}" registrado exitosamente!', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Cliente', f"Creó cliente '{nombre_empresa}' (RIF: {rif})")
             return redirect(url_for('clientes'))
         else:
             flash(' Error al registrar. Verifique que el RIF no esté duplicado.', 'error')
@@ -1124,6 +1207,7 @@ def editar_producto(sku):
 
         if bd.actualizar_producto(sku, nombre, descripcion, marca, compatibilidad, precio):
             flash(f' Producto {sku} actualizado correctamente.', 'exito')
+            bd.registrar_accion_auditoria(session.get('usuario'), 'Edición Producto', f"Editó producto '{nombre}' (SKU: {sku})")
             return redirect(url_for('catalogo'))
         else:
             flash(f' No se pudo actualizar el producto {sku}.', 'error')
@@ -1136,7 +1220,7 @@ def editar_producto(sku):
         return render_template('editar.html', producto=producto)
 
 
-@app.route('/eliminar/<sku>')
+@app.route('/eliminar/<sku>', methods=['POST'])
 @login_requerido
 def eliminar_producto(sku):
     """
@@ -1402,6 +1486,7 @@ def reportes():
     # Datos del reporte
     datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
     datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=10)
+    eventos_especiales = bd.obtener_ultimos_eventos_especiales()
 
     # Semana actual para referencia rapida
     diasem = hoy.weekday()
@@ -1414,6 +1499,7 @@ def reportes():
         hasta=fecha_hasta,
         datos=datos,
         productos_pag=datos_productos,
+        eventos_especiales=eventos_especiales,
         semana_inicio=domingo_pasado.strftime("%d/%m/%Y"),
         semana_fin=domingo_siguiente.strftime("%d/%m/%Y")
     )
@@ -1774,12 +1860,22 @@ def admin_usuario_nuevo():
         flash(' El usuario y la contraseña son obligatorios.', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    ok = bd.crear_usuario(username, password, rol, permisos, email)
+    if not validar_complejidad_password(password):
+        flash(' La contraseña no cumple con los requisitos de seguridad (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales).', 'error')
+        return redirect(url_for('admin_usuarios'))
+
+    superadmin = False
+    bloqueado = False
+    if session.get('es_superadmin'):
+        superadmin = request.form.get('superadmin') in ('true', 'on')
+        bloqueado = request.form.get('bloqueado') in ('true', 'on')
+
+    ok = bd.crear_usuario(username, password, rol, permisos, email, superadmin, bloqueado)
     if ok:
         flash(f' Usuario "{username}" creado correctamente.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Creación Usuario', f"Creó usuario '{username}' (Rol: {rol})")
     else:
-        flash(f' No se pudo crear el usuario "{username}". '
-              'Es posible que ya exista.', 'error')
+        flash(f' No se pudo crear el usuario "{username}". Es posible que ya exista.', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1811,11 +1907,23 @@ def admin_usuario_editar(username):
         flash(' El nombre de usuario no puede quedar vacío.', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos, email)
+    superadmin = False
+    bloqueado = False
+    if session.get('es_superadmin'):
+        superadmin = request.form.get('superadmin') in ('true', 'on')
+        bloqueado = request.form.get('bloqueado') in ('true', 'on')
+    else:
+        # Recuperar valores existentes para no sobreescribirlos
+        datos_ex = bd.obtener_datos_completos_usuario(username)
+        if datos_ex:
+            bloqueado = bool(datos_ex[4])
+            superadmin = bool(datos_ex[5])
+
+    ok = bd.actualizar_usuario(username, nuevo_username, nuevo_rol, permisos, email, superadmin, bloqueado)
     if ok:
         flash(f' Usuario "{username}" actualizado correctamente.', 'success')
     else:
-        flash(f' No se pudo actualizar el usuario "{username}".', 'error')
+        flash(f' No se pudo actualizar el usuario "{username}" (si es el único superadmin, no puede ser des-promovido ni bloqueado).', 'error')
 
     return redirect(url_for('admin_usuarios'))
 
@@ -1867,9 +1975,14 @@ def admin_usuario_pass(username):
         flash(' Las contraseñas no coinciden.', 'error')
         return redirect(url_for('admin_usuarios'))
 
+    if not validar_complejidad_password(nueva_pass):
+        flash(' La nueva contraseña no cumple con los requisitos de seguridad (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales).', 'error')
+        return redirect(url_for('admin_usuarios'))
+
     ok = bd.actualizar_password_usuario(username, nueva_pass)
     if ok:
         flash(f' Contraseña de "{username}" actualizada.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Cambio Contraseña', f"Cambió contraseña del usuario '{username}'")
     else:
         flash(f' No se pudo cambiar la contraseña de "{username}".', 'error')
 

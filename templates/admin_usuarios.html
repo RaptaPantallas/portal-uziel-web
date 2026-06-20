@@ -29,6 +29,21 @@
     </div>
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="admin_usuarios">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'admin_usuarios')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">👥 Guía de Uso: Control de Accesos y Seguridad</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este panel te permite gestionar las cuentas de usuario y controlar la seguridad del sistema:</p>
+        <ul>
+            <li><strong>Crear Usuario:</strong> Haz clic en <em>"+ Nuevo Usuario"</em>. Define un nombre único, correo (para recuperación) y contraseña que cumpla con los requisitos mínimos de seguridad explicados en el formulario.</li>
+            <li><strong>Permisos Granulares:</strong> Puedes conceder acceso a módulos específicos (CRM, PIM, DAM, etc.) y elegir qué acciones puede hacer el usuario (Ver, Editar, Agregar, Eliminar, Subir, Gestionar, Crear).</li>
+            <li><strong>Gestión de Contraseñas:</strong> Utiliza el botón <em>"Contraseña"</em> para cambiar de forma segura la clave de cualquier usuario que lo necesite.</li>
+            <li><strong>Desbloqueo de Cuentas:</strong> Si un usuario es bloqueado tras 5 intentos fallidos de inicio de sesión, haz clic en el botón <em>"Desbloquear"</em> para restablecer su acceso.</li>
+        </ul>
+    </div>
+</div>
+
 {% with mensajes = get_flashed_messages(with_categories=true) %}
     {% if mensajes %}
         {% for categoria, msg in mensajes %}
@@ -111,7 +126,7 @@
             <td>
                 <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                     {% if not usuperadmin or session.get('es_superadmin') %}
-                        <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}')"> Editar</button>
+                        <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}','{{ ubloqueado|lower }}','{{ usuperadmin|lower }}')"> Editar</button>
                         <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')"> Contraseña</button>
                         {% if ubloqueado %}
                         <form method="POST" action="{{ url_for('admin_usuario_desbloquear', username=uname) }}" style="display:inline;">
@@ -156,7 +171,19 @@
             </div>
             <div class="form-group-block">
                 <label>Contraseña</label>
-                <input type="password" name="password" class="form-control" placeholder="Contraseña inicial" required autocomplete="new-password">
+                <input type="password" name="password" id="nuevoPassword" class="form-control" placeholder="Contraseña inicial" required autocomplete="new-password" oninput="validarPasswordInput(this, 'nuevoPasswordReqs')">
+                
+                <!-- Instructivo de Contraseña Segura -->
+                <div id="nuevoPasswordReqs" style="margin-top: 8px; padding: 10px; border: 1.5px solid var(--border); border-radius: var(--radius); background: #f8fafc; font-size: 11px;">
+                    <div style="font-weight:700; color:var(--text-muted); margin-bottom: 4px; text-transform:uppercase; letter-spacing:0.5px;">Requisitos de la Contraseña:</div>
+                    <ul style="padding:0; margin:0; display:flex; flex-direction:column; gap:4px; list-style:none;">
+                        <li data-req="length" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Mínimo 8 caracteres</li>
+                        <li data-req="upper" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos una letra mayúscula</li>
+                        <li data-req="lower" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos una letra minúscula</li>
+                        <li data-req="number" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos un número</li>
+                        <li data-req="special" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos un carácter especial (ej. !@#$*&)</li>
+                    </ul>
+                </div>
             </div>
             <div class="form-group-block">
                 <label>Rol</label>
@@ -165,6 +192,20 @@
                     <option value="Admin">Admin</option>
                 </select>
             </div>
+            {% if session.get('es_superadmin') %}
+            <div class="form-group-block">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
+                    <input type="checkbox" name="superadmin" value="true" style="width:16px;height:16px;accent-color:var(--primary);">
+                    <span>Es Superadministrador (Acceso total)</span>
+                </label>
+            </div>
+            <div class="form-group-block">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
+                    <input type="checkbox" name="bloqueado" value="true" style="width:16px;height:16px;accent-color:#ef4444;">
+                    <span style="color:#ef4444;">Bloquear cuenta / Inhabilitar</span>
+                </label>
+            </div>
+            {% endif %}
             <div class="form-group-block" id="nuevosPermisos">
                 <label>Permisos Granulares</label>
                 <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:12px;">
@@ -244,6 +285,20 @@
                     <option value="Admin">Admin</option>
                 </select>
             </div>
+            {% if session.get('es_superadmin') %}
+            <div class="form-group-block">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
+                    <input type="checkbox" name="superadmin" id="editSuperadmin" value="true" style="width:16px;height:16px;accent-color:var(--primary);">
+                    <span>Es Superadministrador (Acceso total)</span>
+                </label>
+            </div>
+            <div class="form-group-block">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
+                    <input type="checkbox" name="bloqueado" id="editBloqueado" value="true" style="width:16px;height:16px;accent-color:#ef4444;">
+                    <span style="color:#ef4444;">Bloquear cuenta / Inhabilitar</span>
+                </label>
+            </div>
+            {% endif %}
             <div class="form-group-block" id="editPermisos">
                 <label>Permisos Granulares</label>
                 <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:12px;">
@@ -310,7 +365,19 @@
         <form method="POST" id="formPass">
             <div class="form-group-block">
                 <label>Nueva Contraseña</label>
-                <input type="password" name="nueva_password" class="form-control" placeholder="Nueva contraseña" required autocomplete="new-password">
+                <input type="password" name="nueva_password" id="cambiarPassword" class="form-control" placeholder="Nueva contraseña" required autocomplete="new-password" oninput="validarPasswordInput(this, 'cambiarPasswordReqs')">
+                
+                <!-- Instructivo de Contraseña Segura -->
+                <div id="cambiarPasswordReqs" style="margin-top: 8px; padding: 10px; border: 1.5px solid var(--border); border-radius: var(--radius); background: #f8fafc; font-size: 11px;">
+                    <div style="font-weight:700; color:var(--text-muted); margin-bottom: 4px; text-transform:uppercase; letter-spacing:0.5px;">Requisitos de la Contraseña:</div>
+                    <ul style="padding:0; margin:0; display:flex; flex-direction:column; gap:4px; list-style:none;">
+                        <li data-req="length" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Mínimo 8 caracteres</li>
+                        <li data-req="upper" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos una letra mayúscula</li>
+                        <li data-req="lower" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos una letra minúscula</li>
+                        <li data-req="number" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos un número</li>
+                        <li data-req="special" style="color:#ef4444; display:flex; align-items:center; gap:6px;">❌ Al menos un carácter especial (ej. !@#$*&)</li>
+                    </ul>
+                </div>
             </div>
             <div class="form-group-block">
                 <label>Confirmar Contraseña</label>
@@ -354,20 +421,43 @@
     }
 
     function abrirModalNuevo() {
+        // Reset dynamic helper text
+        const pwdInput = document.getElementById('nuevoPassword');
+        if (pwdInput) {
+            pwdInput.value = '';
+            validarPasswordInput(pwdInput, 'nuevoPasswordReqs');
+        }
         document.getElementById('modalNuevo').classList.add('open');
     }
 
-    document.getElementById('modalNuevo')?.querySelector('form')?.addEventListener('submit', function() {
+    document.getElementById('modalNuevo')?.querySelector('form')?.addEventListener('submit', function(e) {
+        const pwdInput = document.getElementById('nuevoPassword');
+        if (pwdInput) {
+            const val = pwdInput.value;
+            const isValid = val.length >= 8 && /[A-Z]/.test(val) && /[a-z]/.test(val) && /[0-9]/.test(val) && /[^A-Za-z0-9]/.test(val);
+            if (!isValid) {
+                e.preventDefault();
+                alert('La contraseña no cumple con los requisitos mínimos de seguridad.');
+                return false;
+            }
+        }
         document.getElementById('nuevoPermisosHidden').value = permisosToStr('nuevo');
     });
 
-    function abrirModalEditar(username, rol, permisosStr, email) {
+    function abrirModalEditar(username, rol, permisosStr, email, bloqueado, superadmin) {
         const modal = document.getElementById('modalEditar');
         const form = document.getElementById('formEditar');
         form.action = '/admin/usuario/' + encodeURIComponent(username) + '/editar';
         document.getElementById('editUsername').value = username;
         document.getElementById('editEmail').value = email || '';
         document.getElementById('editRol').value = rol;
+        
+        if (document.getElementById('editSuperadmin')) {
+            document.getElementById('editSuperadmin').checked = (superadmin === 'true');
+        }
+        if (document.getElementById('editBloqueado')) {
+            document.getElementById('editBloqueado').checked = (bloqueado === 'true');
+        }
         // Parse permisos y marcar checkboxes
         const modMap = permisosFromStr(permisosStr);
         document.querySelectorAll('.edit-perm').forEach(cb => {
@@ -388,10 +478,69 @@
 
     function abrirModalPass(username) {
         const modal = document.getElementById('modalPass');
-        document.getElementById('formPass').action = '/admin/usuario/' + encodeURIComponent(username) + '/pass';
+        const form = document.getElementById('formPass');
+        form.action = '/admin/usuario/' + encodeURIComponent(username) + '/pass';
+        // Reset password helper text
+        const pwdInput = document.getElementById('cambiarPassword');
+        if (pwdInput) {
+            pwdInput.value = '';
+            validarPasswordInput(pwdInput, 'cambiarPasswordReqs');
+        }
+        const confirmInput = form.querySelector('input[name="confirmar_password"]');
+        if (confirmInput) confirmInput.value = '';
+        
         document.getElementById('modalPassTitle').textContent = ' Contraseña de "' + username + '"';
         modal.classList.add('open');
     }
+
+    document.getElementById('formPass')?.addEventListener('submit', function(e) {
+        const pwdInput = document.getElementById('cambiarPassword');
+        const formPass = document.getElementById('formPass');
+        const confirmInput = formPass.querySelector('input[name="confirmar_password"]');
+        
+        if (pwdInput) {
+            const val = pwdInput.value;
+            const isValid = val.length >= 8 && /[A-Z]/.test(val) && /[a-z]/.test(val) && /[0-9]/.test(val) && /[^A-Za-z0-9]/.test(val);
+            if (!isValid) {
+                e.preventDefault();
+                alert('La nueva contraseña no cumple con los requisitos mínimos de seguridad.');
+                return false;
+            }
+        }
+        if (pwdInput && confirmInput && pwdInput.value !== confirmInput.value) {
+            e.preventDefault();
+            alert('Las contraseñas no coinciden.');
+            return false;
+        }
+    });
+
+    function validarPasswordInput(input, reqsId) {
+        const val = input.value;
+        const container = document.getElementById(reqsId);
+        if (!container) return;
+
+        const rules = {
+            length: { met: val.length >= 8, text: "Mínimo 8 caracteres" },
+            upper: { met: /[A-Z]/.test(val), text: "Al menos una letra mayúscula" },
+            lower: { met: /[a-z]/.test(val), text: "Al menos una letra minúscula" },
+            number: { met: /[0-9]/.test(val), text: "Al menos un número" },
+            special: { met: /[^A-Za-z0-9]/.test(val), text: "Al menos un carácter especial (ej. !@#$*&)" }
+        };
+
+        for (const [key, rule] of Object.entries(rules)) {
+            const li = container.querySelector(`[data-req="${key}"]`);
+            if (li) {
+                if (rule.met) {
+                    li.style.color = '#16a34a';
+                    li.innerHTML = '✅ ' + rule.text;
+                } else {
+                    li.style.color = '#ef4444';
+                    li.innerHTML = '❌ ' + rule.text;
+                }
+            }
+        }
+    }
+
     function cerrarModal(id) { document.getElementById(id).classList.remove('open'); }
     document.querySelectorAll('.modal-overlay').forEach(bg => {
         bg.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });

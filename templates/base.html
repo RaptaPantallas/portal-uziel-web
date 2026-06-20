@@ -102,10 +102,23 @@
 
         .sidebar-brand {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 10px;
-            padding: 12px 24px 16px;
+            justify-content: center;
+            padding: 24px 16px;
+            gap: 12px;
             border-bottom: 1px solid rgba(255,255,255,0.06);
+            transition: all 0.3s ease;
+        }
+
+        .brand-icon-wrap {
+            width: 140px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
         }
 
         .brand-icon {
@@ -597,6 +610,13 @@
             .sidebar-nav .nav-item span:not(.nav-icon),
             .nav-badge,
             .sidebar-footer .btn-logout span { display: none; }
+            .brand-icon-wrap {
+                width: 32px !important;
+                height: 32px !important;
+            }
+            .sidebar-brand {
+                padding: 16px 8px !important;
+            }
             .sidebar-nav .nav-item { justify-content: center; padding: 10px 0; }
             .sidebar-nav .nav-item .nav-icon { width: auto; }
             .sidebar-footer .btn-logout { justify-content: center; }
@@ -674,6 +694,47 @@
             }
         }
 
+        /* Estilos para el Bloque de Ayuda de Uso */
+        .ayuda-modulo {
+            background: var(--primary-subtle);
+            border: 1px solid #bae6fd;
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #0369a1;
+            line-height: 1.5;
+            position: relative;
+        }
+        .ayuda-modulo-titulo {
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: var(--primary-dark);
+        }
+        .ayuda-modulo ul {
+            margin-left: 20px;
+            margin-top: 6px;
+        }
+        .ayuda-modulo li {
+            margin-bottom: 4px;
+        }
+        .ayuda-modulo-toggle {
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            background: none;
+            border: none;
+            color: var(--primary-dark);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+        }
 </style>
 {% block head_extra %}{% endblock %}
 </head>
@@ -693,8 +754,13 @@
         </div>
     </div>
     <div class="sidebar-brand">
-        <div class="brand-icon">U</div>
-        <span class="brand-name">Importadora Uziel</span>
+        <a href="{{ url_for('inicio') }}" style="display:flex; flex-direction:column; align-items:center; gap:8px; text-decoration:none; width: 100%;">
+            <div class="brand-icon-wrap">
+                <img src="{{ url_for('servir_activo', nombre_archivo='Logo/logo.png') }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-width:100%; max-height:100%; object-fit:contain; border-radius: 4px;" alt="Logo">
+                <div class="brand-icon" style="display:none; width: 32px; height: 32px; background: var(--primary); border-radius: var(--radius); align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 800;">U</div>
+            </div>
+            <span class="brand-name" style="color: #f8fafc; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">EDJ7 Autoparts</span>
+        </a>
     </div>
     <nav class="sidebar-nav">
         {% block sidebar_links %}
@@ -916,6 +982,9 @@ function cargarContenido(url, pushState = true) {
             ejecutarScripts(contentArea);
             actualizarSidebar(window.location.href);
             injectCsrfTokens();
+            if (typeof inicializarAyudas === 'function') {
+                inicializarAyudas();
+            }
         }
         hideProgress();
         window.scrollTo({ top: 0 });
@@ -979,6 +1048,38 @@ document.addEventListener('DOMContentLoaded', injectCsrfTokens);
 document.addEventListener('submit', function(e) {
     const form = e.target;
     if (form.target === '_blank') return;
+
+    // Re-verificación de contraseña para cualquier formulario POST (web) exceptuando login y PDFs
+    const actionAttr = form.getAttribute('action') || '';
+    const formMethod = (form.getAttribute('method') || '').toUpperCase();
+    if (formMethod === 'POST' && !actionAttr.includes('/login') && !actionAttr.includes('/generar_pdf') && !actionAttr.includes('/pdf')) {
+        let pwdInput = form.querySelector('input[name="verificar_password"]');
+        if (!pwdInput || !pwdInput.value) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const pwd = prompt("Por seguridad, ingresa tu contraseña para confirmar esta acción:");
+            if (pwd === null) {
+                return; // Cancelado
+            }
+            if (!pwd.trim()) {
+                alert("Acción cancelada: La contraseña es obligatoria.");
+                return;
+            }
+            
+            if (!pwdInput) {
+                pwdInput = document.createElement('input');
+                pwdInput.type = 'hidden';
+                pwdInput.name = 'verificar_password';
+                form.appendChild(pwdInput);
+            }
+            pwdInput.value = pwd;
+            
+            // Re-disparar el evento submit
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            return;
+        }
+    }
 
     // Asegurar que tenga el token CSRF antes de construir FormData o enviar
     if ((form.getAttribute('method') || '').toUpperCase() === 'POST') {
@@ -1065,6 +1166,66 @@ document.addEventListener('submit', function(e) {
 window.addEventListener('popstate', function() {
     cargarContenido(window.location.href, false);
 });
+
+// --- MANEJO DE GUÍAS DE AYUDA DE USO ---
+function toggleAyudaModulo(btn, key) {
+    const modulo = btn.closest('.ayuda-modulo');
+    const content = modulo.querySelector('.ayuda-modulo-contenido');
+    const isCollapsed = content.style.display === 'none';
+    if (isCollapsed) {
+        content.style.display = 'block';
+        btn.textContent = '✕ Ocultar Guía';
+        localStorage.setItem('ayuda_colapsada_' + key, 'false');
+    } else {
+        content.style.display = 'none';
+        btn.textContent = '❔ Mostrar Guía';
+        localStorage.setItem('ayuda_colapsada_' + key, 'true');
+    }
+}
+
+function inicializarAyudas() {
+    document.querySelectorAll('.ayuda-modulo').forEach(modulo => {
+        const key = modulo.dataset.ayudaKey;
+        const btn = modulo.querySelector('.ayuda-modulo-toggle');
+        const content = modulo.querySelector('.ayuda-modulo-contenido');
+        if (localStorage.getItem('ayuda_colapsada_' + key) === 'true') {
+            if (content) content.style.display = 'none';
+            if (btn) btn.textContent = '❔ Mostrar Guía';
+        } else {
+            if (content) content.style.display = 'block';
+            if (btn) btn.textContent = '✕ Ocultar Guía';
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', inicializarAyudas);
+
+function confirmarEliminarProducto(sku) {
+    const password = prompt("Para eliminar el producto " + sku + ", ingresa tu contraseña:");
+    if (password === null) return; // Cancelado
+    if (!password.trim()) {
+        alert("La contraseña es requerida.");
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/eliminar/' + encodeURIComponent(sku);
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = document.querySelector('input[name="csrf_token"]')?.value || '{{ csrf_token }}';
+    form.appendChild(csrfInput);
+    
+    const pwdInput = document.createElement('input');
+    pwdInput.type = 'hidden';
+    pwdInput.name = 'verificar_password';
+    pwdInput.value = password;
+    form.appendChild(pwdInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 </script>
 
 {% block scripts %}{% endblock %}

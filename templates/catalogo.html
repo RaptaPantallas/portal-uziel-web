@@ -22,6 +22,21 @@
     {% endif %}
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="catalogo">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'catalogo')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">📦 Guía de Uso: PIM Productos</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este módulo (PIM) te permite gestionar y consultar todo el catálogo de repuestos de <strong>EDJ7 Autoparts</strong>:</p>
+        <ul>
+            <li><strong>Filtros y Búsqueda:</strong> Filtra los productos por categoría, marca o busca directamente por SKU y nombre de pieza en la barra superior.</li>
+            <li><strong>Exportar Catálogos PDF:</strong> Marca las casillas de verificación de los productos deseados y haz clic en <em>"Generar PDF"</em> para descargar un folleto digital con imágenes de alta calidad.</li>
+            <li><strong>Nuevo Producto:</strong> Si eres administrador, usa <em>"+ Nuevo Producto"</em> para registrar nuevas piezas con su compatibilidad y precio corporativo.</li>
+            <li><strong>Ficha de Detalle:</strong> Haz clic en el nombre del producto para abrir su ficha completa, donde podrás vincular fotografías desde la galería digital (DAM).</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for category, message in messages %}
     <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
@@ -79,7 +94,7 @@
                             <a href="{{ url_for('editar_producto', sku=sku) }}" class="btn btn-primary" style="padding:6px 10px;font-size:12px;">Editar</a>
                         {% endif %}
                         {% if puede('productos', 'eliminar') %}
-                            <a href="{{ url_for('eliminar_producto', sku=sku) }}" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="return confirm('¿Eliminar el producto {{ sku }}?');">Borrar</a>
+                            <a href="#" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="confirmarEliminarProducto('{{ sku }}'); return false;">Borrar</a>
                         {% endif %}
                     </td>
                 </tr>

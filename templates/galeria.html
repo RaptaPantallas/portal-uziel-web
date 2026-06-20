@@ -101,6 +101,9 @@
         color: var(--text-muted);
         margin-top: 8px;
     }
+    #galeria-grid {
+        transition: opacity 0.2s ease-in-out;
+    }
     @media (max-width: 600px) {
         .galeria-grid {
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -117,6 +120,20 @@
     </div>
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="galeria">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'galeria')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo">🖼️ Guía de Uso: DAM Galería Digital</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Esta galería (DAM) centraliza los activos de imagen vinculados a los productos del inventario:</p>
+        <ul>
+            <li><strong>Buscador Inteligente:</strong> Permite buscar por SKU o nombre de producto de manera dinámica. Puedes ingresar palabras en cualquier orden (ej: "pcv fox") y se filtrarán los resultados inmediatamente.</li>
+            <li><strong>Limpieza de Búsqueda:</strong> Presiona el botón de limpieza (✕) para reestablecer la vista por defecto (muestra las 10 imágenes agregadas más recientemente).</li>
+            <li><strong>Previsualización y Detalles:</strong> Cada tarjeta muestra la imagen principal del producto y el total de fotos vinculadas. Haz clic en la tarjeta para ir directamente a la ficha detallada del producto.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}{% for category, message in messages %}
     <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
@@ -125,7 +142,7 @@
 
 <div class="search-bar galeria-search">
     <span style="color:var(--text-muted);font-size:16px;"></span>
-    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off">
+    <input type="text" id="buscador-galeria" placeholder="Buscar por SKU o nombre de producto…" autocomplete="off" data-initial-query="{{ query or '' }}">
     <button class="btn-limpiar" id="btn-limpiar-galeria" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>
 <p class="galeria-contador" id="contador-galeria">
@@ -177,17 +194,14 @@
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     }
 
-    function filtrarLocal() {
-        // No hacemos filtrado local — la búsqueda siempre va al servidor
-        // para obtener todos los resultados sin límite
-        const texto = buscador.value.trim();
-        limpiarBtn.classList.toggle('visible', texto.length > 0);
-    }
-
     function buscarRemoto(texto) {
+        grid.style.opacity = '0.5';
         fetch('{{ url_for("api_galeria_buscar") }}?q=' + encodeURIComponent(texto))
             .then(function (r) { return r.json(); })
             .then(function (data) {
+                grid.style.opacity = '1';
+                limpiarBtn.classList.toggle('visible', texto.length > 0);
+                
                 if (!data.results || data.results.length === 0) {
                     grid.innerHTML = '<div class="galeria-vacio" style="grid-column:1/-1;">'
                         + '<div class="icono"></div>'
@@ -198,9 +212,17 @@
                 }
                 let html = '';
                 data.results.forEach(function (item) {
+                    let thumbHtml = '';
+                    if (item.id_activo) {
+                        const imgUrl = '{{ url_for("servir_preview", activo_id=0) }}'.replace('/0', '/' + item.id_activo);
+                        thumbHtml = '<img src="' + imgUrl + '" alt="' + item.sku + '" loading="lazy">';
+                    } else {
+                        thumbHtml = '<span class="placeholder"></span>';
+                    }
+
                     html += '<a href="' + item.url + '" class="galeria-card" data-sku="' + item.sku + '" data-nombre="' + item.nombre + '">'
                         + '<div class="thumb-wrap">'
-                        + '<img src="{{ url_for("servir_preview", activo_id=0) }}'.replace('/0', '/' + item.id_activo) + '" alt="' + item.sku + '" loading="lazy">'
+                        + thumbHtml
                         + '</div>'
                         + '<div class="card-info">'
                         + '<div class="sku-line">'
@@ -212,24 +234,47 @@
                         + '</a>';
                 });
                 grid.innerHTML = html;
-                contador.textContent = data.total + ' producto(s) encontrado(s) para "' + texto + '"';
+                
+                if (data.es_reciente) {
+                    contador.innerHTML = 'Mostrando ' + data.total + ' producto(s) recientes — <strong>usa el buscador para encontrar productos específicos</strong>';
+                } else {
+                    contador.textContent = data.total + ' producto(s) encontrado(s) para "' + texto + '"';
+                }
+            })
+            .catch(function (err) {
+                grid.style.opacity = '1';
+                console.error('Error al realizar búsqueda:', err);
             });
     }
 
     function onSearchInput() {
         const texto = buscador.value.trim();
+        limpiarBtn.classList.toggle('visible', texto.length > 0);
+        
+        // Sincronizar URL dinámicamente sin recargar la página entera
+        const queryParam = texto ? '?q=' + encodeURIComponent(texto) : '';
+        const newUrl = window.location.pathname + queryParam;
+        history.replaceState(null, '', newUrl);
+
         if (timeoutId) clearTimeout(timeoutId);
+        
         if (texto.length > 0) {
             timeoutId = setTimeout(function () { buscarRemoto(texto); }, 300);
         } else {
-            // Restaurar vista completa via recarga de página
-            window.location.href = '{{ url_for("galeria") }}';
+            buscarRemoto('');
         }
     }
 
     function limpiarBusqueda() {
         buscador.value = '';
-        window.location.href = '{{ url_for("galeria") }}';
+        limpiarBtn.classList.remove('visible');
+        
+        // Limpiar URL
+        history.replaceState(null, '', window.location.pathname);
+        
+        if (timeoutId) clearTimeout(timeoutId);
+        buscarRemoto('');
+        buscador.focus();
     }
 
     buscador.addEventListener('input', onSearchInput);
@@ -238,16 +283,18 @@
             e.preventDefault();
             if (timeoutId) clearTimeout(timeoutId);
             const texto = buscador.value.trim();
-            if (texto) buscarRemoto(texto);
-            else window.location.href = '{{ url_for("galeria") }}';
+            buscarRemoto(texto);
         }
     });
 
     // Sincronizar input si se cargó con query
     document.addEventListener('DOMContentLoaded', function () {
-        var initialQuery = {{ query | tojson | safe }};
+        const params = new URLSearchParams(window.location.search);
+        const urlQuery = params.get('q') || '';
+        const initialQuery = buscador.dataset.initialQuery || urlQuery;
         if (initialQuery) {
             buscador.value = initialQuery;
+            limpiarBtn.classList.add('visible');
         }
     });
 </script>

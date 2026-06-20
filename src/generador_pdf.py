@@ -309,13 +309,14 @@ def generar_ficha_tecnica(sku: str) -> bool:
 # FUNCIÓN 2 — Catálogo multi-producto (nueva)
 # ---------------------------------------------------------------------------
 
-def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
+def generar_pdf_catalogo(lista_skus: list[str], ruta_guardar: str = None) -> tuple[bool, str]:
     """
     Genera un catálogo PDF compacto con todos los productos listados.
     Varios productos por página, con thumbnail opcional de 55x55.
     
     Args:
         lista_skus (list[str]): Lista de códigos SKU a incluir en el catálogo.
+        ruta_guardar (str, optional): Ruta personalizada donde guardar el PDF.
 
     Returns:
         tuple[bool, str]:
@@ -336,8 +337,12 @@ def generar_pdf_catalogo(lista_skus: list[str]) -> tuple[bool, str]:
         print(" [PDF Catálogo] Ningún SKU válido encontrado. PDF no generado.")
         return False, ""
 
-    timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre_pdf  = f"Catalogo_Uziel_{timestamp}.pdf"
+    if not ruta_guardar:
+        timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_pdf  = f"Catalogo_Uziel_{timestamp}.pdf"
+    else:
+        nombre_pdf  = ruta_guardar
+
     ancho, alto = letter
 
     c = canvas.Canvas(nombre_pdf, pagesize=letter)
@@ -395,28 +400,43 @@ def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
 
-    # ---- Banda de encabezado ----
-    c.setFillColorRGB(*COLOR_AZUL_EMP)
-    c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
+    # ---- Cabecera Limpia con Logo y Datos Corporativos ----
+    logo_path = os.path.join("almacen_activos", "Logo", "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(logo_path, MARGEN_X, alto - 75, width=110, height=35, preserveAspectRatio=True, mask="auto")
+        except Exception:
+            c.setFont("Helvetica-Bold", 16)
+            c.setFillColorRGB(*COLOR_AZUL_EMP)
+            c.drawString(MARGEN_X, alto - 55, "EDJ7 AUTOPARTS")
+    else:
+        c.setFont("Helvetica-Bold", 16)
+        c.setFillColorRGB(*COLOR_AZUL_EMP)
+        c.drawString(MARGEN_X, alto - 55, "EDJ7 AUTOPARTS")
 
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", FUENTE_EMP)
-    c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0.8, 0.88, 1.0)
-    c.drawString(MARGEN_X, alto - 72, "Cotización / Presupuesto Comercial")
+    # Datos corporativos de la empresa
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColorRGB(*COLOR_NEGRO)
+    c.drawString(MARGEN_X, alto - 90, "IMPORTADORA UZIEL C.A.")
+    c.setFont("Helvetica", 7)
+    c.setFillColorRGB(*COLOR_GRIS)
+    c.drawString(MARGEN_X, alto - 100, "RIF: J-41234567-8 | Tlf: +58 (212) 555-0199 | Correo: contacto@importadorauziel.com")
 
-    # Badge número de cotización
-    badge_x = ancho - 190
-    badge_y = alto - 68
-    c.setFillColorRGB(1, 1, 1)
-    c.roundRect(badge_x, badge_y, 160, 22, 5, fill=True, stroke=False)
+    # Título del documento y Número de Cotización
+    c.setFont("Helvetica-Bold", 14)
     c.setFillColorRGB(*COLOR_AZUL_EMP)
+    c.drawRightString(ancho - MARGEN_X, alto - 50, "PRESUPUESTO COMERCIAL")
     c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(badge_x + 80, badge_y + 7, numero)
+    c.setFillColorRGB(*COLOR_NEGRO)
+    c.drawRightString(ancho - MARGEN_X, alto - 65, f"N° {numero}")
+    
+    # Línea separadora azul brillante (#0ea5e9 = 0.05, 0.65, 0.91)
+    c.setStrokeColorRGB(0.05, 0.65, 0.91)
+    c.setLineWidth(1.5)
+    c.line(MARGEN_X, alto - 110, ancho - MARGEN_X, alto - 110)
 
     # ---- Datos del cliente ----
-    y = alto - 115
+    y = alto - 130
     c.setFillColorRGB(*COLOR_NEGRO)
     c.setFont("Helvetica-Bold", 11)
     c.drawString(MARGEN_X, y, "CLIENTE")
@@ -582,19 +602,43 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     ANCHO_UTIL = ancho - 2 * MARGEN
 
     def encabezado(titulo_extra=""):
+        logo_path = os.path.join("almacen_activos", "Logo", "logo.png")
+        if os.path.exists(logo_path):
+            try:
+                c.drawImage(logo_path, MARGEN, alto - 75, width=110, height=35, preserveAspectRatio=True, mask="auto")
+            except Exception:
+                c.setFont("Helvetica-Bold", 16)
+                c.setFillColorRGB(*COLOR_AZUL_EMP)
+                c.drawString(MARGEN, alto - 55, "EDJ7 AUTOPARTS")
+        else:
+            c.setFont("Helvetica-Bold", 16)
+            c.setFillColorRGB(*COLOR_AZUL_EMP)
+            c.drawString(MARGEN, alto - 55, "EDJ7 AUTOPARTS")
+
+        # Datos corporativos de la empresa
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColorRGB(*COLOR_NEGRO)
+        c.drawString(MARGEN, alto - 90, "IMPORTADORA UZIEL C.A.")
+        c.setFont("Helvetica", 7)
+        c.setFillColorRGB(*COLOR_GRIS)
+        c.drawString(MARGEN, alto - 100, "RIF: J-41234567-8 | Tlf: +58 (212) 555-0199 | Correo: contacto@importadorauziel.com")
+
+        # Título del reporte
+        c.setFont("Helvetica-Bold", 14)
         c.setFillColorRGB(*COLOR_AZUL_EMP)
-        c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
-        c.setFillColorRGB(1, 1, 1)
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(MARGEN, alto - 48, NOMBRE_EMPRESA)
-        c.setFont("Helvetica", 10)
-        c.setFillColorRGB(0.8, 0.88, 1.0)
-        titulo = f"Reporte {tipo} de Actividad"
+        titulo = f"REPORTE {tipo.upper()} DE ACTIVIDAD"
         if titulo_extra:
-            titulo += f" — {titulo_extra}"
-        c.drawString(MARGEN, alto - 68, titulo)
+            titulo += f" — {titulo_extra.upper()}"
+        c.drawRightString(ancho - MARGEN, alto - 55, titulo)
+        
         c.setFont("Helvetica", 8)
-        c.drawString(MARGEN, alto - 80, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        c.setFillColorRGB(*COLOR_GRIS)
+        c.drawRightString(ancho - MARGEN, alto - 70, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+        # Línea separadora azul brillante
+        c.setStrokeColorRGB(0.05, 0.65, 0.91)
+        c.setLineWidth(1.5)
+        c.line(MARGEN, alto - 110, ancho - MARGEN, alto - 110)
 
     def pie():
         c.setFont("Helvetica", 8)
@@ -616,7 +660,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
             pie()
             c.showPage()
             encabezado()
-            return alto - 100
+            return alto - 130
         c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
         if color:
             c.setFillColorRGB(*color)
@@ -675,8 +719,6 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
         c.setFont("Helvetica", 9)
         c.drawCentredString(x + (ANCHO_UTIL // 3 - 10) // 2, cy - 14, label)
         c.setFont("Helvetica-Bold", 22)
-        c.setFillColorRGB(*eval(color_hex.replace("#", "0x")) if False else (0.15, 0.68, 0.37))
-        # Simplificar: usar color del nombre
         c.setFillColorRGB(*{
             "#2563eb": (0.15, 0.39, 0.92),
             "#27ae5f": (0.15, 0.68, 0.37),
@@ -692,7 +734,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     pie()
     c.showPage()
     encabezado("Detalle")
-    y = alto - 120
+    y = alto - 130
 
     # 1. Clientes nuevos
     y = seccion(f" Clientes Nuevos ({len(datos['clientes_nuevos'])})", y)
@@ -705,7 +747,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # 2. Productos nuevos
     if y < 120:
-        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 130
     y = seccion(f" Productos Nuevos ({len(datos['productos_nuevos'])})", y)
     if datos["productos_nuevos"]:
         for prod in datos["productos_nuevos"]:
@@ -716,7 +758,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # 3. Fotos vinculadas
     if y < 120:
-        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 130
     y = seccion(f" Fotos Vinculadas ({len(datos['activos_nuevos'])})", y)
     if datos["activos_nuevos"]:
         for act in datos["activos_nuevos"]:
@@ -727,7 +769,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # 4. Tareas creadas
     if y < 120:
-        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 130
     y = seccion(f" Tareas Creadas ({len(datos['tareas_creadas'])})", y)
     if datos["tareas_creadas"]:
         for t in datos["tareas_creadas"]:
@@ -738,7 +780,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # 5. Tareas completadas
     if y < 120:
-        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 130
     y = seccion(f" Tareas Completadas ({len(datos['tareas_completadas'])})", y)
     if datos["tareas_completadas"]:
         for t in datos["tareas_completadas"]:
@@ -749,7 +791,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # 6. Cotizaciones
     if y < 120:
-        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 120
+        pie(); c.showPage(); encabezado("Detalle (cont.)"); y = alto - 130
     y = seccion(f" Cotizaciones ({len(datos['cotizaciones_creadas'])})", y)
     if datos["cotizaciones_creadas"]:
         for cot in datos["cotizaciones_creadas"]:
@@ -761,7 +803,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     # --- Productos agregados en el periodo ---
     if productos_list:
         if y < 120:
-            pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 120
+            pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 130
         else:
             y -= 10
         y = seccion(f" Productos Agregados ({len(productos_list)})", y)
@@ -778,7 +820,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
         for idx, prod in enumerate(productos_list):
             if y < 60:
-                pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 60
+                pie(); c.showPage(); encabezado("Productos (cont.)"); y = alto - 130
             if idx % 2 == 0:
                 c.setFillColorRGB(0.97, 0.98, 1.0)
             else:
@@ -801,7 +843,7 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
 
     # --- Totales generales ---
     if y < 120:
-        pie(); c.showPage(); encabezado("Totales Generales"); y = alto - 120
+        pie(); c.showPage(); encabezado("Totales Generales"); y = alto - 130
     else:
         y -= 20
     y = seccion(" Totales Generales del Sistema", y)
@@ -813,6 +855,67 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
     ]
     for t in totales:
         y = texto_linea(t, y, bold=True, size=10)
+
+    # --- Bitácora de Auditoría ---
+    if y < 150:
+        pie(); c.showPage(); encabezado("Bitácora"); y = alto - 130
+    else:
+        y -= 20
+    
+    y = seccion(" Bitácora de Auditoría (Acciones de Usuarios)", y)
+    
+    logs = datos.get("logs_auditoria", [])
+    if logs:
+        # Dibujar cabecera de tabla
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColorRGB(*COLOR_AZUL_EMP)
+        c.rect(MARGEN, y - 2, ancho - 2 * MARGEN, 14, fill=True, stroke=False)
+        c.setFillColorRGB(1, 1, 1)
+        c.drawString(MARGEN + 6, y + 3, "FECHA / HORA")
+        c.drawString(MARGEN + 110, y + 3, "USUARIO")
+        c.drawString(MARGEN + 200, y + 3, "ACCIÓN")
+        c.drawString(MARGEN + 310, y + 3, "DETALLE")
+        y -= 16
+
+        for idx, log in enumerate(logs):
+            if y < 60:
+                pie(); c.showPage(); encabezado("Bitácora (cont.)"); y = alto - 130
+                # Redibujar cabecera de tabla
+                c.setFont("Helvetica-Bold", 8)
+                c.setFillColorRGB(*COLOR_AZUL_EMP)
+                c.rect(MARGEN, y - 2, ancho - 2 * MARGEN, 14, fill=True, stroke=False)
+                c.setFillColorRGB(1, 1, 1)
+                c.drawString(MARGEN + 6, y + 3, "FECHA / HORA")
+                c.drawString(MARGEN + 110, y + 3, "USUARIO")
+                c.drawString(MARGEN + 200, y + 3, "ACCIÓN")
+                c.drawString(MARGEN + 310, y + 3, "DETALLE")
+                y -= 16
+                
+            if idx % 2 == 0:
+                c.setFillColorRGB(0.97, 0.98, 1.0)
+            else:
+                c.setFillColorRGB(1, 1, 1)
+            c.rect(MARGEN, y - 2, ancho - 2 * MARGEN, 14, fill=True, stroke=False)
+
+            c.setFillColorRGB(*COLOR_NEGRO)
+            c.setFont("Helvetica", 8)
+            
+            # Formatear fecha
+            fecha_val = log[4]
+            fecha_str = fecha_val.strftime("%d/%m/%Y %H:%M:%S") if hasattr(fecha_val, 'strftime') else str(fecha_val)[:19]
+            
+            c.drawString(MARGEN + 6, y + 3, fecha_str)
+            c.drawString(MARGEN + 110, y + 3, str(log[1]))
+            c.drawString(MARGEN + 200, y + 3, str(log[2]))
+            
+            # Truncar detalle si es muy largo
+            detalle = str(log[3])
+            if len(detalle) > 55:
+                detalle = detalle[:52] + "..."
+            c.drawString(MARGEN + 310, y + 3, detalle)
+            y -= 14
+    else:
+        y = texto_linea("No se registraron acciones en la bitácora durante este periodo.", y, color=COLOR_GRIS)
 
     pie()
     c.save()

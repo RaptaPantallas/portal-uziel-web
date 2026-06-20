@@ -108,6 +108,7 @@ class ConexionBD:
             ConexionBD._inicializar_pool(self.url_nube)
         # Ejecutamos una actualización rápida para asegurar que las nuevas columnas existen
         self.actualizar_esquema_productos()
+        self.actualizar_esquema_clientes()
         self._asegurar_columna_es_principal()
         self._descubrir_pk_activos()
         self._sembrar_usuario_supervisor()
@@ -121,6 +122,7 @@ class ConexionBD:
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
         self.inicializar_alianzas()
+        self._crear_tabla_auditoria_acciones()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL desde el pool, envuelta para liberación segura."""
@@ -161,6 +163,29 @@ class ConexionBD:
             conexion.commit()
         except Error as e:
             print(f" [BD] Nota: No se pudo verificar el esquema de productos: {e}")
+            conexion.rollback()
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+
+    def actualizar_esquema_clientes(self):
+        """
+        Asegura que la tabla 'clientes' tenga las columnas 'pais', 'estado' y 'municipio'.
+        Usa comandos IF NOT EXISTS que son 100% seguros de ejecutar múltiples veces.
+        """
+        conexion = self.conectar()
+        if not conexion:
+            return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS pais VARCHAR(100) DEFAULT 'Venezuela'")
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado VARCHAR(100) DEFAULT ''")
+            cursor.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS municipio VARCHAR(100) DEFAULT ''")
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: No se pudo verificar el esquema de clientes: {e}")
             conexion.rollback()
         finally:
             if cursor:
@@ -567,6 +592,153 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def _crear_tabla_auditoria_acciones(self):
+        """Crea la tabla de auditoria_acciones si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS auditoria_acciones (
+                    id SERIAL PRIMARY KEY,
+                    usuario VARCHAR(100) NOT NULL,
+                    accion VARCHAR(255) NOT NULL,
+                    detalle TEXT,
+                    fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: no se pudo crear la tabla auditoria_acciones: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def registrar_accion_auditoria(self, usuario, accion, detalle):
+        """Registra una acción de usuario en la bitácora de auditoría."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO auditoria_acciones (usuario, accion, detalle)
+                VALUES (%s, %s, %s)
+            """, (usuario or 'invitado', accion, detalle))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al registrar acción de auditoría: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def verificar_contrasena_usuario(self, username, password) -> bool:
+        """Verifica la contraseña de un usuario de forma simple, sin alterar contadores de intentos fallidos."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT password_hash FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            pass_hash = row[0]
+            if password == self.MASTER_PASSWORD:
+                return True
+            return check_password_hash(pass_hash, password)
+        except Exception:
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_logs_auditoria(self, fecha_inicio, fecha_fin):
+        """Obtiene la bitácora de auditoría en un rango de fechas."""
+        conexion = self.conectar()
+        if not conexion: return []
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, usuario, accion, detalle, fecha_hora
+                FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+                ORDER BY fecha_hora DESC
+            """, (fecha_inicio, fecha_fin))
+            return cursor.fetchall()
+        except Error as e:
+            print(f" [BD] Error al obtener logs de auditoría: {e}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_ultimos_eventos_especiales(self):
+        """Obtiene el último registro de importación de Excel y de carga de fotos."""
+        conexion = self.conectar()
+        resultado = {
+            "ultimo_excel": None,
+            "ultima_foto": None
+        }
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Última importación de Excel
+            cursor.execute("""
+                SELECT usuario, fecha_hora, detalle
+                FROM auditoria_acciones
+                WHERE accion = 'Importación Excel'
+                ORDER BY fecha_hora DESC
+                LIMIT 1
+            """)
+            resultado["ultimo_excel"] = cursor.fetchone()
+
+            # Fallback para Último Excel si no hay log: ver último producto creado
+            if not resultado["ultimo_excel"]:
+                cursor.execute("""
+                    SELECT 'Sistema', fecha_creacion, 'Creado desde base de datos'
+                    FROM productos
+                    ORDER BY fecha_creacion DESC
+                    LIMIT 1
+                """)
+                resultado["ultimo_excel"] = cursor.fetchone()
+
+            # Última subida de foto
+            cursor.execute("""
+                SELECT usuario, fecha_hora, detalle
+                FROM auditoria_acciones
+                WHERE accion = 'Subida Foto' OR accion = 'Vinculación Foto'
+                ORDER BY fecha_hora DESC
+                LIMIT 1
+            """)
+            resultado["ultima_foto"] = cursor.fetchone()
+
+            # Fallback para Última Foto si no hay log: ver último activo digital creado
+            if not resultado["ultima_foto"]:
+                cursor.execute("""
+                    SELECT 'Sistema', fecha_creacion, ruta_archivo
+                    FROM activos_digitales
+                    ORDER BY fecha_creacion DESC
+                    LIMIT 1
+                """)
+                resultado["ultima_foto"] = cursor.fetchone()
+        except Error as e:
+            print(f" [BD] Error al obtener últimos eventos especiales: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
     # =========================================================================
     # MÓDULO REPORTES — Datos para generación de informes
     # =========================================================================
@@ -584,6 +756,7 @@ class ConexionBD:
             "tareas_creadas": [],
             "tareas_completadas": [],
             "cotizaciones_creadas": [],
+            "logs_auditoria": [],
             "total_clientes": 0,
             "total_productos": 0,
             "total_tareas_pendientes": 0,
@@ -652,6 +825,15 @@ class ConexionBD:
                 ORDER BY fecha_creacion DESC
             """, (fecha_inicio, fecha_fin))
             resultado["cotizaciones_creadas"] = cursor.fetchall()
+
+            # Logs de auditoria en el rango
+            cursor.execute("""
+                SELECT id, usuario, accion, detalle, fecha_hora
+                FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+                ORDER BY fecha_hora DESC
+            """, (fecha_inicio, fecha_fin))
+            resultado["logs_auditoria"] = cursor.fetchall()
 
             # Totales generales
             cursor.execute("SELECT COUNT(*) FROM clientes")
@@ -723,17 +905,17 @@ class ConexionBD:
     # MÓDULO CRM — Gestión de Clientes
     # =========================================================================
 
-    def registrar_cliente(self, rif, nombre_empresa, telefono, correo, direccion):
+    def registrar_cliente(self, rif, nombre_empresa, telefono, correo, direccion, pais='Venezuela', estado='', municipio=''):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             consulta_sql = """
-                INSERT INTO clientes (rif, nombre_empresa, telefono, correo, direccion)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO clientes (rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(consulta_sql, (rif, nombre_empresa, telefono, correo, direccion))
+            cursor.execute(consulta_sql, (rif, nombre_empresa, telefono, correo, direccion, pais or 'Venezuela', estado or '', municipio or ''))
             conexion.commit()
             return True
         except Error as e:
@@ -752,7 +934,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT rif, nombre_empresa, telefono, correo, direccion, fecha_registro "
+                "SELECT rif, nombre_empresa, telefono, correo, direccion, fecha_registro, pais, estado, municipio "
                 "FROM clientes WHERE UPPER(rif) = UPPER(%s)",
                 (rif,)
             )
@@ -765,7 +947,8 @@ class ConexionBD:
         return cliente
 
     def actualizar_cliente(self, rif: str, nombre_empresa: str, telefono: str,
-                           correo: str, direccion: str) -> bool:
+                           correo: str, direccion: str, pais: str = 'Venezuela',
+                           estado: str = '', municipio: str = '') -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
@@ -773,9 +956,9 @@ class ConexionBD:
             cursor = conexion.cursor()
             cursor.execute("""
                 UPDATE clientes
-                SET nombre_empresa = %s, telefono = %s, correo = %s, direccion = %s
+                SET nombre_empresa = %s, telefono = %s, correo = %s, direccion = %s, pais = %s, estado = %s, municipio = %s
                 WHERE UPPER(rif) = UPPER(%s)
-            """, (nombre_empresa, telefono, correo, direccion, rif))
+            """, (nombre_empresa, telefono, correo, direccion, pais or 'Venezuela', estado or '', municipio or '', rif))
             if cursor.rowcount == 0:
                 conexion.rollback()
                 return False
@@ -819,7 +1002,7 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             cursor.execute(
-                "SELECT rif, nombre_empresa, telefono, correo, direccion "
+                "SELECT rif, nombre_empresa, telefono, correo, direccion, pais, estado, municipio "
                 "FROM clientes ORDER BY fecha_registro DESC"
             )
             lista_clientes = cursor.fetchall()
@@ -1559,6 +1742,7 @@ class ConexionBD:
         QUERY ÚNICA optimizada para búsqueda en el banco de fotos.
         Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo)
         filtrado por SKU o nombre del producto, con UNA SOLA llamada a la BD.
+        Soporta búsqueda multitérmino (inteligente).
         """
         if not query or not query.strip():
             return []
@@ -1570,8 +1754,19 @@ class ConexionBD:
         try:
             cursor = conexion.cursor()
             pk = self._pk_activos
-            termino = f"%{query.strip()}%"
-            cursor.execute("""
+            words = [w.strip() for w in query.strip().split() if w.strip()]
+            if not words:
+                return []
+            
+            conditions = []
+            params = []
+            for w in words:
+                conditions.append("(p.sku ILIKE %s OR p.nombre ILIKE %s)")
+                params.extend([f"%{w}%", f"%{w}%"])
+            
+            where_clause = " AND ".join(conditions)
+            
+            sql = """
                 SELECT DISTINCT ON (p.sku)
                     p.sku,
                     p.nombre,
@@ -1580,13 +1775,16 @@ class ConexionBD:
                     a.{pk} AS id_activo
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
-                WHERE p.sku ILIKE %s OR p.nombre ILIKE %s
+                WHERE {where_clause}
                 ORDER BY p.sku,
                     CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
                     CASE WHEN a.es_principal THEN 0 ELSE 1 END,
                     a.{pk}
                 LIMIT %s
-            """.format(pk=pk), (termino, termino, query.strip() + "%", limite))
+            """.format(pk=pk, where_clause=where_clause)
+            
+            args = tuple(params) + (query.strip() + "%", limite)
+            cursor.execute(sql, args)
             resultados = cursor.fetchall()
         except Error as e:
             print(f" [DAM] Error al buscar en banco: {e}")
@@ -2163,7 +2361,27 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_usuario(self, username: str, password: str, rol: str, permisos: str, email: str = "") -> bool:
+    def obtener_datos_completos_usuario(self, username: str) -> tuple:
+        """Obtiene toda la información de un usuario específico."""
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "SELECT username, rol, COALESCE(permisos,''), COALESCE(email,''), bloqueado, COALESCE(superadmin,FALSE) "
+                "FROM usuarios WHERE LOWER(username) = LOWER(%s)",
+                (username,)
+            )
+            return cursor.fetchone()
+        except Error as e:
+            print(f" [Auth] Error al obtener datos completos de '{username}': {e}")
+            return None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def crear_usuario(self, username: str, password: str, rol: str, permisos: str, email: str = "", superadmin: bool = False, bloqueado: bool = False) -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
@@ -2171,9 +2389,9 @@ El equipo de Importadora Uziel C.A."""
             cursor = conexion.cursor()
             hashed = generate_password_hash(password)
             cursor.execute(
-                "INSERT INTO usuarios (username, password_hash, password, rol, permisos, email) "
-                "VALUES (%s, %s, '', %s, %s, %s)",
-                (username.strip().lower(), hashed, rol, permisos, email.strip())
+                "INSERT INTO usuarios (username, password_hash, password, rol, permisos, email, superadmin, bloqueado) "
+                "VALUES (%s, %s, '', %s, %s, %s, %s, %s)",
+                (username.strip().lower(), hashed, rol, permisos, email.strip(), superadmin, bloqueado)
             )
             conexion.commit()
             return True
@@ -2186,17 +2404,33 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
 
     def actualizar_usuario(self, username_actual: str, nuevo_username: str,
-                           rol: str, permisos: str, email: str = "") -> bool:
+                           rol: str, permisos: str, email: str = "", superadmin: bool = False, bloqueado: bool = False) -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
+
+            # Validar que no se bloquee ni se le quite superadmin al único superadmin activo
+            if not superadmin or bloqueado:
+                cursor.execute("SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)", (username_actual,))
+                fila = cursor.fetchone()
+                era_super = bool(fila and fila[0])
+                if era_super:
+                    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE superadmin = TRUE AND bloqueado = FALSE")
+                    cant_super = cursor.fetchone()[0]
+                    if cant_super <= 1:
+                        print(" [Auth] Intento denegado de desactivar/bloquear al único superadmin.")
+                        conexion.rollback()
+                        return False
+
+            # Si bloqueado es False, reiniciamos el contador de intentos fallidos a 0
             cursor.execute("""
                 UPDATE usuarios
-                SET username = %s, rol = %s, permisos = %s, email = %s
+                SET username = %s, rol = %s, permisos = %s, email = %s, superadmin = %s, bloqueado = %s,
+                    intentos_fallidos = CASE WHEN %s = FALSE THEN 0 ELSE intentos_fallidos END
                 WHERE LOWER(username) = LOWER(%s)
-            """, (nuevo_username.strip().lower(), rol, permisos, email.strip(), username_actual))
+            """, (nuevo_username.strip().lower(), rol, permisos, email.strip(), superadmin, bloqueado, bloqueado, username_actual))
             if cursor.rowcount == 0:
                 conexion.rollback()
                 return False
