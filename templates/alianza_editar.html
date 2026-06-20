@@ -164,7 +164,7 @@ buscador.addEventListener('input', () => {
     listaProds.style.display = 'block';
 });
 
-let itemCount = {{ items|length }};
+let itemCount = parseInt("{{ items|length }}") || 0;
 
 function agregarProducto(el) {
     const sku = el.dataset.sku;
