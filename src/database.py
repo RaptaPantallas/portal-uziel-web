@@ -511,8 +511,6 @@ class ConexionBD:
                 for mod in resultado:
                     for acc in resultado[mod]:
                         resultado[mod][acc] = True
-                if cursor: cursor.close()
-                conexion.close()
                 return resultado
 
             if not permisos_raw:
