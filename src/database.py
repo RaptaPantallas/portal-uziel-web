@@ -1653,6 +1653,35 @@ class ConexionBD:
             conexion.close()
         return resultado
 
+    def obtener_preview_principal_por_sku(self, sku: str) -> bytes | None:
+        """Retorna los bytes del preview_webp de la imagen principal para un SKU."""
+        conexion = self.conectar()
+        if not conexion:
+            return None
+        cursor = None
+        resultado = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT a.preview_webp FROM activos_digitales a
+                JOIN productos p ON p.id_producto = a.producto_id
+                WHERE p.sku = %s
+                ORDER BY CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC, a.ruta_archivo ASC
+                LIMIT 1
+            """, (sku,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                # En PostgreSQL/psycopg2, los campos BYTEA pueden retornarse como memoryview o bytes
+                resultado = bytes(row[0])
+        except Error as e:
+            print(f" [DAM] Error al obtener preview principal por SKU: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            conexion.close()
+        return resultado
+
+
     def actualizar_ruta_activo(self, activo_id: int, nueva_ruta: str) -> bool:
         """Actualiza la ruta de un activo digital (ej: WebP → JPG)."""
         conexion = self.conectar()

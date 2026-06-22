@@ -1419,7 +1419,22 @@ def generar_pdf():
                 c.drawImage(ruta_local, thumb_x, thumb_y, width=thumb_ancho, height=thumb_alto, preserveAspectRatio=True, mask="auto")
                 has_thumb = True
             except Exception as e:
-                print(f"[PDF Gen] Error al dibujar imagen {ruta_local}: {e}")
+                print(f"[PDF Gen] Error al dibujar imagen local {ruta_local}: {e}")
+                pass
+
+        # Fallback: Obtener bytes de la imagen directamente de la base de datos si no existe el archivo local
+        if not has_thumb:
+            try:
+                preview_bytes = bd.obtener_preview_principal_por_sku(sku)
+                if preview_bytes:
+                    c.setStrokeColorRGB(*LINEA)
+                    c.setLineWidth(0.5)
+                    c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=False, stroke=True)
+                    # ReportLab permite usar un objeto tipo archivo como BytesIO para la imagen
+                    c.drawImage(io.BytesIO(preview_bytes), thumb_x, thumb_y, width=thumb_ancho, height=thumb_alto, preserveAspectRatio=True, mask="auto")
+                    has_thumb = True
+            except Exception as e:
+                print(f"[PDF Gen] Error al dibujar imagen desde la BD para {sku}: {e}")
                 pass
 
         if not has_thumb:
