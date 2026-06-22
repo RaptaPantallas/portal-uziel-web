@@ -1012,7 +1012,7 @@ document.addEventListener('click', function(e) {
         return;
     }
 
-    if (href.startsWith('javascript:') || href.startsWith('#') || href.includes('/logout') || href.includes('/pdf') || link.classList.contains('btn-logout')) {
+    if (href.startsWith('javascript:') || href.startsWith('#') || href.includes('/logout') || href.includes('/pdf') || href.includes('_pdf') || link.classList.contains('btn-logout')) {
         return;
     }
 
@@ -1052,7 +1052,7 @@ document.addEventListener('submit', function(e) {
     // Re-verificación de contraseña para cualquier formulario POST (web) exceptuando login y PDFs
     const actionAttr = form.getAttribute('action') || '';
     const formMethod = (form.getAttribute('method') || '').toUpperCase();
-    if (formMethod === 'POST' && !actionAttr.includes('/login') && !actionAttr.includes('/generar_pdf') && !actionAttr.includes('/pdf')) {
+    if (formMethod === 'POST' && !actionAttr.includes('/login') && !actionAttr.includes('/generar_pdf') && !actionAttr.includes('/pdf') && !actionAttr.includes('_pdf')) {
         let pwdInput = form.querySelector('input[name="verificar_password"]');
         if (!pwdInput || !pwdInput.value) {
             e.preventDefault();
@@ -1100,7 +1100,7 @@ document.addEventListener('submit', function(e) {
         return;
     }
 
-    if (action.includes('/generar_pdf') || action.includes('/pdf')) {
+    if (action.includes('/generar_pdf') || action.includes('/pdf') || action.includes('_pdf')) {
         return;
     }
 
