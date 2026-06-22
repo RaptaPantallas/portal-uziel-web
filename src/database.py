@@ -1503,6 +1503,7 @@ class ConexionBD:
                 FROM productos p
                 LEFT JOIN activos_digitales a ON p.id_producto = a.producto_id
                 WHERE p.sku = %s
+                ORDER BY CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC, a.ruta_archivo ASC
                 LIMIT 1
             """
             cursor.execute(consulta, (sku,))
@@ -1585,13 +1586,8 @@ class ConexionBD:
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
                 ORDER BY p.sku,
-                    CASE a.angulo
-                        WHEN 'Frontal'     THEN 1
-                        WHEN 'Lateral'     THEN 2
-                        WHEN 'Detalle'     THEN 3
-                        WHEN 'En-contexto' THEN 4
-                        ELSE 5
-                    END, a.{pk}
+                    CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC,
+                    a.ruta_archivo ASC
             """
             cursor.execute(consulta)
             for sku, ruta in cursor.fetchall():
@@ -1642,7 +1638,8 @@ class ConexionBD:
             cursor.execute("""
                 SELECT a.ruta_archivo FROM activos_digitales a
                 JOIN productos p ON p.id_producto = a.producto_id
-                WHERE p.sku = %s AND a.es_principal = TRUE
+                WHERE p.sku = %s
+                ORDER BY CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC, a.ruta_archivo ASC
                 LIMIT 1
             """, (sku,))
             row = cursor.fetchone()
@@ -1742,8 +1739,8 @@ class ConexionBD:
                     JOIN activos_digitales a ON p.id_producto = a.producto_id
                     WHERE {where_clause}
                     ORDER BY p.sku,
-                             CASE WHEN a.es_principal THEN 0 ELSE 1 END,
-                             a.{pk}
+                             CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC,
+                             a.ruta_archivo ASC
                 ) sub
                 ORDER BY
                     CASE WHEN sku ILIKE %s THEN 0 ELSE 1 END,
@@ -1854,8 +1851,8 @@ class ConexionBD:
                 FROM productos p
                 JOIN activos_digitales a ON p.id_producto = a.producto_id
                 ORDER BY p.sku,
-                    CASE WHEN a.es_principal THEN 0 ELSE 1 END,
-                    a.{pk}
+                    CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC,
+                    a.ruta_archivo ASC
             """.format(pk=pk))
             resultados = cursor.fetchall()
         except Error as e:
@@ -1907,8 +1904,8 @@ class ConexionBD:
                 WHERE {where_clause}
                 ORDER BY p.sku,
                     CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
-                    CASE WHEN a.es_principal THEN 0 ELSE 1 END,
-                    a.{pk}
+                    CASE WHEN a.es_principal = TRUE THEN 0 ELSE 1 END ASC,
+                    a.ruta_archivo ASC
                 LIMIT %s
             """.format(pk=pk, where_clause=where_clause)
             

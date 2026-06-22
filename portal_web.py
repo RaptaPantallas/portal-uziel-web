@@ -44,7 +44,7 @@
 # =============================================================================
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, abort, make_response
 from functools import wraps
 import io
 import secrets
@@ -1491,12 +1491,10 @@ def generar_pdf():
     c.save()
     buffer.seek(0)
 
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=NOMBRE_ARCHIVO_PDF,
-        mimetype='application/pdf'
-    )
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="{NOMBRE_ARCHIVO_PDF}"'
+    return response
 
 
 # =============================================================================
@@ -1666,12 +1664,10 @@ def reporte_pdf(tipo=None):
 
     buffer = generar_reporte_pdf(datos, tipo_reporte, productos_list=productos_list)
 
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"Reporte_{tipo_reporte}_{hoy.strftime('%Y%m%d')}.pdf",
-        mimetype='application/pdf'
-    )
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="Reporte_{tipo_reporte}_{hoy.strftime("%Y%m%d")}.pdf"'
+    return response
 
 
 # =============================================================================
@@ -1892,12 +1888,10 @@ def cotizacion_pdf(cotizacion_id):
 
     buffer = generar_pdf_cotizacion(datos)
     numero = datos['cabecera'][1]   # numero  (columna 1)
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"Cotizacion_{numero}.pdf",
-        mimetype='application/pdf'
-    )
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="Cotizacion_{numero}.pdf"'
+    return response
 
 
 # =============================================================================
