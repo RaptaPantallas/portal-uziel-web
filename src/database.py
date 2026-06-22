@@ -659,19 +659,38 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
-    def obtener_logs_auditoria(self, fecha_inicio, fecha_fin):
-        """Obtiene la bitácora de auditoría en un rango de fechas."""
+    def obtener_logs_auditoria(self, fecha_inicio, fecha_fin, termino=""):
+        """Obtiene la bitácora de auditoría en un rango de fechas con filtro opcional."""
         conexion = self.conectar()
         if not conexion: return []
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute("""
+            
+            params = [fecha_inicio, fecha_fin]
+            search_clause = ""
+            if termino.strip():
+                palabras = termino.strip().split()
+                clauses = []
+                for p in palabras:
+                    like_val = f"%{p}%"
+                    clauses.append("""(
+                        usuario ILIKE %s OR 
+                        accion ILIKE %s OR 
+                        detalle ILIKE %s OR 
+                        TO_CHAR(fecha_hora, 'DD/MM/YYYY HH24:MI:SS') ILIKE %s OR
+                        TO_CHAR(fecha_hora, 'YYYY-MM-DD') ILIKE %s
+                    )""")
+                    params.extend([like_val, like_val, like_val, like_val, like_val])
+                search_clause = " AND " + " AND ".join(clauses)
+
+            query = f"""
                 SELECT id, usuario, accion, detalle, fecha_hora
                 FROM auditoria_acciones
-                WHERE fecha_hora::date BETWEEN %s AND %s
+                WHERE fecha_hora::date BETWEEN %s AND %s {search_clause}
                 ORDER BY fecha_hora DESC
-            """, (fecha_inicio, fecha_fin))
+            """
+            cursor.execute(query, tuple(params))
             return cursor.fetchall()
         except Error as e:
             print(f" [BD] Error al obtener logs de auditoría: {e}")
@@ -680,30 +699,52 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
-    def obtener_logs_auditoria_paginados(self, fecha_inicio, fecha_fin, pagina=1, por_pagina=5) -> dict:
-        """Obtiene la bitácora de auditoría paginada en un rango de fechas."""
+    def obtener_logs_auditoria_paginados(self, fecha_inicio, fecha_fin, pagina=1, por_pagina=5, termino="") -> dict:
+        """Obtiene la bitácora de auditoría paginada en un rango de fechas con filtro opcional."""
         conexion = self.conectar()
         resultado = {"logs": [], "total": 0, "pagina": pagina, "por_pagina": por_pagina, "total_paginas": 0}
         if not conexion: return resultado
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute("""
+            
+            params_count = [fecha_inicio, fecha_fin]
+            params_select = [fecha_inicio, fecha_fin]
+            search_clause = ""
+            if termino.strip():
+                palabras = termino.strip().split()
+                clauses = []
+                for p in palabras:
+                    like_val = f"%{p}%"
+                    clauses.append("""(
+                        usuario ILIKE %s OR 
+                        accion ILIKE %s OR 
+                        detalle ILIKE %s OR 
+                        TO_CHAR(fecha_hora, 'DD/MM/YYYY HH24:MI:SS') ILIKE %s OR
+                        TO_CHAR(fecha_hora, 'YYYY-MM-DD') ILIKE %s
+                    )""")
+                    params_count.extend([like_val, like_val, like_val, like_val, like_val])
+                    params_select.extend([like_val, like_val, like_val, like_val, like_val])
+                search_clause = " AND " + " AND ".join(clauses)
+
+            cursor.execute(f"""
                 SELECT COUNT(*) FROM auditoria_acciones
-                WHERE fecha_hora::date BETWEEN %s AND %s
-            """, (fecha_inicio, fecha_fin))
+                WHERE fecha_hora::date BETWEEN %s AND %s {search_clause}
+            """, tuple(params_count))
             total = cursor.fetchone()[0]
             resultado["total"] = total
             resultado["total_paginas"] = max(1, -(-total // por_pagina))
 
             offset = (pagina - 1) * por_pagina
-            cursor.execute("""
+            query = f"""
                 SELECT id, usuario, accion, detalle, fecha_hora
                 FROM auditoria_acciones
-                WHERE fecha_hora::date BETWEEN %s AND %s
+                WHERE fecha_hora::date BETWEEN %s AND %s {search_clause}
                 ORDER BY fecha_hora DESC
                 LIMIT %s OFFSET %s
-            """, (fecha_inicio, fecha_fin, por_pagina, offset))
+            """
+            params_select.extend([por_pagina, offset])
+            cursor.execute(query, tuple(params_select))
             resultado["logs"] = cursor.fetchall()
         except Error as e:
             print(f" [Reportes] Error al obtener logs de auditoría paginados: {e}")
@@ -773,7 +814,7 @@ class ConexionBD:
     # MÓDULO REPORTES — Datos para generación de informes
     # =========================================================================
 
-    def obtener_datos_reporte(self, fecha_inicio, fecha_fin) -> dict:
+    def obtener_datos_reporte(self, fecha_inicio, fecha_fin, termino="") -> dict:
         """
         Obtiene todos los datos de actividad en un rango de fechas.
         Retorna un dict con listas de: clientes, productos, activos, tareas, cotizaciones.
@@ -857,12 +898,29 @@ class ConexionBD:
             resultado["cotizaciones_creadas"] = cursor.fetchall()
 
             # Logs de auditoria en el rango
-            cursor.execute("""
+            params_audit = [fecha_inicio, fecha_fin]
+            search_clause = ""
+            if termino.strip():
+                palabras = termino.strip().split()
+                clauses = []
+                for p in palabras:
+                    like_val = f"%{p}%"
+                    clauses.append("""(
+                        usuario ILIKE %s OR 
+                        accion ILIKE %s OR 
+                        detalle ILIKE %s OR 
+                        TO_CHAR(fecha_hora, 'DD/MM/YYYY HH24:MI:SS') ILIKE %s OR
+                        TO_CHAR(fecha_hora, 'YYYY-MM-DD') ILIKE %s
+                    )""")
+                    params_audit.extend([like_val, like_val, like_val, like_val, like_val])
+                search_clause = " AND " + " AND ".join(clauses)
+
+            cursor.execute(f"""
                 SELECT id, usuario, accion, detalle, fecha_hora
                 FROM auditoria_acciones
-                WHERE fecha_hora::date BETWEEN %s AND %s
+                WHERE fecha_hora::date BETWEEN %s AND %s {search_clause}
                 ORDER BY fecha_hora DESC
-            """, (fecha_inicio, fecha_fin))
+            """, tuple(params_audit))
             resultado["logs_auditoria"] = cursor.fetchall()
 
             # Totales generales

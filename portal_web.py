@@ -1514,6 +1514,7 @@ def reportes():
     # Leer fechas de query params o usar valores por defecto (mes actual)
     desde = request.args.get('desde', '')
     hasta = request.args.get('hasta', '')
+    termino = request.args.get('termino', '')
 
     if desde and hasta:
         fecha_desde = desde
@@ -1529,10 +1530,10 @@ def reportes():
         fecha_hasta = fin_mes.strftime("%Y-%m-%d")
 
     # Datos del reporte
-    datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
+    datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta, termino=termino)
     datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=10)
     eventos_especiales = bd.obtener_ultimos_eventos_especiales()
-    logs_pag = bd.obtener_logs_auditoria_paginados(fecha_desde, fecha_hasta, pagina=1, por_pagina=5)
+    logs_pag = bd.obtener_logs_auditoria_paginados(fecha_desde, fecha_hasta, pagina=1, por_pagina=5, termino=termino)
 
     # Semana actual para referencia rapida
     diasem = hoy.weekday()
@@ -1543,6 +1544,7 @@ def reportes():
         'reportes.html',
         desde=fecha_desde,
         hasta=fecha_hasta,
+        termino=termino,
         datos=datos,
         productos_pag=datos_productos,
         logs_pag=logs_pag,
@@ -1593,11 +1595,12 @@ def api_reporte_auditoria():
     desde = request.args.get('desde', '')
     hasta = request.args.get('hasta', '')
     pagina = request.args.get('pagina', 1, type=int)
+    termino = request.args.get('termino', '')
 
     if not desde or not hasta:
         return {"logs": [], "total": 0, "html": ""}
 
-    datos = bd.obtener_logs_auditoria_paginados(desde, hasta, pagina=pagina, por_pagina=5)
+    datos = bd.obtener_logs_auditoria_paginados(desde, hasta, pagina=pagina, por_pagina=5, termino=termino)
 
     html = ""
     for log in datos["logs"]:
@@ -1629,6 +1632,7 @@ def reporte_pdf(tipo=None):
 
     desde = request.args.get('desde', '')
     hasta = request.args.get('hasta', '')
+    termino = request.args.get('termino', '')
 
     if desde and hasta:
         fecha_inicio = desde
@@ -1653,7 +1657,7 @@ def reporte_pdf(tipo=None):
     fi = fecha_inicio if isinstance(fecha_inicio, str) else fecha_inicio.strftime("%Y-%m-%d")
     ff = fecha_fin if isinstance(fecha_fin, str) else fecha_fin.strftime("%Y-%m-%d")
 
-    datos = bd.obtener_datos_reporte(fi, ff)
+    datos = bd.obtener_datos_reporte(fi, ff, termino=termino)
     datos["fecha_inicio"] = fi
     datos["fecha_fin"] = ff
 

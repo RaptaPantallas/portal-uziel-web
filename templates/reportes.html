@@ -148,7 +148,7 @@
         <span class="card-title">Seleccionar Periodo</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="submit" class="btn btn-primary">Aplicar</button>
-            <a href="{{ url_for('reporte_pdf', desde=desde, hasta=hasta) }}" class="btn btn-primary">Descargar PDF</a>
+            <a href="{{ url_for('reporte_pdf', desde=desde, hasta=hasta, termino=termino) }}" class="btn btn-primary" id="btn-descargar-pdf">Descargar PDF</a>
         </div>
     </div>
     <div style="padding:16px 20px;">
@@ -403,11 +403,21 @@
     </div>
 </div>
 
-<!-- Contenedor Pestaña: Bitácora de Auditoría -->
 <div id="tab-auditoria" class="reportes-tab-content">
     <div style="margin-bottom: 20px; padding: 0 4px;">
         <h2 style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Bitácora de Auditoría — Historial de Acciones</h2>
-        <p style="font-size: 13px; color: var(--text-muted);">Muestra las operaciones y accesos realizados en el sistema por cada usuario.</p>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Muestra las operaciones y accesos realizados en el sistema por cada usuario.</p>
+        
+        <!-- Buscador de Auditoría -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; max-width: 500px; margin-top: 10px;">
+            <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                <input type="text" id="input-buscar-auditoria" value="{{ termino or '' }}" placeholder="Buscar usuario, acción o detalle (ej: Administrador 20-05-2026)..." 
+                       style="width: 100%; padding: 8px 32px 8px 12px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 13px; background: var(--card-bg); color: var(--text); outline: none;"
+                       onkeyup="if(event.key === 'Enter') buscarAuditoria()">
+                <span style="position: absolute; right: 10px; color: var(--text-muted); cursor: pointer;" onclick="document.getElementById('input-buscar-auditoria').value=''; buscarAuditoria();">✕</span>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="buscarAuditoria()" style="padding: 8px 16px; font-size: 13px;">Buscar</button>
+        </div>
     </div>
 
     <!-- Bitácora de Auditoría -->
@@ -446,13 +456,13 @@
                 </tbody>
             </table>
         </div>
-        {% if logs_pag.total_paginas > 1 %}
-        <div class="prod-paginacion">
-            <button class="btn btn-ghost btn-sm" id="audit-btn-ant" onclick="cambiarPaginaAudit(-1)" {% if logs_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
-            <span id="audit-info-pagina">Pagina {{ logs_pag.pagina }} de {{ logs_pag.total_paginas }} ({{ logs_pag.total }} acciones)</span>
-            <button class="btn btn-ghost btn-sm" id="audit-btn-sig" onclick="cambiarPaginaAudit(1)" {% if logs_pag.pagina >= logs_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
+        <div id="audit-paginacion-wrapper" style="{% if logs_pag.total_paginas <= 1 %}display:none;{% endif %}">
+            <div class="prod-paginacion">
+                <button class="btn btn-ghost btn-sm" id="audit-btn-ant" onclick="cambiarPaginaAudit(-1)" {% if logs_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
+                <span id="audit-info-pagina">Pagina {{ logs_pag.pagina }} de {{ logs_pag.total_paginas }} ({{ logs_pag.total }} acciones)</span>
+                <button class="btn btn-ghost btn-sm" id="audit-btn-sig" onclick="cambiarPaginaAudit(1)" {% if logs_pag.pagina >= logs_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
+            </div>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -555,13 +565,14 @@ function cambiarPaginaProd(delta) {
 
 function cambiarPaginaAudit(delta) {
     var nueva = auditPaginaActual + delta;
-    if (nueva < 1 || nueva > auditTotalPaginas) return;
+    if (nueva < 1 || (nueva > auditTotalPaginas && auditTotalPaginas > 0)) return;
     auditPaginaActual = nueva;
 
     var desde = document.getElementById('input-desde').value;
     var hasta = document.getElementById('input-hasta').value;
+    var termino = document.getElementById('input-buscar-auditoria').value;
 
-    fetch('/api/reporte_auditoria?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&pagina=' + nueva)
+    fetch('/api/reporte_auditoria?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&pagina=' + nueva + '&termino=' + encodeURIComponent(termino))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             document.getElementById('tabla-auditoria-reporte').innerHTML = data.html;
@@ -570,6 +581,38 @@ function cambiarPaginaAudit(delta) {
             auditTotalPaginas = data.total_paginas;
             document.getElementById('audit-btn-ant').disabled = data.pagina <= 1;
             document.getElementById('audit-btn-sig').disabled = data.pagina >= data.total_paginas;
+        });
+}
+
+function buscarAuditoria() {
+    auditPaginaActual = 1;
+    var desde = document.getElementById('input-desde').value;
+    var hasta = document.getElementById('input-hasta').value;
+    var termino = document.getElementById('input-buscar-auditoria').value;
+
+    // Actualizar enlace de descarga de PDF
+    var pdfBtn = document.getElementById('btn-descargar-pdf');
+    if (pdfBtn) {
+        pdfBtn.href = '/reporte_pdf?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&termino=' + encodeURIComponent(termino);
+    }
+
+    fetch('/api/reporte_auditoria?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&pagina=1&termino=' + encodeURIComponent(termino))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('tabla-auditoria-reporte').innerHTML = data.html;
+            document.getElementById('audit-info-pagina').textContent = 'Pagina ' + data.pagina + ' de ' + data.total_paginas + ' (' + data.total + ' acciones)';
+            document.getElementById('audit-total-badge').textContent = data.total + ' acciones';
+            auditTotalPaginas = data.total_paginas;
+            
+            // Actualizar visibilidad y estados de los botones de paginación
+            var pagWrapper = document.getElementById('audit-paginacion-wrapper');
+            if (data.total_paginas > 1) {
+                if (pagWrapper) pagWrapper.style.display = 'block';
+                document.getElementById('audit-btn-ant').disabled = true;
+                document.getElementById('audit-btn-sig').disabled = false;
+            } else {
+                if (pagWrapper) pagWrapper.style.display = 'none';
+            }
         });
 }
 </script>
