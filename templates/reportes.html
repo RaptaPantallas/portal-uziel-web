@@ -61,13 +61,60 @@
     }
     .stat-icon { font-size: 22px; }
     .stat-col { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Estilos para pestañas de reportes (similares a la app de escritorio) */
+    .reportes-tabs-nav {
+        display: flex;
+        gap: 6px;
+        border-bottom: 2px solid var(--border);
+        margin: 24px 0 20px 0;
+        padding-bottom: 0;
+    }
+    .reportes-tab-btn {
+        padding: 10px 24px;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        margin-bottom: -2px;
+    }
+    .reportes-tab-btn:hover {
+        color: var(--primary);
+    }
+    .reportes-tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+    .reportes-tab-content {
+        display: none;
+        animation: fadeIn 0.2s ease-in-out;
+    }
+    .reportes-tab-content.active {
+        display: block;
+    }
+    
+    /* Cabecera azul para la tabla de auditoría, similar a escritorio */
+    .tabla-auditoria-custom thead th {
+        background-color: var(--primary) !important;
+        color: white !important;
+        font-weight: 600;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 </style>
 {% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>Reportes de Actividad</h1>
-        <p class="subtitulo">Selecciona un rango de fechas para ver las estadisticas del periodo.</p>
+        <h1>Generador de Reportes y Auditoría</h1>
+        <p class="subtitulo">Selecciona un rango de fechas para ver las estadísticas del período.</p>
     </div>
 </div>
 
@@ -119,7 +166,7 @@
             <button type="button" onclick="setRangoSemana()">Esta Semana</button>
             <button type="button" onclick="setRangoMes()">Este Mes</button>
             <button type="button" onclick="setRangoMesPasado()">Mes Pasado</button>
-            <button type="button" onclick="setRangoAnio()">Este Ano</button>
+            <button type="button" onclick="setRangoAnio()">Todo el Año</button>
         </div>
     </div>
 </div>
@@ -190,206 +237,223 @@
     </div>
 </div>
 
-<!-- Estadisticas -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <span class="card-title">Resumen del Periodo</span>
-        <span class="total-badge">{{ datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.tareas_completadas|length + datos.cotizaciones_creadas|length }} eventos</span>
-    </div>
-    <div style="padding:20px;">
-        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));">
-            <div class="stat-card" style="background:#eff6ff;border-left:4px solid #2563eb;">
-                <div class="stat-label"><span class="stat-icon">Clientes Nuevos</span><span class="icon">+</span></div>
-                <div class="stat-value" style="color:#2563eb;">{{ datos.clientes_nuevos|length }}</div>
-                <div class="stat-col">vs {{ datos.total_clientes }} totales</div>
-            </div>
-            <div class="stat-card" style="background:#f0fdf4;border-left:4px solid #16a34a;">
-                <div class="stat-label"><span class="stat-icon">Productos Nuevos</span><span class="icon">+</span></div>
-                <div class="stat-value" style="color:#16a34a;">{{ datos.productos_nuevos|length }}</div>
-                <div class="stat-col">vs {{ datos.total_productos }} totales</div>
-            </div>
-            <div class="stat-card" style="background:#fffbeb;border-left:4px solid #d97706;">
-                <div class="stat-label"><span class="stat-icon">Fotos Vinculadas</span><span class="icon">+</span></div>
-                <div class="stat-value" style="color:#d97706;">{{ datos.activos_nuevos|length }}</div>
-            </div>
-            <div class="stat-card" style="background:#faf5ff;border-left:4px solid #9333ea;">
-                <div class="stat-label"><span class="stat-icon">Tareas Creadas</span><span class="icon">+</span></div>
-                <div class="stat-value" style="color:#9333ea;">{{ datos.tareas_creadas|length }}</div>
-                <div class="stat-col">{{ datos.tareas_completadas|length }} completadas</div>
-            </div>
-            <div class="stat-card" style="background:#fef2f2;border-left:4px solid #dc2626;">
-                <div class="stat-label"><span class="stat-icon">Alianzas Comerciales</span><span class="icon">+</span></div>
-                <div class="stat-value" style="color:#dc2626;">{{ datos.cotizaciones_creadas|length }}</div>
-            </div>
-        </div>
-    </div>
+<!-- Navegación de Pestañas (Tabs) -->
+<div class="reportes-tabs-nav">
+    <button type="button" class="reportes-tab-btn active" id="btn-tab-resumen" onclick="switchTab('resumen')">Resumen de Actividad</button>
+    <button type="button" class="reportes-tab-btn" id="btn-tab-auditoria" onclick="switchTab('auditoria')">Bitácora de Auditoría</button>
 </div>
 
-<!-- Graficos de texto (barras) -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <span class="card-title">Proporcion de Actividad</span>
+<!-- Contenedor Pestaña: Resumen de Actividad -->
+<div id="tab-resumen" class="reportes-tab-content active">
+    <!-- Estadisticas -->
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">
+            <span class="card-title">Resumen del Periodo</span>
+            <span class="total-badge">{{ datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.tareas_completadas|length + datos.cotizaciones_creadas|length }} eventos</span>
+        </div>
+        <div style="padding:20px;">
+            <div class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));">
+                <div class="stat-card" style="background:#eff6ff;border-left:4px solid #2563eb;">
+                    <div class="stat-label"><span class="stat-icon">Clientes Nuevos</span><span class="icon">+</span></div>
+                    <div class="stat-value" style="color:#2563eb;">{{ datos.clientes_nuevos|length }}</div>
+                    <div class="stat-col">vs {{ datos.total_clientes }} totales</div>
+                </div>
+                <div class="stat-card" style="background:#f0fdf4;border-left:4px solid #16a34a;">
+                    <div class="stat-label"><span class="stat-icon">Productos Nuevos</span><span class="icon">+</span></div>
+                    <div class="stat-value" style="color:#16a34a;">{{ datos.productos_nuevos|length }}</div>
+                    <div class="stat-col">vs {{ datos.total_productos }} totales</div>
+                </div>
+                <div class="stat-card" style="background:#fffbeb;border-left:4px solid #d97706;">
+                    <div class="stat-label"><span class="stat-icon">Fotos Vinculadas</span><span class="icon">+</span></div>
+                    <div class="stat-value" style="color:#d97706;">{{ datos.activos_nuevos|length }}</div>
+                </div>
+                <div class="stat-card" style="background:#faf5ff;border-left:4px solid #9333ea;">
+                    <div class="stat-label"><span class="stat-icon">Tareas Creadas</span><span class="icon">+</span></div>
+                    <div class="stat-value" style="color:#9333ea;">{{ datos.tareas_creadas|length }}</div>
+                    <div class="stat-col">{{ datos.tareas_completadas|length }} completadas</div>
+                </div>
+                <div class="stat-card" style="background:#fef2f2;border-left:4px solid #dc2626;">
+                    <div class="stat-label"><span class="stat-icon">Alianzas Comerciales</span><span class="icon">+</span></div>
+                    <div class="stat-value" style="color:#dc2626;">{{ datos.cotizaciones_creadas|length }}</div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div style="padding:20px;">
-        {% set total_eventos = datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.cotizaciones_creadas|length %}
-        {% if total_eventos > 0 %}
-        {% set pct_clientes = (datos.clientes_nuevos|length / total_eventos * 100)|round %}
-        {% set pct_productos = (datos.productos_nuevos|length / total_eventos * 100)|round %}
-        {% set pct_activos = (datos.activos_nuevos|length / total_eventos * 100)|round %}
-        {% set pct_tareas = (datos.tareas_creadas|length / total_eventos * 100)|round %}
-        {% set pct_cotizaciones = (datos.cotizaciones_creadas|length / total_eventos * 100)|round %}
-        <div class="bar-chart">
-            <div class="bar-label"><span>Clientes Nuevos</span><span>{{ pct_clientes }}%</span></div>
-            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_clientes }}%;background:#2563eb;"></div></div>
+
+    <!-- Graficos de texto (barras) -->
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">
+            <span class="card-title">Proporcion de Actividad</span>
         </div>
-        <div class="bar-chart">
-            <div class="bar-label"><span>Productos Nuevos</span><span>{{ pct_productos }}%</span></div>
-            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_productos }}%;background:#16a34a;"></div></div>
+        <div style="padding:20px;">
+            {% set total_eventos = datos.clientes_nuevos|length + datos.productos_nuevos|length + datos.activos_nuevos|length + datos.tareas_creadas|length + datos.cotizaciones_creadas|length %}
+            {% if total_eventos > 0 %}
+            {% set pct_clientes = (datos.clientes_nuevos|length / total_eventos * 100)|round %}
+            {% set pct_productos = (datos.productos_nuevos|length / total_eventos * 100)|round %}
+            {% set pct_activos = (datos.activos_nuevos|length / total_eventos * 100)|round %}
+            {% set pct_tareas = (datos.tareas_creadas|length / total_eventos * 100)|round %}
+            {% set pct_cotizaciones = (datos.cotizaciones_creadas|length / total_eventos * 100)|round %}
+            <div class="bar-chart">
+                <div class="bar-label"><span>Clientes Nuevos</span><span>{{ pct_clientes }}%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:{{ pct_clientes }}%;background:#2563eb;"></div></div>
+            </div>
+            <div class="bar-chart">
+                <div class="bar-label"><span>Productos Nuevos</span><span>{{ pct_productos }}%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:{{ pct_productos }}%;background:#16a34a;"></div></div>
+            </div>
+            <div class="bar-chart">
+                <div class="bar-label"><span>Fotos Vinculadas</span><span>{{ pct_activos }}%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:{{ pct_activos }}%;background:#d97706;"></div></div>
+            </div>
+            <div class="bar-chart">
+                <div class="bar-label"><span>Tareas Creadas</span><span>{{ pct_tareas }}%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:{{ pct_tareas }}%;background:#9333ea;"></div></div>
+            </div>
+            <div class="bar-chart">
+                <div class="bar-label"><span>Alianzas Comerciales</span><span>{{ pct_cotizaciones }}%</span></div>
+                <div class="bar-track"><div class="bar-fill" style="width:{{ pct_cotizaciones }}%;background:#dc2626;"></div></div>
+            </div>
+            {% else %}
+            <p style="text-align:center;color:var(--text-muted);padding:20px;">No hay datos en el periodo seleccionado.</p>
+            {% endif %}
         </div>
-        <div class="bar-chart">
-            <div class="bar-label"><span>Fotos Vinculadas</span><span>{{ pct_activos }}%</span></div>
-            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_activos }}%;background:#d97706;"></div></div>
+    </div>
+
+    <!-- Detalle por categoria -->
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">
+            <span class="card-title">Detalle por Categoria</span>
         </div>
-        <div class="bar-chart">
-            <div class="bar-label"><span>Tareas Creadas</span><span>{{ pct_tareas }}%</span></div>
-            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_tareas }}%;background:#9333ea;"></div></div>
+        <div style="padding:20px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+                <!-- Clientes Nuevos -->
+                <div>
+                    <h3 style="font-size:14px;font-weight:600;color:#2563eb;margin-bottom:8px;">Clientes Nuevos ({{ datos.clientes_nuevos|length }})</h3>
+                    {% if datos.clientes_nuevos %}
+                    <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                        {% for c in datos.clientes_nuevos %}
+                        <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ c[1] }} <span style="color:#94a3b8;font-size:11px;">({{ c[0] }})</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+                </div>
+                <!-- Tareas Creadas -->
+                <div>
+                    <h3 style="font-size:14px;font-weight:600;color:#9333ea;margin-bottom:8px;">Tareas Creadas ({{ datos.tareas_creadas|length }})</h3>
+                    {% if datos.tareas_creadas %}
+                    <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                        {% for t in datos.tareas_creadas %}
+                        <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">[{{ t[3] }}] {{ t[2] }} — <span style="color:#94a3b8;">{{ t[1] }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+                </div>
+                <!-- Alianzas -->
+                <div>
+                    <h3 style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:8px;">Alianzas ({{ datos.cotizaciones_creadas|length }})</h3>
+                    {% if datos.cotizaciones_creadas %}
+                    <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
+                        {% for cot in datos.cotizaciones_creadas %}
+                        <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ cot[1] }} — {{ cot[2] }} <span style="color:var(--primary);font-weight:600;">${{ cot[3] }}</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
+                </div>
+            </div>
         </div>
-        <div class="bar-chart">
-            <div class="bar-label"><span>Alianzas Comerciales</span><span>{{ pct_cotizaciones }}%</span></div>
-            <div class="bar-track"><div class="bar-fill" style="width:{{ pct_cotizaciones }}%;background:#dc2626;"></div></div>
+    </div>
+
+    <!-- Lista de Productos Agregados con Paginado -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Productos Agregados en el Periodo</span>
+            <span class="total-badge" id="prod-total-badge">{{ productos_pag.total }} productos</span>
         </div>
-        {% else %}
-        <p style="text-align:center;color:var(--text-muted);padding:20px;">No hay datos en el periodo seleccionado.</p>
+        <div class="table-responsive"><table>
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Nombre</th>
+                    <th>Marca</th>
+                    <th>Precio</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-productos-reporte">
+                {% for p in productos_pag.productos %}
+                <tr>
+                    <td><span class="sku-badge">{{ p[0] }}</span></td>
+                    <td>{{ p[1] }}</td>
+                    <td>{{ p[2] }}</td>
+                    <td class="precio">${{ "%.2f"|format(p[4]|float) if p[4] else "—" }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align:center;color:var(--text-muted);padding:30px;">No hay productos agregados en este periodo.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table></div>
+        {% if productos_pag.total_paginas > 1 %}
+        <div class="prod-paginacion">
+            <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)" {% if productos_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
+            <span id="prod-info-pagina">Pagina {{ productos_pag.pagina }} de {{ productos_pag.total_paginas }} ({{ productos_pag.total }} productos)</span>
+            <button class="btn btn-ghost btn-sm" id="prod-btn-sig" onclick="cambiarPaginaProd(1)" {% if productos_pag.pagina >= productos_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
+        </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Detalle por categoria -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <span class="card-title">Detalle por Categoria</span>
+<!-- Contenedor Pestaña: Bitácora de Auditoría -->
+<div id="tab-auditoria" class="reportes-tab-content">
+    <div style="margin-bottom: 20px; padding: 0 4px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Bitácora de Auditoría — Historial de Acciones</h2>
+        <p style="font-size: 13px; color: var(--text-muted);">Muestra las operaciones y accesos realizados en el sistema por cada usuario.</p>
     </div>
-    <div style="padding:20px;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
-            <!-- Clientes Nuevos -->
-            <div>
-                <h3 style="font-size:14px;font-weight:600;color:#2563eb;margin-bottom:8px;">Clientes Nuevos ({{ datos.clientes_nuevos|length }})</h3>
-                {% if datos.clientes_nuevos %}
-                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
-                    {% for c in datos.clientes_nuevos %}
-                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ c[1] }} <span style="color:#94a3b8;font-size:11px;">({{ c[0] }})</span></li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
-            <!-- Tareas Creadas -->
-            <div>
-                <h3 style="font-size:14px;font-weight:600;color:#9333ea;margin-bottom:8px;">Tareas Creadas ({{ datos.tareas_creadas|length }})</h3>
-                {% if datos.tareas_creadas %}
-                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
-                    {% for t in datos.tareas_creadas %}
-                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">[{{ t[3] }}] {{ t[2] }} — <span style="color:#94a3b8;">{{ t[1] }}</span></li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
-            <!-- Alianzas -->
-            <div>
-                <h3 style="font-size:14px;font-weight:600;color:#dc2626;margin-bottom:8px;">Alianzas ({{ datos.cotizaciones_creadas|length }})</h3>
-                {% if datos.cotizaciones_creadas %}
-                <ul style="font-size:13px;color:var(--text);list-style:none;padding:0;">
-                    {% for cot in datos.cotizaciones_creadas %}
-                    <li style="padding:4px 0;border-bottom:1px solid #f1f5f9;">{{ cot[1] }} — {{ cot[2] }} <span style="color:var(--primary);font-weight:600;">${{ cot[3] }}</span></li>
-                    {% endfor %}
-                </ul>
-                {% else %}<p style="font-size:13px;color:#94a3b8;">Sin registros</p>{% endif %}
-            </div>
+
+    <!-- Bitácora de Auditoría -->
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">
+            <span class="card-title">Bitácora de Auditoría (Acciones en el Periodo)</span>
+            <span class="total-badge" id="audit-total-badge">{{ datos.logs_auditoria|length }} acciones</span>
         </div>
+        <div class="table-responsive">
+            <table class="tabla-auditoria-custom">
+                <thead>
+                    <tr>
+                        <th>Fecha / Hora</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Detalles de la Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-auditoria-reporte">
+                    {% for log in logs_pag.logs %}
+                    <tr>
+                        <td style="white-space: nowrap; font-weight: 500;">
+                            {% if log[4] is string %}{{ log[4] }}{% else %}{{ log[4].strftime('%d/%m/%Y %H:%M:%S') }}{% endif %}
+                        </td>
+                        <td><strong style="color:var(--text);">{{ log[1] }}</strong></td>
+                        <td><span class="sku-badge" style="background:var(--primary-light); color:var(--primary-dark);">{{ log[2] }}</span></td>
+                        <td style="color:var(--text-muted); font-size:13px;">{{ log[3] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding:30px;">
+                            No hay registros de auditoría en este periodo.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if logs_pag.total_paginas > 1 %}
+        <div class="prod-paginacion">
+            <button class="btn btn-ghost btn-sm" id="audit-btn-ant" onclick="cambiarPaginaAudit(-1)" {% if logs_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
+            <span id="audit-info-pagina">Pagina {{ logs_pag.pagina }} de {{ logs_pag.total_paginas }} ({{ logs_pag.total }} acciones)</span>
+            <button class="btn btn-ghost btn-sm" id="audit-btn-sig" onclick="cambiarPaginaAudit(1)" {% if logs_pag.pagina >= logs_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
+        </div>
+        {% endif %}
     </div>
-</div>
-
-<!-- Bitácora de Auditoría -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <span class="card-title">Bitácora de Auditoría (Acciones en el Periodo)</span>
-        <span class="total-badge" id="audit-total-badge">{{ datos.logs_auditoria|length }} acciones</span>
-    </div>
-    <div class="table-responsive">
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha / Hora</th>
-                    <th>Usuario</th>
-                    <th>Acción</th>
-                    <th>Detalle</th>
-                </tr>
-            </thead>
-            <tbody id="tabla-auditoria-reporte">
-                {% for log in logs_pag.logs %}
-                <tr>
-                    <td style="white-space: nowrap; font-weight: 500;">
-                        {% if log[4] is string %}{{ log[4] }}{% else %}{{ log[4].strftime('%d/%m/%Y %H:%M:%S') }}{% endif %}
-                    </td>
-                    <td><strong style="color:var(--text);">{{ log[1] }}</strong></td>
-                    <td><span class="sku-badge" style="background:var(--primary-light); color:var(--primary-dark);">{{ log[2] }}</span></td>
-                    <td style="color:var(--text-muted); font-size:13px;">{{ log[3] }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" style="text-align:center; color:var(--text-muted); padding:30px;">
-                        No hay registros de auditoría en este periodo.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% if logs_pag.total_paginas > 1 %}
-    <div class="prod-paginacion">
-        <button class="btn btn-ghost btn-sm" id="audit-btn-ant" onclick="cambiarPaginaAudit(-1)" {% if logs_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
-        <span id="audit-info-pagina">Pagina {{ logs_pag.pagina }} de {{ logs_pag.total_paginas }} ({{ logs_pag.total }} acciones)</span>
-        <button class="btn btn-ghost btn-sm" id="audit-btn-sig" onclick="cambiarPaginaAudit(1)" {% if logs_pag.pagina >= logs_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
-    </div>
-    {% endif %}
-</div>
-
-<!-- Lista de Productos Agregados con Paginado -->
-<div class="card">
-    <div class="card-header">
-        <span class="card-title">Productos Agregados en el Periodo</span>
-        <span class="total-badge" id="prod-total-badge">{{ productos_pag.total }} productos</span>
-    </div>
-    <div class="table-responsive"><table>
-        <thead>
-            <tr>
-                <th>SKU</th>
-                <th>Nombre</th>
-                <th>Marca</th>
-                <th>Precio</th>
-            </tr>
-        </thead>
-        <tbody id="tabla-productos-reporte">
-            {% for p in productos_pag.productos %}
-            <tr>
-                <td><span class="sku-badge">{{ p[0] }}</span></td>
-                <td>{{ p[1] }}</td>
-                <td>{{ p[2] }}</td>
-                <td class="precio">${{ "%.2f"|format(p[4]|float) if p[4] else "—" }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" style="text-align:center;color:var(--text-muted);padding:30px;">No hay productos agregados en este periodo.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        </table></div>
-    {% if productos_pag.total_paginas > 1 %}
-    <div class="prod-paginacion">
-        <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)" {% if productos_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
-        <span id="prod-info-pagina">Pagina {{ productos_pag.pagina }} de {{ productos_pag.total_paginas }} ({{ productos_pag.total }} productos)</span>
-        <button class="btn btn-ghost btn-sm" id="prod-btn-sig" onclick="cambiarPaginaProd(1)" {% if productos_pag.pagina >= productos_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}
@@ -398,6 +462,37 @@ var prodPaginaActual = {{ productos_pag.pagina }};
 var prodTotalPaginas = {{ productos_pag.total_paginas }};
 var auditPaginaActual = {{ logs_pag.pagina }};
 var auditTotalPaginas = {{ logs_pag.total_paginas }};
+
+function switchTab(tabId) {
+    // Ocultar todos los contenidos de pestaña
+    document.querySelectorAll('.reportes-tab-content').forEach(function(content) {
+        content.classList.remove('active');
+    });
+    // Quitar la clase active de todos los botones de pestaña
+    document.querySelectorAll('.reportes-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    
+    // Mostrar la pestaña actual y marcar el botón como activo
+    var contentEl = document.getElementById('tab-' + tabId);
+    var btnEl = document.getElementById('btn-tab-' + tabId);
+    if (contentEl && btnEl) {
+        contentEl.classList.add('active');
+        btnEl.classList.add('active');
+    }
+    
+    // Guardar pestaña activa en localStorage para persistencia
+    localStorage.setItem('active_report_tab', tabId);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var storedTab = localStorage.getItem('active_report_tab');
+    if (storedTab === 'resumen' || storedTab === 'auditoria') {
+        switchTab(storedTab);
+    } else {
+        switchTab('resumen'); // Por defecto
+    }
+});
 
 function setRangoSemana() {
     var hoy = new Date();
