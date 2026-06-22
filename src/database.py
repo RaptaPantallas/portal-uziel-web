@@ -1294,14 +1294,24 @@ class ConexionBD:
         cursor = None
         try:
             cursor = conexion.cursor()
+            
+            # Check if this product already has a principal photo
+            cursor.execute("""
+                SELECT COUNT(*) FROM activos_digitales
+                WHERE producto_id = (SELECT id_producto FROM productos WHERE sku = %s) AND es_principal = TRUE
+            """, (sku,))
+            tiene_principal = cursor.fetchone()[0] > 0
+            
+            es_p = not tiene_principal # True if no principal yet, False otherwise
+            
             consulta_sql = """
-                INSERT INTO activos_digitales (producto_id, ruta_archivo, tipo_archivo, angulo)
+                INSERT INTO activos_digitales (producto_id, ruta_archivo, tipo_archivo, angulo, es_principal)
                 VALUES (
                     (SELECT id_producto FROM productos WHERE sku = %s),
-                    %s, %s, %s
+                    %s, %s, %s, %s
                 )
             """
-            cursor.execute(consulta_sql, (sku, ruta_archivo, tipo_archivo, angulo))
+            cursor.execute(consulta_sql, (sku, ruta_archivo, tipo_archivo, angulo, es_p))
             conexion.commit()
             return True
         except Error as e:
@@ -1318,14 +1328,24 @@ class ConexionBD:
         cursor = None
         try:
             cursor = conexion.cursor()
+            
+            # Check if this product already has a principal photo
+            cursor.execute("""
+                SELECT COUNT(*) FROM activos_digitales
+                WHERE producto_id = (SELECT id_producto FROM productos WHERE sku = %s) AND es_principal = TRUE
+            """, (sku,))
+            tiene_principal = cursor.fetchone()[0] > 0
+            
+            es_p = not tiene_principal # True if no principal yet, False otherwise
+            
             consulta_sql = """
-                INSERT INTO activos_digitales (producto_id, ruta_archivo, preview_webp, tipo_archivo, angulo)
+                INSERT INTO activos_digitales (producto_id, ruta_archivo, preview_webp, tipo_archivo, angulo, es_principal)
                 VALUES (
                     (SELECT id_producto FROM productos WHERE sku = %s),
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s
                 )
             """
-            cursor.execute(consulta_sql, (sku, ruta_archivo, psycopg2.Binary(preview_binary), tipo_archivo, angulo))
+            cursor.execute(consulta_sql, (sku, ruta_archivo, psycopg2.Binary(preview_binary), tipo_archivo, angulo, es_p))
             conexion.commit()
             return True
         except Error as e:
@@ -3003,16 +3023,40 @@ El equipo de Importadora Uziel C.A."""
         return resultados
 
     def eliminar_activo_por_id(self, activo_id: int) -> bool:
-        """Elimina un registro de activo digital por su ID. Retorna True/False."""
+        """Elimina un registro de activo digital por su ID. Promueve otro a principal si era el principal."""
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             pk = self._pk_activos
+            
+            # Fetch product_id and whether it was principal
+            cursor.execute(f"SELECT producto_id, es_principal FROM activos_digitales WHERE {pk} = %s", (activo_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            
+            producto_id, fue_principal = row[0], row[1]
+            
+            # Delete the asset
             cursor.execute(f"DELETE FROM activos_digitales WHERE {pk} = %s", (activo_id,))
+            
+            # If the deleted one was principal, pick the next available one and make it principal
+            if fue_principal:
+                cursor.execute(f"""
+                    SELECT {pk} FROM activos_digitales 
+                    WHERE producto_id = %s 
+                    ORDER BY {pk} ASC 
+                    LIMIT 1
+                """, (producto_id,))
+                next_row = cursor.fetchone()
+                if next_row:
+                    next_id = next_row[0]
+                    cursor.execute(f"UPDATE activos_digitales SET es_principal = TRUE WHERE {pk} = %s", (next_id,))
+            
             conexion.commit()
-            return cursor.rowcount > 0
+            return True
         except Error as e:
             print(f" [DAM] Error al eliminar activo #{activo_id}: {e}")
             conexion.rollback()
@@ -3334,7 +3378,7 @@ El equipo de Importadora Uziel C.A."""
             cursor = conexion.cursor()
             query = """
                 SELECT oi.id, oi.numero_orden, a.nombre_aliado, oi.estado,
-                       oi.valor_total_referencial, oi.creado_por, oi.fecha_creacion
+                       oi.valor_total_referencial, oi.creado_por, oi.fecha_creacion, oi.notas
                 FROM ordenes_intercambio oi
                 JOIN aliados a ON oi.aliado_id = a.id
             """
