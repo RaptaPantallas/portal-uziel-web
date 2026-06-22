@@ -276,10 +276,23 @@
         const filas = Array.from(document.querySelectorAll('#tabla-productos tbody tr')).filter(function (f) { return f.cells && f.cells.length > 1; });
         return filas.filter(function (fila) {
             const coincideCat = categoriaActiva === 'todas' || fila.getAttribute('data-categoria') === categoriaActiva;
-            const coincideTexto = !texto
-                || normalizar(fila.cells[1].textContent).includes(texto)
-                || normalizar(fila.cells[2].textContent).includes(texto)
-                || normalizar(fila.cells[3].textContent).includes(texto);
+            
+            let coincideTexto = true;
+            if (texto) {
+                const palabras = texto.split(/\s+/).filter(function(w) { return w.length > 0; });
+                for (let i = 0; i < palabras.length; i++) {
+                    const pal = palabras[i];
+                    const match = normalizar(fila.getAttribute('data-sku') || '').includes(pal)
+                        || normalizar(fila.getAttribute('data-nombre') || '').includes(pal)
+                        || normalizar(fila.getAttribute('data-marca') || '').includes(pal)
+                        || normalizar(fila.getAttribute('data-compatibilidad') || '').includes(pal)
+                        || normalizar(fila.getAttribute('data-descripcion') || '').includes(pal);
+                    if (!match) {
+                        coincideTexto = false;
+                        break;
+                    }
+                }
+            }
             return coincideCat && coincideTexto;
         });
     }

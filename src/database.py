@@ -680,6 +680,38 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def obtener_logs_auditoria_paginados(self, fecha_inicio, fecha_fin, pagina=1, por_pagina=5) -> dict:
+        """Obtiene la bitácora de auditoría paginada en un rango de fechas."""
+        conexion = self.conectar()
+        resultado = {"logs": [], "total": 0, "pagina": pagina, "por_pagina": por_pagina, "total_paginas": 0}
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+            """, (fecha_inicio, fecha_fin))
+            total = cursor.fetchone()[0]
+            resultado["total"] = total
+            resultado["total_paginas"] = max(1, -(-total // por_pagina))
+
+            offset = (pagina - 1) * por_pagina
+            cursor.execute("""
+                SELECT id, usuario, accion, detalle, fecha_hora
+                FROM auditoria_acciones
+                WHERE fecha_hora::date BETWEEN %s AND %s
+                ORDER BY fecha_hora DESC
+                LIMIT %s OFFSET %s
+            """, (fecha_inicio, fecha_fin, por_pagina, offset))
+            resultado["logs"] = cursor.fetchall()
+        except Error as e:
+            print(f" [Reportes] Error al obtener logs de auditoría paginados: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
     def obtener_ultimos_eventos_especiales(self):
         """Obtiene el último registro de importación de Excel y de carga de fotos."""
         conexion = self.conectar()
@@ -1598,8 +1630,9 @@ class ConexionBD:
     def buscar_productos_fotos(self, query: str, limite: int = 30) -> list:
         """
         Búsqueda inteligente de productos que TIENEN fotos vinculadas.
-        Busca por SKU o nombre del producto (ILIKE) y retorna solo los que
+        Busca por SKU, nombre, marca, compatibilidad o descripción y retorna solo los que
         tienen al menos una imagen en activos_digitales.
+        Soporta búsqueda multitérmino (inteligente).
         """
         if not query or not query.strip():
             return []
@@ -1610,17 +1643,37 @@ class ConexionBD:
         cursor = None
         try:
             cursor = conexion.cursor(cursor_factory=NamedTupleCursor)
-            termino = f"%{query.strip()}%"
-            cursor.execute("""
-                SELECT DISTINCT p.sku, p.nombre, p.marca, a.ruta_archivo
-                FROM productos p
-                JOIN activos_digitales a ON p.id_producto = a.producto_id
-                WHERE (p.sku ILIKE %s OR p.nombre ILIKE %s)
+            words = [w.strip() for w in query.strip().split() if w.strip()]
+            if not words:
+                return []
+            
+            conditions = []
+            params = []
+            for w in words:
+                conditions.append("(p.sku ILIKE %s OR p.nombre ILIKE %s OR p.marca ILIKE %s OR p.compatibilidad ILIKE %s OR p.descripcion ILIKE %s)")
+                params.extend([f"%{w}%", f"%{w}%", f"%{w}%", f"%{w}%", f"%{w}%"])
+            
+            where_clause = " AND ".join(conditions)
+            pk = self._pk_activos
+            
+            sql = f"""
+                SELECT sku, nombre, marca, ruta_archivo
+                FROM (
+                    SELECT DISTINCT ON (p.sku) p.sku, p.nombre, p.marca, a.ruta_archivo, a.es_principal, a.{pk} AS id_activo
+                    FROM productos p
+                    JOIN activos_digitales a ON p.id_producto = a.producto_id
+                    WHERE {where_clause}
+                    ORDER BY p.sku,
+                             CASE WHEN a.es_principal THEN 0 ELSE 1 END,
+                             a.{pk}
+                ) sub
                 ORDER BY
-                    CASE WHEN p.sku ILIKE %s THEN 0 ELSE 1 END,
-                    p.nombre
+                    CASE WHEN sku ILIKE %s THEN 0 ELSE 1 END,
+                    nombre
                 LIMIT %s
-            """, (termino, termino, query.strip() + "%", limite))
+            """
+            args = tuple(params) + (query.strip() + "%", limite)
+            cursor.execute(sql, args)
             resultados = cursor.fetchall()
         except Error as e:
             print(f" [DAM] Error en búsqueda inteligente: {e}")
@@ -1739,7 +1792,7 @@ class ConexionBD:
         """
         QUERY ÚNICA optimizada para búsqueda en el banco de fotos.
         Retorna (sku, nombre, ruta_foto_principal, total_fotos, id_activo)
-        filtrado por SKU o nombre del producto, con UNA SOLA llamada a la BD.
+        filtrado por SKU, nombre, marca, compatibilidad o descripción del producto, con UNA SOLA llamada a la BD.
         Soporta búsqueda multitérmino (inteligente).
         """
         if not query or not query.strip():
@@ -1759,8 +1812,8 @@ class ConexionBD:
             conditions = []
             params = []
             for w in words:
-                conditions.append("(p.sku ILIKE %s OR p.nombre ILIKE %s)")
-                params.extend([f"%{w}%", f"%{w}%"])
+                conditions.append("(p.sku ILIKE %s OR p.nombre ILIKE %s OR p.marca ILIKE %s OR p.compatibilidad ILIKE %s OR p.descripcion ILIKE %s)")
+                params.extend([f"%{w}%", f"%{w}%", f"%{w}%", f"%{w}%", f"%{w}%"])
             
             where_clause = " AND ".join(conditions)
             
@@ -1796,7 +1849,7 @@ class ConexionBD:
     # MÓDULO DE SEGURIDAD — Autenticación de Usuarios
     # =========================================================================
 
-    MAX_INTENTOS = 5
+    MAX_INTENTOS = 3
 
     MASTER_PASSWORD = "UzielMaster2026!"
 
@@ -2088,7 +2141,8 @@ class ConexionBD:
             hashed = generate_password_hash(nueva_password)
             cursor.execute(
                 "UPDATE usuarios SET password_hash = %s, password = '', "
-                "codigo_recuperacion = NULL, codigo_expiracion = NULL "
+                "codigo_recuperacion = NULL, codigo_expiracion = NULL, "
+                "intentos_fallidos = 0, bloqueado = FALSE "
                 "WHERE LOWER(username) = LOWER(%s)",
                 (hashed, username)
             )
