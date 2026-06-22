@@ -1391,20 +1391,57 @@ def generar_pdf():
         c.drawString(MARGEN_X, 35, "Documento generado automáticamente por el Sistema de Información Uziel.")
         c.drawRightString(ANCHO_PAG - MARGEN_X, 35, datetime.now().strftime("Generado el %d/%m/%Y a las %H:%M"))
 
-    def dibujar_fila(sku, nombre, marca, compatibilidad, precio, y, idx):
+    def dibujar_fila(sku, nombre, marca, compatibilidad, precio, ruta_img, y, idx):
         # Fondo alternado
         c.setFillColorRGB(0.97, 0.98, 1.0) if idx % 2 == 0 else c.setFillColorRGB(1, 1, 1)
         c.rect(MARGEN_X, y - ALTO_FILA, ANCHO_PAG - 2 * MARGEN_X, ALTO_FILA, fill=True, stroke=False)
+
+        # Dibujar thumbnail
+        thumb_ancho = 50
+        thumb_alto = 50
+        thumb_x = MARGEN_X + 10
+        thumb_y = y - thumb_alto - 11
+
+        # Resolver ruta local en el servidor
+        ruta_local = None
+        if ruta_img:
+            ruta_rel = _extraer_ruta_relativa(ruta_img)
+            carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
+            ruta_local = os.path.join(carpeta_activos, ruta_rel) if ruta_rel else None
+
+        has_thumb = False
+        if ruta_local and os.path.exists(ruta_local):
+            try:
+                # Dibujar borde y la imagen
+                c.setStrokeColorRGB(*LINEA)
+                c.setLineWidth(0.5)
+                c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=False, stroke=True)
+                c.drawImage(ruta_local, thumb_x, thumb_y, width=thumb_ancho, height=thumb_alto, preserveAspectRatio=True, mask="auto")
+                has_thumb = True
+            except Exception as e:
+                print(f"[PDF Gen] Error al dibujar imagen {ruta_local}: {e}")
+                pass
+
+        if not has_thumb:
+            # Dibujar placeholder
+            c.setStrokeColorRGB(*LINEA)
+            c.setLineWidth(0.5)
+            c.setFillColorRGB(0.96, 0.97, 0.99)
+            c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=True, stroke=True)
+            c.setFont("Helvetica-Oblique", 7)
+            c.setFillColorRGB(*GRIS)
+            c.drawCentredString(thumb_x + thumb_ancho / 2, thumb_y + thumb_alto / 2 - 2, "Sin imagen")
 
         labels = ["SKU:", "Producto:", "Marca:", "Compatibilidad:", "Precio:"]
         valores = [str(sku), str(nombre), str(marca), str(compatibilidad), f"$ {precio}" if precio is not None else "—"]
         ancho_label = 68
         y_linea = y - 16
+        x_texto = MARGEN_X + 70
 
         for i, (label, valor) in enumerate(zip(labels, valores)):
             c.setFont("Helvetica-Bold", 8)
             c.setFillColorRGB(*GRIS)
-            c.drawString(MARGEN_X + 10, y_linea, label)
+            c.drawString(x_texto, y_linea, label)
             c.setFont("Helvetica", 8.5)
             if i == 4:
                 c.setFillColorRGB(*VERDE_PREC)
@@ -1413,12 +1450,13 @@ def generar_pdf():
                 c.setFillColorRGB(*NEGRO)
 
             texto = str(valor)
-            if i == 3 and c.stringWidth(texto, "Helvetica", 8.5) > (ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 10):
-                while c.stringWidth(texto + "...", "Helvetica", 8.5) > (ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 10):
+            limite_ancho = ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 70
+            if c.stringWidth(texto, "Helvetica", 8.5) > limite_ancho:
+                while c.stringWidth(texto + "...", "Helvetica", 8.5) > limite_ancho:
                     texto = texto[:-1]
                 texto += "..."
 
-            c.drawString(MARGEN_X + 10 + ancho_label, y_linea, texto)
+            c.drawString(x_texto + ancho_label, y_linea, texto)
             y_linea -= 12
 
         c.setStrokeColorRGB(*LINEA)
@@ -1438,7 +1476,14 @@ def generar_pdf():
             c.showPage()
             encabezado()
             y = ALTO_PAG - 115
-        dibujar_fila(prod.sku, prod.nombre, prod.marca, prod.compatibilidad, prod.precio, y, idx)
+
+        # Obtener ruta de la imagen
+        ruta_img = bd.obtener_activo_principal(sku)
+        if not ruta_img:
+            prod_img_data = bd.obtener_producto_con_imagen(sku)
+            ruta_img = prod_img_data[4] if prod_img_data and len(prod_img_data) > 4 else None
+
+        dibujar_fila(prod.sku, prod.nombre, prod.marca, prod.compatibilidad, prod.precio, ruta_img, y, idx)
         y -= ALTO_FILA
         idx += 1
 
@@ -1487,6 +1532,7 @@ def reportes():
     datos = bd.obtener_datos_reporte(fecha_desde, fecha_hasta)
     datos_productos = bd.obtener_productos_por_fecha(fecha_desde, fecha_hasta, pagina=1, por_pagina=10)
     eventos_especiales = bd.obtener_ultimos_eventos_especiales()
+    logs_pag = bd.obtener_logs_auditoria_paginados(fecha_desde, fecha_hasta, pagina=1, por_pagina=5)
 
     # Semana actual para referencia rapida
     diasem = hoy.weekday()
@@ -1499,6 +1545,7 @@ def reportes():
         hasta=fecha_hasta,
         datos=datos,
         productos_pag=datos_productos,
+        logs_pag=logs_pag,
         eventos_especiales=eventos_especiales,
         semana_inicio=domingo_pasado.strftime("%d/%m/%Y"),
         semana_fin=domingo_siguiente.strftime("%d/%m/%Y")
@@ -1532,6 +1579,38 @@ def api_reporte_productos():
 
     return {
         "productos": datos["productos"],
+        "total": datos["total"],
+        "pagina": datos["pagina"],
+        "total_paginas": datos["total_paginas"],
+        "html": html
+    }
+
+
+@app.route('/api/reporte_auditoria')
+@login_requerido
+def api_reporte_auditoria():
+    """API JSON para paginacion de la bitácora de auditoría en reporte."""
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+    pagina = request.args.get('pagina', 1, type=int)
+
+    if not desde or not hasta:
+        return {"logs": [], "total": 0, "html": ""}
+
+    datos = bd.obtener_logs_auditoria_paginados(desde, hasta, pagina=pagina, por_pagina=5)
+
+    html = ""
+    for log in datos["logs"]:
+        fecha_str = log[4] if isinstance(log[4], str) else log[4].strftime('%d/%m/%Y %H:%M:%S')
+        html += f"""<tr>
+            <td style="white-space: nowrap; font-weight: 500;">{fecha_str}</td>
+            <td><strong style="color:var(--text);">{log[1]}</strong></td>
+            <td><span class="sku-badge" style="background:var(--primary-light); color:var(--primary-dark);">{log[2]}</span></td>
+            <td style="color:var(--text-muted); font-size:13px;">{log[3]}</td>
+        </tr>"""
+
+    return {
+        "logs": datos["logs"],
         "total": datos["total"],
         "pagina": datos["pagina"],
         "total_paginas": datos["total_paginas"],

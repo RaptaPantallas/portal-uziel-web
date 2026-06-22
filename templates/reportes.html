@@ -312,7 +312,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">
         <span class="card-title">Bitácora de Auditoría (Acciones en el Periodo)</span>
-        <span class="total-badge">{{ datos.logs_auditoria|length }} acciones</span>
+        <span class="total-badge" id="audit-total-badge">{{ datos.logs_auditoria|length }} acciones</span>
     </div>
     <div class="table-responsive">
         <table>
@@ -324,8 +324,8 @@
                     <th>Detalle</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for log in datos.logs_auditoria %}
+            <tbody id="tabla-auditoria-reporte">
+                {% for log in logs_pag.logs %}
                 <tr>
                     <td style="white-space: nowrap; font-weight: 500;">
                         {% if log[4] is string %}{{ log[4] }}{% else %}{{ log[4].strftime('%d/%m/%Y %H:%M:%S') }}{% endif %}
@@ -344,6 +344,13 @@
             </tbody>
         </table>
     </div>
+    {% if logs_pag.total_paginas > 1 %}
+    <div class="prod-paginacion">
+        <button class="btn btn-ghost btn-sm" id="audit-btn-ant" onclick="cambiarPaginaAudit(-1)" {% if logs_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
+        <span id="audit-info-pagina">Pagina {{ logs_pag.pagina }} de {{ logs_pag.total_paginas }} ({{ logs_pag.total }} acciones)</span>
+        <button class="btn btn-ghost btn-sm" id="audit-btn-sig" onclick="cambiarPaginaAudit(1)" {% if logs_pag.pagina >= logs_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Lista de Productos Agregados con Paginado -->
@@ -378,9 +385,9 @@
         </table></div>
     {% if productos_pag.total_paginas > 1 %}
     <div class="prod-paginacion">
-        <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)">← Anterior</button>
+        <button class="btn btn-ghost btn-sm" id="prod-btn-ant" onclick="cambiarPaginaProd(-1)" {% if productos_pag.pagina <= 1 %}disabled{% endif %}>← Anterior</button>
         <span id="prod-info-pagina">Pagina {{ productos_pag.pagina }} de {{ productos_pag.total_paginas }} ({{ productos_pag.total }} productos)</span>
-        <button class="btn btn-ghost btn-sm" id="prod-btn-sig" onclick="cambiarPaginaProd(1)">Siguiente →</button>
+        <button class="btn btn-ghost btn-sm" id="prod-btn-sig" onclick="cambiarPaginaProd(1)" {% if productos_pag.pagina >= productos_pag.total_paginas %}disabled{% endif %}>Siguiente →</button>
     </div>
     {% endif %}
 </div>
@@ -389,6 +396,8 @@
 <script>
 var prodPaginaActual = {{ productos_pag.pagina }};
 var prodTotalPaginas = {{ productos_pag.total_paginas }};
+var auditPaginaActual = {{ logs_pag.pagina }};
+var auditTotalPaginas = {{ logs_pag.total_paginas }};
 
 function setRangoSemana() {
     var hoy = new Date();
@@ -446,6 +455,26 @@ function cambiarPaginaProd(delta) {
             prodTotalPaginas = data.total_paginas;
             document.getElementById('prod-btn-ant').disabled = data.pagina <= 1;
             document.getElementById('prod-btn-sig').disabled = data.pagina >= data.total_paginas;
+        });
+}
+
+function cambiarPaginaAudit(delta) {
+    var nueva = auditPaginaActual + delta;
+    if (nueva < 1 || nueva > auditTotalPaginas) return;
+    auditPaginaActual = nueva;
+
+    var desde = document.getElementById('input-desde').value;
+    var hasta = document.getElementById('input-hasta').value;
+
+    fetch('/api/reporte_auditoria?desde=' + encodeURIComponent(desde) + '&hasta=' + encodeURIComponent(hasta) + '&pagina=' + nueva)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('tabla-auditoria-reporte').innerHTML = data.html;
+            document.getElementById('audit-info-pagina').textContent = 'Pagina ' + data.pagina + ' de ' + data.total_paginas + ' (' + data.total + ' acciones)';
+            document.getElementById('audit-total-badge').textContent = data.total + ' acciones';
+            auditTotalPaginas = data.total_paginas;
+            document.getElementById('audit-btn-ant').disabled = data.pagina <= 1;
+            document.getElementById('audit-btn-sig').disabled = data.pagina >= data.total_paginas;
         });
 }
 </script>
