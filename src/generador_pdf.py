@@ -27,6 +27,19 @@ from reportlab.lib.units import cm
 from src.database import ConexionBD
 
 
+def _extraer_ruta_relativa(ruta_archivo):
+    """Extrae la ruta relativa de un activo digital dentro de almacen_activos/."""
+    if not ruta_archivo:
+        return None
+    ruta = str(ruta_archivo).replace('\\', '/')
+    if 'almacen_activos/' in ruta:
+        idx = ruta.index('almacen_activos/')
+        return ruta[idx + len('almacen_activos/'):]
+    if ruta.startswith('/') or (len(ruta) > 2 and ruta[1] == ':'):
+        return os.path.basename(ruta)
+    return ruta
+
+
 # =============================================================================
 # ████████  CONFIGURACIÓN DEL PDF — EDITAR AQUÍ  ████████
 # =============================================================================
@@ -137,10 +150,21 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
 
     # ---- Fotografía del producto ----
     c.setFillColorRGB(*COLOR_NEGRO)
-    if ruta_img and os.path.exists(ruta_img):
+    ruta_local = None
+    if ruta_img:
+        if os.path.exists(ruta_img):
+            ruta_local = ruta_img
+        else:
+            ruta_rel = _extraer_ruta_relativa(ruta_img)
+            if ruta_rel:
+                ruta_alt = os.path.join("almacen_activos", ruta_rel)
+                if os.path.exists(ruta_alt):
+                    ruta_local = ruta_alt
+
+    if ruta_local:
         try:
             c.drawImage(
-                ruta_img,
+                ruta_local,
                 X_IMAGEN,
                 alto - Y_IMAGEN_OFFSET,
                 width=ANCHO_IMAGEN,
@@ -201,10 +225,21 @@ def _dibujar_fila_producto(c, sku: str, nombre: str, marca: str,
 
     # ---- Thumbnail ----
     thumb_y = y - ALTO_THUMB - 10
-    if ruta_img and os.path.exists(ruta_img):
+    ruta_local = None
+    if ruta_img:
+        if os.path.exists(ruta_img):
+            ruta_local = ruta_img
+        else:
+            ruta_rel = _extraer_ruta_relativa(ruta_img)
+            if ruta_rel:
+                ruta_alt = os.path.join("almacen_activos", ruta_rel)
+                if os.path.exists(ruta_alt):
+                    ruta_local = ruta_alt
+
+    if ruta_local:
         try:
             c.roundRect(MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB, 4, fill=False, stroke=True)
-            c.drawImage(ruta_img, MARGEN_X, thumb_y,
+            c.drawImage(ruta_local, MARGEN_X, thumb_y,
                         width=ANCHO_THUMB, height=ALTO_THUMB,
                         preserveAspectRatio=True, mask="auto")
         except Exception:
@@ -299,7 +334,11 @@ def generar_ficha_tecnica(sku: str) -> bool:
 
     c = canvas.Canvas(nombre_pdf, pagesize=letter)
     _dibujar_pagina_producto(c, sku, datos, ancho, alto)
-    c.save()
+    try:
+        c.save()
+    except Exception as e:
+        print(f" [PDF] Error al guardar ficha técnica: {e}")
+        return False
 
     print(f" [PDF] Ficha técnica generada: '{nombre_pdf}'")
     return True
@@ -361,11 +400,19 @@ def generar_pdf_catalogo(lista_skus: list[str], ruta_guardar: str = None) -> tup
             _dibujar_encabezado_catalogo(c, ancho, alto)
             y = alto - 125
 
-        y = _dibujar_fila_producto(c, sku, nombre, marca, compatibilidad,
-                                    precio, ruta_img, ancho, y, idx)
+        try:
+            y = _dibujar_fila_producto(c, sku, nombre, marca, compatibilidad,
+                                        precio, ruta_img, ancho, y, idx)
+        except Exception as e:
+            print(f"  [PDF Catálogo] Error al dibujar producto '{sku}': {e}")
+            y -= ALTO_FILA
 
     _dibujar_pie(c, ancho)
-    c.save()
+    try:
+        c.save()
+    except Exception as e:
+        print(f" [PDF Catálogo] Error al guardar PDF: {e}")
+        return False, str(e)
 
     print(f" [PDF Catálogo] {len(paginas)} producto(s) incluidos. Archivo: '{nombre_pdf}'")
     return True, nombre_pdf
