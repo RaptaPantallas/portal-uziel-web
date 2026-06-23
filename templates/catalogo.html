@@ -25,7 +25,7 @@
 <!-- Guía de Uso del Módulo -->
 <div class="ayuda-modulo" data-ayuda-key="catalogo">
     <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'catalogo')">✕ Ocultar Guía</button>
-    <div class="ayuda-modulo-titulo">📦 Guía de Uso: PIM Productos</div>
+    <div class="ayuda-modulo-titulo"><i data-lucide="info" style="width:18px;height:18px;"></i> Guía de Uso: PIM Productos</div>
     <div class="ayuda-modulo-contenido">
         <p>Este módulo (PIM) te permite gestionar y consultar todo el catálogo de repuestos de <strong>EDJ7 Autoparts</strong>:</p>
         <ul>
@@ -44,7 +44,7 @@
 {% endwith %}
 
 <div class="search-bar">
-    <span style="color:var(--text-muted);font-size:16px;"></span>
+    <span style="color:var(--text-muted);display:flex;align-items:center;"><i data-lucide="search" style="width:18px;height:18px;"></i></span>
     <input type="text" id="buscador" placeholder="Buscar por SKU, nombre o marca..." oninput="filtrarProductos()" autocomplete="off">
     <button class="btn-limpiar" id="btn-limpiar" onclick="limpiarBusqueda()" title="Limpiar búsqueda">✕</button>
 </div>

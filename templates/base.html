@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Importadora Uziel{% endblock %}</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
@@ -34,10 +35,10 @@
             --warning-bg: #fffbeb;
             --radius: 8px;
             --radius-lg: 12px;
-            --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-            --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+            --font: 'Inter', system-ui, -apple-system, sans-serif;
+            --shadow-sm: 0 2px 4px rgba(15,23,42,0.04);
+            --shadow: 0 4px 6px rgba(15,23,42,0.06), 0 2px 4px rgba(15,23,42,0.04);
+            --shadow-lg: 0 10px 25px rgba(15,23,42,0.1);
         }
 
         body {
@@ -301,8 +302,8 @@
             white-space: nowrap;
         }
 
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn:active { transform: translateY(0); }
+        .btn:hover { opacity: 0.95; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+        .btn:active { transform: translateY(0); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .btn-sm { padding: 5px 12px; font-size: 12px; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-hover); }
@@ -736,6 +737,7 @@
             text-decoration: underline;
         }
 </style>
+<script src="https://unpkg.com/lucide@latest"></script>
 {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -765,24 +767,24 @@
     <nav class="sidebar-nav">
         {% block sidebar_links %}
         <a href="{{ url_for('inicio') }}" class="nav-item {% if request.endpoint == 'inicio' %}active{% endif %}">
-            <span class="nav-icon">⊞</span> <span>Dashboard</span>
+            <i data-lucide="layout-dashboard" class="nav-icon"></i> <span>Dashboard</span>
         </a>
         {% if puede_ver('clientes') %}
         <a href="{{ url_for('clientes') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cliente') %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Clientes</span>
+            <i data-lucide="users" class="nav-icon"></i> <span>Clientes</span>
         </a>
         {% endif %}
         {% if puede_ver('productos') %}
         <a href="{{ url_for('catalogo') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith(('catalogo','producto','nuevo_producto','editar')) %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Productos</span>
+            <i data-lucide="box" class="nav-icon"></i> <span>Productos</span>
         </a>
         <a href="{{ url_for('galeria') }}" class="nav-item {% if request.endpoint == 'galeria' %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Galería</span>
+            <i data-lucide="image" class="nav-icon"></i> <span>Galería</span>
         </a>
         {% endif %}
         {% if puede_ver('tareas') %}
         <a href="{{ url_for('tareas') }}" class="nav-item {% if request.endpoint == 'tareas' %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Tareas</span>
+            <i data-lucide="check-square" class="nav-icon"></i> <span>Tareas</span>
             {% if total_notif > 0 %}
                 <span class="nav-badge">{{ total_notif }}</span>
             {% endif %}
@@ -790,25 +792,25 @@
         {% endif %}
         {% if puede_ver('cotizaciones') %}
         <a href="{{ url_for('cotizaciones') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cotizacion') %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Alianzas Comerciales</span>
+            <i data-lucide="file-text" class="nav-icon"></i> <span>Alianzas Comerciales</span>
         </a>
         {% endif %}
         <hr class="nav-divider">
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Reportes</span>
+            <i data-lucide="pie-chart" class="nav-icon"></i> <span>Reportes</span>
         </a>
         {% if puede('usuarios', 'gestionar') %}
         <a href="{{ url_for('admin_usuarios') }}" class="nav-item {% if request.endpoint == 'admin_usuarios' %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Usuarios</span>
+            <i data-lucide="shield" class="nav-icon"></i> <span>Usuarios</span>
         </a>
         <a href="{{ url_for('admin_config_correo') }}" class="nav-item {% if request.endpoint == 'admin_config_correo' %}active{% endif %}">
-            <span class="nav-icon"></span> <span>Correo SMTP</span>
+            <i data-lucide="mail" class="nav-icon"></i> <span>Correo SMTP</span>
         </a>
         {% endif %}
         {% endblock %}
     </nav>
     <div class="sidebar-footer">
-        <a href="{{ url_for('logout') }}" class="btn-logout">↪ <span>Cerrar Sesión</span></a>
+        <a href="{{ url_for('logout') }}" class="btn-logout"><i data-lucide="log-out" class="nav-icon" style="width: 16px;"></i> <span>Cerrar Sesión</span></a>
     </div>
 </aside>
 
@@ -985,6 +987,9 @@ function cargarContenido(url, pushState = true) {
             if (typeof inicializarAyudas === 'function') {
                 inicializarAyudas();
             }
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
         hideProgress();
         window.scrollTo({ top: 0 });
@@ -1147,6 +1152,9 @@ document.addEventListener('submit', function(e) {
             contentArea.innerHTML = html;
             ejecutarScripts(contentArea);
             actualizarSidebar(window.location.href);
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
         hideProgress();
         window.scrollTo({ top: 0 });
@@ -1197,7 +1205,12 @@ function inicializarAyudas() {
         }
     });
 }
-document.addEventListener('DOMContentLoaded', inicializarAyudas);
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarAyudas();
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+});
 
 function confirmarEliminarProducto(sku) {
     const password = prompt("Para eliminar el producto " + sku + ", ingresa tu contraseña:");

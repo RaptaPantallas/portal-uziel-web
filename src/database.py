@@ -68,6 +68,12 @@ class ConnectionWrapper:
             except Exception:
                 pass
 
+    def rollback(self):
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+
 
 class ConexionBD:
     """

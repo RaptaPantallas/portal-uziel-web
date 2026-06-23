@@ -66,7 +66,7 @@
 <!-- Guía de Uso del Módulo -->
 <div class="ayuda-modulo" data-ayuda-key="dashboard">
     <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'dashboard')">✕ Ocultar Guía</button>
-    <div class="ayuda-modulo-titulo">⊞ Guía Rápida: Dashboard Principal</div>
+    <div class="ayuda-modulo-titulo"><i data-lucide="info" style="width:18px;height:18px;"></i> Guía Rápida: Dashboard Principal</div>
     <div class="ayuda-modulo-contenido">
         <p>Bienvenido al Panel de Control de <strong>EDJ7 Autoparts</strong>. Aquí puedes monitorear y gestionar las operaciones principales del sistema:</p>
         <ul>
@@ -88,16 +88,16 @@
 
 <div class="stats-grid">
     <div class="stat-card clientes-card">
-        <div class="stat-label">Total Clientes <span class="icon"></span></div>
+        <div class="stat-label">Total Clientes <i data-lucide="users" class="icon"></i></div>
         <div class="stat-value">{{ total_cli }}</div>
     </div>
     <div class="stat-card productos-card">
-        <div class="stat-label">Total Productos <span class="icon"></span></div>
+        <div class="stat-label">Total Productos <i data-lucide="box" class="icon"></i></div>
         <div class="stat-value">{{ total_prod }}</div>
     </div>
     {% if mis_tareas %}
     <div class="stat-card tareas-card">
-        <div class="stat-label">Mis Tareas Activas <span class="icon"></span></div>
+        <div class="stat-label">Mis Tareas Activas <i data-lucide="check-square" class="icon"></i></div>
         <div class="stat-value">{{ mis_tareas | length }}</div>
     </div>
     {% endif %}

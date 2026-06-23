@@ -25,7 +25,7 @@
 <!-- Guía de Uso del Módulo -->
 <div class="ayuda-modulo" data-ayuda-key="tareas">
     <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'tareas')">✕ Ocultar Guía</button>
-    <div class="ayuda-modulo-titulo">📋 Guía de Uso: Tablero de Tareas</div>
+    <div class="ayuda-modulo-titulo"><i data-lucide="info" style="width:18px;height:18px;"></i> Guía de Uso: Tablero de Tareas</div>
     <div class="ayuda-modulo-contenido">
         <p>Este tablero permite organizar las actividades operativas asociadas a los clientes del CRM:</p>
         <ul>
@@ -123,7 +123,7 @@
         </table></div>
     {% else %}
     <div class="empty-state">
-        <span class="icon"></span>
+        <i data-lucide="check-square" class="icon" style="width:48px;height:48px;color:var(--text-light);margin-bottom:12px;"></i>
         <p>No hay tareas registradas.</p>
     </div>
     {% endif %}
