@@ -721,7 +721,8 @@ def subir_imagen(sku):
 
     # Crear carpeta del SKU
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-    carpeta_sku = os.path.join(carpeta_activos, sku)
+    sku_safe = sku.replace('/', '-').replace('\\', '-')
+    carpeta_sku = os.path.join(carpeta_activos, sku_safe)
     os.makedirs(carpeta_sku, exist_ok=True)
 
     # Determinar el siguiente número secuencial
