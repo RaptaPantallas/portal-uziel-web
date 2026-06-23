@@ -441,7 +441,7 @@ def generar_pdf_alianza(datos: dict) -> io.BytesIO:
     items = datos['items']
 
     # Desempacar cabecera
-    _, numero, cliente_rif, cliente_nombre, estado, notas, total_usd, creado_por, fecha_creacion = cab
+    _, numero, cliente_rif, cliente_nombre, estado, notas, total_usd, creado_por, fecha_creacion = cab[:9]
 
     ancho, alto = letter
     buffer = io.BytesIO()
