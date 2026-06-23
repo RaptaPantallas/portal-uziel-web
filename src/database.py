@@ -22,6 +22,7 @@
 
 import os
 import psycopg2
+import time
 from psycopg2 import Error
 from psycopg2.extras import NamedTupleCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -132,26 +133,52 @@ class ConexionBD:
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL desde el pool, envuelta para liberación segura."""
-        if ConexionBD._pool is None:
-            ConexionBD._inicializar_pool(self.url_nube)
-        
-        conexion = None
-        usando_pool = False
-        if ConexionBD._pool:
-            try:
-                conexion = ConexionBD._pool.getconn()
-                usando_pool = True
-            except Exception as e:
-                print(f" [BD] Error al obtener conexión del pool: {e}")
-        
-        if not conexion:
-            try:
-                conexion = psycopg2.connect(self.url_nube)
-            except Exception as e:
-                print(f" [BD] Error en fallback de conexión a PostgreSQL: {e}")
-                return None
+        intentos = 0
+        max_intentos = 3
 
-        return ConnectionWrapper(conexion, ConexionBD._pool if usando_pool else None)
+        while intentos < max_intentos:
+            if ConexionBD._pool is None:
+                ConexionBD._inicializar_pool(self.url_nube)
+            
+            conexion = None
+            usando_pool = False
+            
+            if ConexionBD._pool:
+                try:
+                    conexion = ConexionBD._pool.getconn()
+                    usando_pool = True
+                    
+                    if conexion.closed != 0:
+                        raise Exception("Conexión marcada como cerrada por psycopg2.")
+                    
+                    with conexion.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                except Exception as e:
+                    if conexion:
+                        try:
+                            ConexionBD._pool.putconn(conexion, close=True)
+                        except:
+                            pass
+                    conexion = None
+                    usando_pool = False
+
+            if not conexion:
+                try:
+                    conexion = psycopg2.connect(self.url_nube)
+                    with conexion.cursor() as cursor:
+                        cursor.execute("SELECT 1")
+                except Exception as e:
+                    print(f" [BD] Error en conexión a PostgreSQL (Intento {intentos+1}): {e}")
+                    conexion = None
+
+            if conexion:
+                return ConnectionWrapper(conexion, ConexionBD._pool if usando_pool else None)
+            
+            intentos += 1
+            time.sleep(0.5)
+
+        print(" [BD] Error Crítico: No se pudo obtener conexión válida después de múltiples intentos.")
+        return None
 
     def actualizar_esquema_productos(self):
         """

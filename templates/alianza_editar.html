@@ -76,7 +76,15 @@
                 <input type="text" id="buscador-producto" placeholder="Buscar producto para agregar por nombre o SKU..." autocomplete="off">
                 <div id="lista-productos">
                     {% for p in productos %}
-                    <div class="prod-item" data-sku="{{ p[0] }}" data-nombre="{{ p[1] }}" data-precio="{{ p[5] }}" onclick="agregarProducto(this)">
+                    <div class="prod-item" 
+                         data-sku="{{ p[0] }}" 
+                         data-nombre="{{ p[1] }}" 
+                         data-precio="{{ p[5] }}"
+                         data-marca="{{ p[3] or '' }}"
+                         data-compatibilidad="{{ p[4] or '' }}"
+                         data-descripcion="{{ p[2] or '' }}"
+                         data-categoria="{{ p[6] or '' }}"
+                         onclick="agregarProducto(this)">
                         <span>{{ p[1] }} <span class="prod-sku">{{ p[0] }}</span></span>
                         <span class="prod-precio">$ {{ p[5] }}</span>
                     </div>
@@ -145,6 +153,14 @@ const listaProds = document.getElementById('lista-productos');
 const prodItems = listaProds.querySelectorAll('.prod-item');
 const sinResultados = document.getElementById('sin-resultados');
 
+function normalizarTexto(txt) {
+    if (!txt) return "";
+    return txt.toString()
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+}
+
 buscador.addEventListener('focus', () => listaProds.style.display = 'block');
 document.addEventListener('click', (e) => { 
     if (!buscador.contains(e.target) && !listaProds.contains(e.target)) {
@@ -153,13 +169,46 @@ document.addEventListener('click', (e) => {
 });
 
 buscador.addEventListener('input', () => {
-    const q = buscador.value.trim().toLowerCase();
+    const q = normalizarTexto(buscador.value.trim());
     let visibles = 0;
-    prodItems.forEach(item => { 
-        const mostrar = !q || item.textContent.toLowerCase().includes(q); 
-        item.style.display = mostrar ? '' : 'none'; 
-        if (mostrar) visibles++; 
+    
+    if (!q) {
+        prodItems.forEach(item => {
+            item.style.display = '';
+            visibles++;
+        });
+        sinResultados.style.display = 'none';
+        listaProds.style.display = 'block';
+        return;
+    }
+
+    const palabras = q.split(/\s+/);
+
+    prodItems.forEach(item => {
+        const sku = normalizarTexto(item.dataset.sku);
+        const nombre = normalizarTexto(item.dataset.nombre);
+        const marca = normalizarTexto(item.dataset.marca);
+        const compatibilidad = normalizarTexto(item.dataset.compatibilidad);
+        const descripcion = normalizarTexto(item.dataset.descripcion);
+        const categoria = normalizarTexto(item.dataset.categoria);
+
+        const coincideTodo = palabras.every(palabra => {
+            return sku.includes(palabra) ||
+                   nombre.includes(palabra) ||
+                   marca.includes(palabra) ||
+                   compatibilidad.includes(palabra) ||
+                   descripcion.includes(palabra) ||
+                   categoria.includes(palabra);
+        });
+
+        if (coincideTodo) {
+            item.style.display = '';
+            visibles++;
+        } else {
+            item.style.display = 'none';
+        }
     });
+
     sinResultados.style.display = visibles === 0 ? 'block' : 'none';
     listaProds.style.display = 'block';
 });
