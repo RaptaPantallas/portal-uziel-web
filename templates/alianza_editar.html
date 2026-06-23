@@ -37,16 +37,16 @@
     <div class="page-header" style="margin-bottom: 20px;">
         <div>
             <nav class="breadcrumb">
-                <a href="{{ url_for('cotizaciones') }}">Alianzas</a>
+                <a href="{{ url_for('alianzas') }}">Alianzas</a>
                 <span class="breadcrumb-sep">›</span>
-                <a href="{{ url_for('cotizacion_detalle', cotizacion_id=cab[0]) }}">{{ cab[1] }}</a>
+                <a href="{{ url_for('alianza_detalle', alianza_id=cab[0]) }}">{{ cab[1] }}</a>
                 <span class="breadcrumb-sep">›</span>
                 <span>Editar</span>
             </nav>
             <h1 style="margin-top: 4px;">Editar Alianza Comercial</h1>
         </div>
         <div class="acciones">
-            <a href="{{ url_for('cotizacion_detalle', cotizacion_id=cab[0]) }}" class="btn btn-ghost">← Cancelar</a>
+            <a href="{{ url_for('alianza_detalle', alianza_id=cab[0]) }}" class="btn btn-ghost">← Cancelar</a>
         </div>
     </div>
 
@@ -57,7 +57,7 @@
     {% endwith %}
 
     <div class="card" style="position: relative;">
-        <form method="POST" action="{{ url_for('cotizacion_editar', cotizacion_id=cab[0]) }}" id="form-editar-cotizacion">
+        <form method="POST" action="{{ url_for('alianza_editar', alianza_id=cab[0]) }}" id="form-editar-cotizacion">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             
             <div class="form-grid" style="margin-bottom: 20px;">
@@ -137,7 +137,7 @@
             <textarea name="notas" class="form-control" placeholder="Detalle la publicidad comprometida..." style="margin-bottom: 24px; min-height: 100px;">{{ cab[5] or '' }}</textarea>
 
             <div class="form-actions">
-                <a href="{{ url_for('cotizacion_detalle', cotizacion_id=cab[0]) }}" class="btn btn-ghost">Cancelar</a>
+                <a href="{{ url_for('alianza_detalle', alianza_id=cab[0]) }}" class="btn btn-ghost">Cancelar</a>
                 <button type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
             </div>
         </form>

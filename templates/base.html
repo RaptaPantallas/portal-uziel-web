@@ -791,7 +791,7 @@
         </a>
         {% endif %}
         {% if puede_ver('cotizaciones') %}
-        <a href="{{ url_for('cotizaciones') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('cotizacion') %}active{% endif %}">
+        <a href="{{ url_for('alianzas') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('alianza') %}active{% endif %}">
             <i data-lucide="file-text" class="nav-icon"></i> <span>Alianzas Comerciales</span>
         </a>
         {% endif %}

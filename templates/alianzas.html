@@ -34,7 +34,7 @@
     <div>
         <h1>Alianzas Comerciales (GAAE)</h1>
         <p class="subtitulo">
-            {{ cotizaciones|length }} alianza{{ 's' if cotizaciones|length != 1 else '' }} encontrada{{ 's' if cotizaciones|length != 1 else '' }}
+            {{ alianzas|length }} alianza{{ 's' if alianzas|length != 1 else '' }} encontrada{{ 's' if alianzas|length != 1 else '' }}
             {% if estado_activo %} · filtrado por: <strong>{{ estado_activo }}</strong>{% endif %}
         </p>
     </div>
@@ -64,14 +64,14 @@
 {% endwith %}
 
 <div class="filtros">
-    <a href="{{ url_for('cotizaciones') }}" class="filtro-btn {% if not estado_activo %}activo{% endif %}">Todos</a>
+    <a href="{{ url_for('alianzas') }}" class="filtro-btn {% if not estado_activo %}activo{% endif %}">Todos</a>
     {% for estado in estados %}
-    <a href="{{ url_for('cotizaciones', estado=estado) }}" class="filtro-btn {% if estado_activo == estado %}activo{% endif %}">{{ estado }}</a>
+    <a href="{{ url_for('alianzas', estado=estado) }}" class="filtro-btn {% if estado_activo == estado %}activo{% endif %}">{{ estado }}</a>
     {% endfor %}
 </div>
 
 <div class="card">
-    {% if cotizaciones %}
+    {% if alianzas %}
     <div class="table-responsive"><table>
         <thead>
             <tr>
@@ -85,15 +85,25 @@
             </tr>
         </thead>
         <tbody>
-            {% for c in cotizaciones %}
+            {% for c in alianzas %}
             <tr>
-                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="link-detalle">{{ c[1] }}</a></td>
+                <td><a href="{{ url_for('alianza_detalle', alianza_id=c[0]) }}" class="link-detalle">{{ c[1] }}</a></td>
                 <td>{{ c[2] }}</td>
                 <td><span class="badge badge-{{ c[3] | lower }}">{{ c[3] }}</span></td>
                 <td class="monto">$ {{ "%.2f"|format(c[4]|float) }}</td>
                 <td>{{ c[5] }}</td>
                 <td>{{ c[6].strftime('%d/%m/%Y') if c[6] else '—' }}</td>
-                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver Detalle</a></td>
+                <td>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <a href="{{ url_for('alianza_detalle', alianza_id=c[0]) }}" class="btn btn-primary btn-sm" style="padding:5px 12px;font-size:12px;">Ver Detalle</a>
+                        {% if puede('cotizaciones', 'crear') %}
+                        <form action="{{ url_for('eliminar_alianza', alianza_id=c[0]) }}" method="POST" style="margin:0;" onsubmit="return confirm('¿Seguro que deseas eliminar esta alianza permanentemente?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-danger btn-sm" style="padding:5px 12px;font-size:12px; height: auto;">Borrar</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -118,7 +128,7 @@
             <span> Registrar Nueva Alianza Comercial</span>
             <button class="modal-close" onclick="cerrarModalAlianza()">✕</button>
         </div>
-        <form method="POST" action="{{ url_for('cotizacion_nueva') }}" id="form-cotizacion">
+        <form method="POST" action="{{ url_for('alianza_nueva') }}" id="form-cotizacion">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             
             <div class="form-grid" style="margin-bottom: 16px;">

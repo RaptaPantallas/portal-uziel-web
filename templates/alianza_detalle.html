@@ -149,17 +149,22 @@
     <div class="page-header" style="margin-bottom: 20px;">
         <div>
             <nav class="breadcrumb">
-                <a href="{{ url_for('cotizaciones') }}">Alianzas</a>
+                <a href="{{ url_for('alianzas') }}">Alianzas</a>
                 <span class="breadcrumb-sep">›</span>
                 <span>Ficha {{ cab[1] }}</span>
             </nav>
             <h1 style="margin-top: 4px;">Ficha de Alianza</h1>
         </div>
         <div class="acciones" style="display:flex;gap:10px;">
+            <a href="{{ url_for('alianza_pdf', alianza_id=cab[0]) }}" class="btn btn-ghost" style="padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">📄 Descargar PDF</a>
             {% if puede('cotizaciones', 'crear') %}
-            <a href="{{ url_for('cotizacion_editar', cotizacion_id=cab[0]) }}" class="btn btn-primary">✏️ Editar Alianza</a>
+            <a href="{{ url_for('alianza_editar', alianza_id=cab[0]) }}" class="btn btn-primary">✏️ Editar Alianza</a>
+            <form action="{{ url_for('eliminar_alianza', alianza_id=cab[0]) }}" method="POST" style="display:inline; margin: 0;" onsubmit="return confirm('¿Seguro que deseas eliminar esta alianza permanentemente?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-danger">🗑️ Borrar Alianza</button>
+            </form>
             {% endif %}
-            <a href="{{ url_for('cotizaciones') }}" class="btn btn-ghost">← Volver</a>
+            <a href="{{ url_for('alianzas') }}" class="btn btn-ghost">← Volver</a>
         </div>
     </div>
 
@@ -232,7 +237,7 @@
         {% if puede('cotizaciones', 'crear') %}
         <div style="margin-top: 32px; padding-top: 20px; border-top: 1px dashed var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">¿Cambiar estado de entrega/cumplimiento?</span>
-            <form method="POST" action="{{ url_for('cotizacion_estado', cotizacion_id=cab[0]) }}" style="display: flex; gap: 8px;">
+            <form method="POST" action="{{ url_for('alianza_estado', alianza_id=cab[0]) }}" style="display: flex; gap: 8px;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <select name="nuevo_estado" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px; height: 32px; border-radius: 6px;">
                     {% for est in estados %}

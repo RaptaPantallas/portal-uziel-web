@@ -52,7 +52,7 @@ from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
-from src.generador_pdf import generar_pdf_cotizacion, generar_reporte_pdf
+from src.generador_pdf import generar_pdf_alianza, generar_reporte_pdf
 
 # =============================================================================
 # ██████████████ CONFIGURACIÓN - EDITAR AQUÍ ██████████████
@@ -1068,17 +1068,17 @@ def cliente_detalle(rif):
 
     tareas = bd.obtener_tareas_por_cliente(rif)
 
-    # Las cotizaciones se muestran según permiso
-    cotizaciones = []
+    # Las alianzas se muestran según permiso
+    alianzas = []
     if _puede("cotizaciones", "ver"):
-        cotizaciones = bd.obtener_cotizaciones_por_cliente(rif)
+        alianzas = bd.obtener_alianzas_por_aliado_rif(rif)
 
     return render_template(
         'cliente_detalle.html',
         cliente=cliente,
         tareas=tareas,
-        cotizaciones=cotizaciones,
-        puede_cotizaciones=_puede("cotizaciones", "ver")
+        alianzas=alianzas,
+        puede_alianzas=_puede("cotizaciones", "ver")
     )
 
 
@@ -1343,6 +1343,25 @@ def actualizar_tarea(tarea_id):
         flash(f' Tarea #{tarea_id} marcada como "{nuevo_estado}".', 'exito')
     else:
         flash(f' No se pudo actualizar la tarea #{tarea_id}.', 'error')
+
+    return redirect(url_for('tareas'))
+
+
+@app.route('/tarea/<int:tarea_id>/eliminar', methods=['POST'])
+@login_requerido
+def eliminar_tarea(tarea_id):
+    """
+    Elimina una tarea del tablero.
+    Solo accesible para administradores con el permiso tareas:gestionar.
+    """
+    if not _puede("tareas", "gestionar"):
+        flash(' No tienes permisos para eliminar tareas.', 'error')
+        return redirect(url_for('tareas'))
+
+    if bd.eliminar_tarea(tarea_id):
+        flash(' Tarea eliminada exitosamente.', 'exito')
+    else:
+        flash(' Error al eliminar la tarea.', 'error')
 
     return redirect(url_for('tareas'))
 
@@ -1692,7 +1711,7 @@ def reporte_pdf(tipo=None):
 
 @app.route('/alianzas')
 @login_requerido
-def cotizaciones():
+def alianzas():
     """
     Lista todas las alianzas registradas.
     Permite filtrar por estado mediante el parámetro GET ?estado=...
@@ -1701,13 +1720,13 @@ def cotizaciones():
         flash(' No tienes permisos para acceder a alianzas.', 'error')
         return redirect(url_for('inicio'))
     estado_filtro = request.args.get('estado', '')
-    lista = bd.obtener_cotizaciones(estado_filtro if estado_filtro else None)
+    lista = bd.obtener_alianzas(estado_filtro if estado_filtro else None)
     estados = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     clientes_lista = bd.obtener_clientes()
     productos_lista = bd.obtener_productos()
     return render_template(
         'alianzas.html',
-        cotizaciones=lista,
+        alianzas=lista,
         estados=estados,
         estado_activo=estado_filtro,
         clientes=clientes_lista,
@@ -1717,7 +1736,7 @@ def cotizaciones():
 
 @app.route('/alianza/nueva', methods=['GET', 'POST'])
 @login_requerido
-def cotizacion_nueva():
+def alianza_nueva():
     """
     Crear una nueva alianza.
 
@@ -1726,7 +1745,7 @@ def cotizacion_nueva():
     """
     if not _puede("cotizaciones", "crear"):
         flash(' No tienes permisos para registrar alianzas.', 'error')
-        return redirect(url_for('cotizaciones'))
+        return redirect(url_for('alianzas'))
 
     if request.method == 'POST':
         cliente_rif    = request.form.get('cliente_rif', '').strip()
@@ -1771,28 +1790,28 @@ def cotizacion_nueva():
                 )
                 if cot_id:
                     flash(' Alianza comercial registrada exitosamente.', 'success')
-                    return redirect(url_for('cotizacion_detalle', cotizacion_id=cot_id))
+                    return redirect(url_for('alianza_detalle', alianza_id=cot_id))
                 else:
                     flash(' Error al guardar la alianza. Intenta de nuevo.', 'error')
             elif not error_validacion:
                 flash(' Debes agregar al menos un activo válido.', 'error')
 
-    return redirect(url_for('cotizaciones'))
+    return redirect(url_for('alianzas'))
 
 
-@app.route('/alianza/<int:cotizacion_id>')
+@app.route('/alianza/<int:alianza_id>')
 @login_requerido
-def cotizacion_detalle(cotizacion_id):
+def alianza_detalle(alianza_id):
     """
     Muestra la alianza completa con todos sus ítems, estado y opciones de acción.
     """
     if not _puede("cotizaciones", "ver"):
         flash(' No tienes permisos para ver alianzas.', 'error')
         return redirect(url_for('inicio'))
-    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    datos = bd.obtener_alianza_con_items(alianza_id)
     if not datos:
         flash(' Alianza comercial no encontrada.', 'error')
-        return redirect(url_for('cotizaciones'))
+        return redirect(url_for('alianzas'))
     estados = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     return render_template(
         'alianza_detalle.html',
@@ -1803,15 +1822,15 @@ def cotizacion_detalle(cotizacion_id):
     )
 
 
-@app.route('/alianza/<int:cotizacion_id>/editar', methods=['GET', 'POST'])
+@app.route('/alianza/<int:alianza_id>/editar', methods=['GET', 'POST'])
 @login_requerido
-def cotizacion_editar(cotizacion_id):
+def alianza_editar(alianza_id):
     if not _puede("cotizaciones", "crear"):
         flash(' No tienes permisos para editar alianzas.', 'error')
-        return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+        return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
     
     if request.method == 'POST':
-        notas = request.form.get('notas', '').strip()
+        notes = request.form.get('notas', '').strip()
         skus = request.form.getlist('sku[]')
         nombres = request.form.getlist('nombre[]')
         cantidades = request.form.getlist('cantidad[]')
@@ -1842,17 +1861,17 @@ def cotizacion_editar(cotizacion_id):
                 })
             
             if not error_validacion and items:
-                ok = bd.actualizar_alianza(cotizacion_id, items, notas)
+                ok = bd.actualizar_alianza(alianza_id, items, notes)
                 if ok:
                     flash(' Alianza comercial actualizada correctamente.', 'success')
-                    return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+                    return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
                 else:
                     flash(' Error al actualizar la alianza.', 'error')
                     
-    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    datos = bd.obtener_alianza_con_items(alianza_id)
     if not datos:
         flash(' Alianza comercial no encontrada.', 'error')
-        return redirect(url_for('cotizaciones'))
+        return redirect(url_for('alianzas'))
         
     productos_lista = bd.obtener_productos()
     return render_template(
@@ -1863,51 +1882,70 @@ def cotizacion_editar(cotizacion_id):
     )
 
 
-@app.route('/alianza/<int:cotizacion_id>/estado', methods=['POST'])
+@app.route('/alianza/<int:alianza_id>/estado', methods=['POST'])
 @login_requerido
-def cotizacion_estado(cotizacion_id):
+def alianza_estado(alianza_id):
     """
     Cambia el estado de una alianza.
     POST param: nuevo_estado
     """
     if not _puede("cotizaciones", "crear"):
         flash(' No tienes permisos para cambiar el estado.', 'error')
-        return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+        return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
 
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
     estados_validos = ['Borrador', 'Autorizada', 'Entregada', 'Incumplida', 'Completada']
     if nuevo_estado not in estados_validos:
         flash(' Estado no válido.', 'error')
     else:
-        ok = bd.actualizar_estado_cotizacion(cotizacion_id, nuevo_estado)
+        ok = bd.actualizar_estado_alianza(alianza_id, nuevo_estado)
         if ok:
             flash(f' Estado actualizado a "{nuevo_estado}".', 'success')
         else:
             flash(' Error al actualizar el estado.', 'error')
 
-    return redirect(url_for('cotizacion_detalle', cotizacion_id=cotizacion_id))
+    return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
 
 
-@app.route('/alianza/<int:cotizacion_id>/pdf')
+@app.route('/alianza/<int:alianza_id>/pdf')
 @login_requerido
-def cotizacion_pdf(cotizacion_id):
+def alianza_pdf(alianza_id):
     """
     Genera y descarga el PDF de la alianza indicada.
     """
     if not _puede("cotizaciones", "ver"):
         flash(' No tienes permisos para descargar la alianza.', 'error')
         return redirect(url_for('inicio'))
-    datos = bd.obtener_cotizacion_con_items(cotizacion_id)
+    datos = bd.obtener_alianza_con_items(alianza_id)
     if not datos:
         flash(' Alianza comercial no encontrada.', 'error')
-        return redirect(url_for('cotizaciones'))
+        return redirect(url_for('alianzas'))
 
-    buffer = generar_pdf_cotizacion(datos)
-    numero = datos['cabecera'][1]   # numero  (columna 1)
+    buffer = generar_pdf_alianza(datos)
+    numero = datos['cabecera'][1]
     response = make_response(buffer.getvalue())
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename="Cotizacion_{numero}.pdf"'
+    response.headers['Content-Disposition'] = f'attachment; filename="Alianza_{numero}.pdf"'
     return response
+
+
+@app.route('/alianza/<int:alianza_id>/eliminar', methods=['POST'])
+@login_requerido
+def eliminar_alianza(alianza_id):
+    """
+    Elimina una alianza comercial.
+    Solo accesible para usuarios con permiso cotizaciones:crear.
+    """
+    if not _puede("cotizaciones", "crear"):
+        flash(' No tienes permisos para eliminar alianzas.', 'error')
+        return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
+
+    if bd.eliminar_alianza(alianza_id):
+        flash(' Alianza comercial eliminada exitosamente.', 'exito')
+        return redirect(url_for('alianzas'))
+    else:
+        flash(' Error al eliminar la alianza comercial.', 'error')
+        return redirect(url_for('alianza_detalle', alianza_id=alianza_id))
 
 
 # =============================================================================

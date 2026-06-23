@@ -2912,6 +2912,24 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
+    def eliminar_tarea(self, tarea_id: int) -> bool:
+        """Elimina una tarea de la base de datos."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM tareas WHERE id = %s", (tarea_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Tareas] Error al eliminar tarea #{tarea_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def contar_tareas_pendientes(self, asignado_a):
         conexion = self.conectar()
         total = 0
@@ -3123,18 +3141,6 @@ El equipo de Importadora Uziel C.A."""
         finally:
             if cursor: cursor.close()
             conexion.close()
-
-    def obtener_cotizaciones_por_cliente(self, cliente_rif: str) -> list:
-        return self.obtener_alianzas_por_aliado_rif(cliente_rif)
-
-    def obtener_cotizaciones(self, estado: str = None) -> list:
-        return self.obtener_alianzas(estado)
-
-    def obtener_cotizacion_con_items(self, cotizacion_id: int) -> dict | None:
-        return self.obtener_alianza_con_items(cotizacion_id)
-
-    def actualizar_estado_cotizacion(self, cotizacion_id: int, nuevo_estado: str) -> bool:
-        return self.actualizar_estado_alianza(cotizacion_id, nuevo_estado)
 
     # =========================================================================
     # MÓDULO GAAE — Gestión de Alianzas y Activos Estratégicos
@@ -3649,3 +3655,21 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
         return resultado
+
+    def eliminar_alianza(self, orden_id: int) -> bool:
+        """Elimina una alianza comercial y todos sus registros vinculados (en cascada)."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM ordenes_intercambio WHERE id = %s", (orden_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [GAAE] Error al eliminar alianza #{orden_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()

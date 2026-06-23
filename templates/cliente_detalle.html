@@ -57,8 +57,8 @@
         </div>
     </div>
     <div class="acciones">
-        {% if puede_cotizaciones %}
-        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Registrar Alianza para este aliado</a>
+        {% if puede_alianzas %}
+        <a href="{{ url_for('alianza_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary"> Registrar Alianza para este aliado</a>
         {% endif %}
         {% if puede('clientes', 'editar') %}
         <button class="btn btn-primary" onclick="abrirModal()"> Editar Datos</button>
@@ -74,14 +74,14 @@
             <div class="resumen-num">{{ tareas | length }}</div>
             <div class="resumen-lbl">Tarea{{ 's' if tareas|length != 1 else '' }} registrada{{ 's' if tareas|length != 1 else '' }}</div>
         </div>
-        {% if puede_cotizaciones %}
+        {% if puede_alianzas %}
         <div class="resumen-card">
-            <div class="resumen-num">{{ cotizaciones | length }}</div>
-            <div class="resumen-lbl">Alianza{{ 's' if cotizaciones|length != 1 else '' }} registrada{{ 's' if cotizaciones|length != 1 else '' }}</div>
+            <div class="resumen-num">{{ alianzas | length }}</div>
+            <div class="resumen-lbl">Alianza{{ 's' if alianzas|length != 1 else '' }} registrada{{ 's' if alianzas|length != 1 else '' }}</div>
         </div>
         <div class="resumen-card">
             {% set ns = namespace(total_acept=0) %}
-            {% for c in cotizaciones %}{% if c[2] == 'Completada' %}{% set ns.total_acept = ns.total_acept + 1 %}{% endif %}{% endfor %}
+            {% for c in alianzas %}{% if c[2] == 'Completada' %}{% set ns.total_acept = ns.total_acept + 1 %}{% endif %}{% endfor %}
             <div class="resumen-num">{{ ns.total_acept }}</div>
             <div class="resumen-lbl">Alianza{{ 's' if ns.total_acept != 1 else '' }} completada{{ 's' if ns.total_acept != 1 else '' }}</div>
         </div>
@@ -167,11 +167,11 @@
         </table></div>
     </div>
 
-{% if puede_cotizaciones %}
+{% if puede_alianzas %}
 <div class="card">
     <div class="card-title">
         <span> Alianzas Comerciales</span>
-        <a href="{{ url_for('cotizacion_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Nueva Alianza</a>
+        <a href="{{ url_for('alianza_nueva', cliente_rif=cliente[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Nueva Alianza</a>
     </div>
     <div class="table-responsive"><table>
         <thead>
@@ -185,9 +185,9 @@
             </tr>
         </thead>
         <tbody>
-            {% for c in cotizaciones %}
+            {% for c in alianzas %}
             <tr>
-                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="link-cotiz">{{ c[1] }}</a></td>
+                <td><a href="{{ url_for('alianza_detalle', alianza_id=c[0]) }}" class="link-cotiz">{{ c[1] }}</a></td>
                 <td>
                     {% set est = c[2] | lower %}
                     <span class="badge badge-{{ est }}">{{ c[2] }}</span>
@@ -195,7 +195,7 @@
                 <td class="monto" style="text-align:right;">$ {{ "%.2f"|format(c[3]|float) }}</td>
                 <td>{{ c[4] }}</td>
                 <td>{{ c[5].strftime('%d/%m/%Y') if c[5] else '—' }}</td>
-                <td><a href="{{ url_for('cotizacion_detalle', cotizacion_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver</a></td>
+                <td><a href="{{ url_for('alianza_detalle', alianza_id=c[0]) }}" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">Ver</a></td>
             </tr>
             {% else %}
             <tr><td colspan="6" class="empty-row">Sin alianzas registradas para este aliado.</td></tr>

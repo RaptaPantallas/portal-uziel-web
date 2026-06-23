@@ -419,15 +419,15 @@ def generar_pdf_catalogo(lista_skus: list[str], ruta_guardar: str = None) -> tup
 
 
 # ---------------------------------------------------------------------------
-# FUNCIÓN 3 — PDF de cotización (para el portal web)
+# FUNCIÓN 3 — PDF de alianza (para el portal web)
 # ---------------------------------------------------------------------------
 
-def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
+def generar_pdf_alianza(datos: dict) -> io.BytesIO:
     """
-    Genera el PDF de una cotización y lo devuelve en un buffer de memoria.
+    Genera el PDF de una alianza comercial y lo devuelve en un buffer de memoria.
 
     Args:
-        datos (dict): Resultado de ConexionBD.obtener_cotizacion_con_items().
+        datos (dict): Resultado de ConexionBD.obtener_alianza_con_items().
                       Claves: 'cabecera' (tuple), 'items' (list[tuple]).
                       cabecera: (id, numero, cliente_rif, cliente_nombre,
                                  estado, notas, total_usd, creado_por, fecha_creacion)
@@ -472,7 +472,7 @@ def generar_pdf_cotizacion(datos: dict) -> io.BytesIO:
     # Título del documento y Número de Cotización
     c.setFont("Helvetica-Bold", 14)
     c.setFillColorRGB(*COLOR_AZUL_EMP)
-    c.drawRightString(ancho - MARGEN_X, alto - 50, "PRESUPUESTO COMERCIAL")
+    c.drawRightString(ancho - MARGEN_X, alto - 50, "ALIANZA COMERCIAL")
     c.setFont("Helvetica-Bold", 10)
     c.setFillColorRGB(*COLOR_NEGRO)
     c.drawRightString(ancho - MARGEN_X, alto - 65, f"N° {numero}")
