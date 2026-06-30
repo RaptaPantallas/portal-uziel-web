@@ -129,6 +129,7 @@ class ConexionBD:
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
         self.inicializar_alianzas()
+        self.inicializar_categorias()
         self._crear_tabla_auditoria_acciones()
 
     def conectar(self):
@@ -1256,6 +1257,116 @@ class ConexionBD:
             return True
         except Error as e:
             print(f" [PIM] Error al actualizar categorías masivamente: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def inicializar_categorias(self):
+        """Crea la tabla de categorías si no existe y siembra las categorías iniciales."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS categorias (
+                    id SERIAL PRIMARY KEY,
+                    nombre VARCHAR(100) UNIQUE NOT NULL
+                )
+            """)
+            
+            # Verificar si está vacía
+            cursor.execute("SELECT COUNT(*) FROM categorias")
+            if cursor.fetchone()[0] == 0:
+                categorias_iniciales = [
+                    "Sin Categoría", "Tren Delantero", "Sistema Eléctrico", 
+                    "Motor", "Frenos", "Suspensión", "Refrigeración", "Accesorios"
+                ]
+                for cat in categorias_iniciales:
+                    cursor.execute(
+                        "INSERT INTO categorias (nombre) VALUES (%s) ON CONFLICT DO NOTHING",
+                        (cat,)
+                    )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al inicializar categorías: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_categorias(self) -> list[str]:
+        """Obtiene la lista ordenada de nombres de categorías."""
+        conexion = self.conectar()
+        categorias = []
+        if not conexion: return categorias
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT nombre FROM categorias ORDER BY nombre ASC")
+            categorias = [row[0] for row in cursor.fetchall()]
+        except Error as e:
+            print(f" [BD] Error al obtener categorías: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        # Asegurar que 'Sin Categoría' esté al menos
+        if "Sin Categoría" not in categorias:
+            categorias.insert(0, "Sin Categoría")
+        return categorias
+
+    def registrar_categoria(self, nombre: str) -> bool:
+        """Registra una nueva categoría en la base de datos."""
+        if not nombre.strip():
+            return False
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute(
+                "INSERT INTO categorias (nombre) VALUES (%s) ON CONFLICT DO NOTHING",
+                (nombre.strip(),)
+            )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al registrar categoría '{nombre}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def eliminar_categoria(self, nombre: str) -> bool:
+        """Elimina una categoría y reasigna los productos de la misma a 'Sin Categoría'."""
+        if nombre == "Sin Categoría":
+            # No se puede eliminar la categoría por defecto
+            return False
+            
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # 1. Reasignar productos de esta categoría a 'Sin Categoría'
+            cursor.execute(
+                "UPDATE productos SET categoria = 'Sin Categoría' WHERE categoria = %s",
+                (nombre,)
+            )
+            # 2. Eliminar la categoría
+            cursor.execute(
+                "DELETE FROM categorias WHERE nombre = %s",
+                (nombre,)
+            )
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al eliminar categoría '{nombre}': {e}")
             conexion.rollback()
             return False
         finally:
