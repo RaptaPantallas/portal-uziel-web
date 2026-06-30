@@ -33,6 +33,7 @@
     .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8; line-height: 1; }
     .modal-close:hover { color: var(--error); }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .hidden-element { display: none !important; }
 </style>
 {% endblock %}
 {% block content %}
@@ -237,7 +238,7 @@
                         <option value="Venezuela" {% if cliente[6] == 'Venezuela' or not cliente[6] %}selected{% endif %}>Venezuela</option>
                         <option value="Otro" {% if cliente[6] and cliente[6] != 'Venezuela' %}selected{% endif %}>Otro (Escribir)...</option>
                     </select>
-                    <input type="text" id="edit-pais-input" name="pais" class="form-control" value="{{ cliente[6] or 'Venezuela' }}" style="{% if cliente[6] == 'Venezuela' or not cliente[6] %}display:none;{% endif %} margin-top:6px;" placeholder="Escribe el país">
+                    <input type="text" id="edit-pais-input" name="pais" class="form-control {% if cliente[6] == 'Venezuela' or not cliente[6] %}hidden-element{% endif %}" value="{{ cliente[6] or 'Venezuela' }}" style="margin-top:6px;" placeholder="Escribe el país">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Estado</label>
@@ -261,16 +262,16 @@
         </form>
     </div>
 </div>
-{% endif %}
+<div id="venezuela-data-holder" data-json='{{ venezuela_data_js | safe }}' style="display: none;"></div>
 {% endblock %}
 {% block scripts %}
 <script>
 function abrirModal() { document.getElementById('modal-editar').classList.add('open'); document.body.style.overflow = 'hidden'; }
-function cerrarModal() { document.getElementById('modal-editar').classList.remove('open'); document.body.style.overflow = ''; }
+cerrarModal = function() { document.getElementById('modal-editar').classList.remove('open'); document.body.style.overflow = ''; }
 document.getElementById('modal-editar')?.addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 if (document.getElementById('modal-editar')) { document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarModal(); }); }
 
-const VENEZUELA_DATA = {{ venezuela_data_js | safe }};
+const VENEZUELA_DATA = JSON.parse(document.getElementById('venezuela-data-holder').getAttribute('data-json'));
 const currentCountry = "{{ cliente[6] or 'Venezuela' }}";
 const currentState = "{{ cliente[7] or '' }}";
 const currentMunicipio = "{{ cliente[8] or '' }}";
