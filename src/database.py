@@ -1229,6 +1229,39 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def actualizar_categoria_masiva(self, skus: list[str] | None, nueva_categoria: str) -> bool:
+        """
+        Actualiza la categoría de una lista de productos en lote.
+        Si skus es None, se actualizan TODOS los productos de la tabla.
+        """
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            if skus is None:
+                consulta_sql = "UPDATE productos SET categoria = %s"
+                cursor.execute(consulta_sql, (nueva_categoria,))
+            else:
+                if not skus:
+                    return True
+                placeholders = ",".join(["%s"] * len(skus))
+                consulta_sql = f"""
+                    UPDATE productos
+                    SET categoria = %s
+                    WHERE sku IN ({placeholders})
+                """
+                cursor.execute(consulta_sql, [nueva_categoria] + list(skus))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [PIM] Error al actualizar categorías masivamente: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def eliminar_producto(self, sku):
         conexion = self.conectar()
         if not conexion: return False
