@@ -1124,6 +1124,33 @@ def cliente_editar(rif):
     return redirect(url_for('cliente_detalle', rif=rif))
 
 
+@app.route('/cliente/<path:rif>/eliminar', methods=['POST'])
+@login_requerido
+def cliente_eliminar(rif):
+    """
+    Elimina un cliente del CRM.
+    Solo accesible para usuarios con el permiso 'clientes:eliminar'.
+    """
+    if not _puede("clientes", "eliminar"):
+        flash(' No tienes permisos para eliminar clientes.', 'error')
+        return redirect(url_for('cliente_detalle', rif=rif))
+
+    cliente = bd.obtener_cliente(rif)
+    if not cliente:
+        flash(' Cliente no encontrado.', 'error')
+        return redirect(url_for('clientes'))
+
+    nombre_empresa = cliente[1]
+    ok = bd.eliminar_cliente(rif)
+    if ok:
+        flash(f' Cliente "{nombre_empresa}" eliminado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Eliminar Cliente', f"Eliminó cliente '{nombre_empresa}' (RIF: {rif})")
+        return redirect(url_for('clientes'))
+    else:
+        flash(' Error al eliminar el cliente de la base de datos.', 'error')
+        return redirect(url_for('cliente_detalle', rif=rif))
+
+
 @app.route('/nuevo_producto', methods=['GET', 'POST'])
 @login_requerido
 def nuevo_producto():

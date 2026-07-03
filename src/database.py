@@ -1095,6 +1095,24 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def eliminar_cliente(self, rif: str) -> bool:
+        """Elimina un cliente de la base de datos."""
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM clientes WHERE UPPER(rif) = UPPER(%s)", (rif,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [CRM] Error al eliminar cliente '{rif}': {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def obtener_tareas_por_cliente(self, cliente_rif: str) -> list:
         conexion = self.conectar()
         tareas = []

@@ -64,6 +64,11 @@
         {% if puede('clientes', 'editar') %}
         <button class="btn btn-primary" onclick="abrirModal()"> Editar Datos</button>
         {% endif %}
+        {% if puede('clientes', 'eliminar') %}
+        <form action="{{ url_for('cliente_eliminar', rif=cliente[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este cliente por completo? Esta acción no se puede deshacer.');">
+            <button type="submit" class="btn btn-danger" style="background-color:#ef4444; border-color:#ef4444; color:#fff; cursor:pointer; font-weight:600; padding: 10px 16px; border-radius: var(--radius-md); font-size:14px;">✕ Eliminar Cliente</button>
+        </form>
+        {% endif %}
         <a href="{{ url_for('clientes') }}" class="btn btn-ghost">← Volver</a>
     </div>
 </div>
