@@ -3869,6 +3869,17 @@ El equipo de Importadora Uziel C.A."""
                 )
             """)
             conexion.commit()
+
+            # Agregar nuevas columnas de segmentación a gastos_lonas de forma segura
+            try:
+                cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS categoria VARCHAR(100) DEFAULT 'Otros'")
+                cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS aliado_id INTEGER REFERENCES aliados(id) ON DELETE SET NULL")
+                cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS cantidad INTEGER DEFAULT 1")
+                conexion.commit()
+            except Exception as e:
+                print(f" [Gastos] Error al agregar nuevas columnas a gastos_lonas: {e}")
+                conexion.rollback()
+
             return True
         except Error as e:
             print(f" [Gastos] Error al inicializar tablas de gastos: {e}")
@@ -3937,16 +3948,16 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por):
+    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id=None, cantidad=1):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por))
+                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad))
             conexion.commit()
             return True
         except Error as e:
@@ -3965,10 +3976,12 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT id, herramienta, uso, precio, para_quien, total, comentario, creado_por, fecha_creacion
-                FROM gastos_lonas
-                WHERE EXTRACT(MONTH FROM fecha_creacion) = %s AND EXTRACT(YEAR FROM fecha_creacion) = %s
-                ORDER BY fecha_creacion DESC
+                SELECT gl.id, gl.herramienta, gl.uso, gl.precio, gl.para_quien, gl.total, gl.comentario, gl.creado_por, gl.fecha_creacion,
+                       gl.categoria, gl.aliado_id, gl.cantidad, a.nombre_aliado
+                FROM gastos_lonas gl
+                LEFT JOIN aliados a ON gl.aliado_id = a.id
+                WHERE EXTRACT(MONTH FROM gl.fecha_creacion) = %s AND EXTRACT(YEAR FROM gl.fecha_creacion) = %s
+                ORDER BY gl.fecha_creacion DESC
             """, (mes, anio))
             resultado = cursor.fetchall()
         except Error as e:

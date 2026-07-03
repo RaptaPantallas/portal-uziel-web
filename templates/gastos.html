@@ -231,11 +231,12 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Insumo / Material</th>
-                        <th>Uso / Detalle</th>
+                        <th>Categoría</th>
+                        <th>Concepto / Material</th>
+                        <th style="text-align: center;">Cant.</th>
+                        <th style="text-align: right;">P. Unitario</th>
+                        <th style="text-align: right;">Total</th>
                         <th>Destinatario (¿Para quién?)</th>
-                        <th style="text-align: right;">Precio</th>
-                        <th style="text-align: right;">Total Lona</th>
                         <th>Comentario</th>
                         <th>Por</th>
                         {% if puede('gastos', 'gestionar') %}
@@ -245,21 +246,45 @@
                 </thead>
                 <tbody>
                     {% for g in gastos_lonas %}
-                    {# g = (id, herramienta, uso, precio, para_quien, total, comentario, creado_por, fecha_creacion) #}
+                    {# g = (id, herramienta, uso, precio, para_quien, total, comentario, creado_por, fecha_creacion, categoria, aliado_id, cantidad, nombre_aliado) #}
                     <tr>
-                        <td><strong>{{ g[1] }}</strong></td>
-                        <td>{{ g[2] }}</td>
-                        <td><span class="tipo-badge" style="background:#d1fae5; color:#065f46; font-size:12px;">{{ g[4] }}</span></td>
+                        <td>
+                            {% if g[9] == 'Material para Aliado' %}
+                                <span class="tipo-badge" style="background:#ccfbf1; color:#0f766e; border: 1px solid #99f6e4;">Aliado</span>
+                            {% elif g[9] == 'Servicio del Departamento' %}
+                                <span class="tipo-badge" style="background:#fef3c7; color:#d97706; border: 1px solid #fde68a;">Servicio</span>
+                            {% elif g[9] == 'Implementos / Herramientas' %}
+                                <span class="tipo-badge" style="background:#e0f2fe; color:#0369a1; border: 1px solid #bae6fd;">Herramienta</span>
+                            {% elif g[9] == 'Material POP / Promocional' %}
+                                <span class="tipo-badge" style="background:#f3e8ff; color:#7e22ce; border: 1px solid #e9d5ff;">Material POP</span>
+                            {% else %}
+                                <span class="tipo-badge" style="background:#f1f5f9; color:#475569; border: 1px solid #e2e8f0;">Otros</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ g[1] }}</strong>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">{{ g[2] }}</div>
+                        </td>
+                        <td style="text-align: center; font-weight: 600;">{{ g[11] if g[11] is not none else 1 }}</td>
                         <td style="text-align: right; font-weight: 600;">${{ "{:,.2f}".format(g[3]) }}</td>
                         <td style="text-align: right; font-weight: 700; color: #10b981;">${{ "{:,.2f}".format(g[5]) }}</td>
-                        <td style="max-width: 250px; white-space: normal; font-size: 13px; color: var(--text-muted);">
+                        <td>
+                            {% if g[10] %}
+                                <span style="font-weight: 600; color: var(--primary); display: inline-flex; align-items: center; gap: 4px;">
+                                    <i data-lucide="handshake" style="width:14px;height:14px;"></i> {{ g[12] }}
+                                </span>
+                            {% else %}
+                                {{ g[4] }}
+                            {% endif %}
+                        </td>
+                        <td style="max-width: 200px; white-space: normal; font-size: 13px; color: var(--text-muted);">
                             {{ g[6] if g[6] else '—' }}
                         </td>
                         <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[7].capitalize() }}</span></td>
                         {% if puede('gastos', 'gestionar') %}
                         <td style="text-align: center;">
-                            <form action="{{ url_for('eliminar_gasto_lona', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este registro de lona?');">
-                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕ Eliminar</button>
+                            <form action="{{ url_for('eliminar_gasto_lona', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este gasto?');">
+                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕</button>
                             </form>
                         </td>
                         {% endif %}
@@ -341,38 +366,65 @@
     </div>
 </div>
 
-<!-- MODAL: REGISTRAR LONA -->
+<!-- MODAL: REGISTRAR GASTO FÍSICO / DEPARTAMENTO -->
 <div class="modal-overlay" id="modalLona">
     <div class="modal wide">
         <div class="modal-header">
-            <span>Registrar Lona / Insumo Físico</span>
+            <span>Registrar Gasto de Insumo / Servicio</span>
             <button class="modal-close" onclick="cerrarModalLona()">✕</button>
         </div>
         <form action="{{ url_for('nuevo_gasto_lona') }}" method="POST">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="lon-categoria">Categoría del Gasto <span class="req">*</span></label>
+                    <select name="categoria" id="lon-categoria" class="form-control" required onchange="toggleLonaCampos(this.value)">
+                        <option value="Material para Aliado" selected>Material para Aliado Comercial</option>
+                        <option value="Servicio del Departamento">Servicio del Departamento (Ej. Teléfono, Envío)</option>
+                        <option value="Implementos / Herramientas">Implementos / Herramientas del Departamento</option>
+                        <option value="Material POP / Promocional">Material POP / Promocional (Ej. Gorras, Llaveros)</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                
+                <!-- Campos dinámicos de destinatario -->
+                <div class="form-group" id="form-group-aliado">
+                    <label for="lon-aliado-id">Seleccionar Aliado Comercial <span class="req">*</span></label>
+                    <select name="aliado_id" id="lon-aliado-id" class="form-control" required>
+                        <option value="">— Seleccionar Aliado —</option>
+                        {% for aliado in lista_aliados %}
+                        <option value="{{ aliado[0] }}">{{ aliado[2] }} ({{ aliado[1] }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group" id="form-group-para-quien" style="display:none;">
+                    <label for="lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
+                    <input type="text" name="para_quien" id="lon-para-quien" class="form-control" placeholder="Ej: Departamento de Marketing, Línea Oficina">
+                </div>
+
                 <div class="form-group">
-                    <label for="lon-herramienta">Herramienta / Material / Tipo <span class="req">*</span></label>
-                    <input type="text" name="herramienta" id="lon-herramienta" class="form-control" placeholder="Ej: Lona front, Vinil autoadhesivo" required>
+                    <label for="lon-herramienta">Concepto / Material / Insumo <span class="req">*</span></label>
+                    <input type="text" name="herramienta" id="lon-herramienta" class="form-control" placeholder="Ej: Gorras bordadas, Lona publicitaria, Pago Plan Movil" required>
                 </div>
                 <div class="form-group">
                     <label for="lon-uso">Uso / Propósito <span class="req">*</span></label>
-                    <input type="text" name="uso" id="lon-uso" class="form-control" placeholder="Ej: Letrero fachada, Banner stand" required>
+                    <input type="text" name="uso" id="lon-uso" class="form-control" placeholder="Ej: Campaña marca, Letrero exterior, Línea de contacto" required>
                 </div>
                 <div class="form-group">
-                    <label for="lon-precio">Precio / Costo Unitario ($)</label>
-                    <input type="number" name="precio" id="lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" oninput="calcularTotalLona()">
+                    <label for="lon-cantidad">Cantidad <span class="req">*</span></label>
+                    <input type="number" name="cantidad" id="lon-cantidad" class="form-control" value="1" min="1" step="1" required oninput="calcularTotalLona()">
                 </div>
                 <div class="form-group">
-                    <label for="lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
-                    <input type="text" name="para_quien" id="lon-para-quien" class="form-control" placeholder="Ej: Inversiones 2020 C.A., Sucursal Valencia" required>
+                    <label for="lon-precio">Precio / Costo Unitario ($) <span class="req">*</span></label>
+                    <input type="number" name="precio" id="lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" required oninput="calcularTotalLona()">
                 </div>
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="lon-total">Monto Total ($) <span class="req">*</span></label>
-                    <input type="number" name="total" id="lon-total" class="form-control" min="0" step="0.01" placeholder="Total a registrar (si no se especifica, toma el precio unitario)" required>
+                    <label for="lon-total">Monto Total ($)</label>
+                    <input type="number" name="total" id="lon-total" class="form-control" min="0" step="0.01" placeholder="Se calcula automáticamente (Cantidad × Unitario) o ingresa valor fijo">
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label for="lon-comentario">Comentario / Notas adicionales</label>
-                    <textarea name="comentario" id="lon-comentario" class="form-control" placeholder="Detalle de medidas (ej. 2x3m), material específico..."></textarea>
+                    <textarea name="comentario" id="lon-comentario" class="form-control" placeholder="Detalla especificaciones técnicas, medidas, colores..."></textarea>
                 </div>
             </div>
             <div class="form-actions">
@@ -428,9 +480,34 @@
         if (modal) modal.classList.remove('open');
     }
     
+    // --- MOSTRAR/OCULTAR CAMPOS DINÁMICOS DE LONAS ---
+    function toggleLonaCampos(categoria) {
+        const grpAliado = document.getElementById('form-group-aliado');
+        const grpParaQuien = document.getElementById('form-group-para-quien');
+        const selectAliado = document.getElementById('lon-aliado-id');
+        const inputParaQuien = document.getElementById('lon-para-quien');
+        
+        if (categoria === 'Material para Aliado') {
+            if (grpAliado) grpAliado.style.display = 'block';
+            if (grpParaQuien) grpParaQuien.style.display = 'none';
+            if (selectAliado) selectAliado.setAttribute('required', 'true');
+            if (inputParaQuien) inputParaQuien.removeAttribute('required');
+        } else {
+            if (grpAliado) grpAliado.style.display = 'none';
+            if (grpParaQuien) grpParaQuien.style.display = 'block';
+            if (selectAliado) selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+        }
+    }
+
     function abrirModalLona() {
         const modal = document.getElementById('modalLona');
         if (modal) modal.classList.add('open');
+        // Asegurar estado inicial de los campos dinámicos
+        const catSelect = document.getElementById('lon-categoria');
+        if (catSelect) {
+            toggleLonaCampos(catSelect.value);
+        }
     }
     
     function cerrarModalLona() {
@@ -461,11 +538,14 @@
     
     // --- AUTO-CÁLCULO DE TOTAL LONA ---
     function calcularTotalLona() {
+        const cantidad = parseInt(document.getElementById('lon-cantidad').value) || 1;
         const precio = parseFloat(document.getElementById('lon-precio').value) || 0;
         const totalInput = document.getElementById('lon-total');
         
-        if (precio > 0 && (!totalInput.value || totalInput.value == 0)) {
-            totalInput.value = precio.toFixed(2);
+        if (precio > 0) {
+            totalInput.value = (cantidad * precio).toFixed(2);
+        } else {
+            totalInput.value = '';
         }
     }
 

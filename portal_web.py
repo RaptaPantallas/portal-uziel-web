@@ -2248,7 +2248,8 @@ def ver_gastos():
         total_general=total_general,
         mes_seleccionado=mes,
         anio_seleccionado=anio,
-        meses_filtros=lista_meses_formateados
+        meses_filtros=lista_meses_formateados,
+        lista_aliados=bd.obtener_todos_aliados()
     )
 
 
@@ -2335,22 +2336,57 @@ def nuevo_gasto_lona():
     para_quien = request.form.get('para_quien', '').strip()
     total = request.form.get('total', 0, type=float)
     comentario = request.form.get('comentario', '').strip()
+    
+    # Nuevos campos de segmentación
+    categoria = request.form.get('categoria', 'Otros').strip()
+    aliado_id_val = request.form.get('aliado_id', '').strip()
+    aliado_id = int(aliado_id_val) if aliado_id_val and aliado_id_val.isdigit() else None
+    cantidad = request.form.get('cantidad', 1, type=int)
 
-    if not herramienta or not uso or not para_quien:
-        flash(' Todos los campos (excepto comentario) son obligatorios para lonas.', 'error')
+    # Validaciones y asignaciones según categoría
+    if not herramienta or not uso:
+        flash(' El concepto y el uso son campos obligatorios.', 'error')
         return redirect(url_for('ver_gastos'))
 
+    if categoria == 'Material para Aliado':
+        if not aliado_id:
+            flash(' Debes seleccionar un aliado comercial para esta categoría.', 'error')
+            return redirect(url_for('ver_gastos'))
+        # Recuperar nombre del aliado para guardarlo como texto (compatibilidad)
+        aliado_datos = bd.obtener_aliado(aliado_id)
+        if aliado_datos:
+            para_quien = aliado_datos[2] # nombre_aliado
+        else:
+            para_quien = f"Aliado #{aliado_id}"
+    else:
+        # Para servicios, herramientas o POP se usa el campo de texto ingresado
+        aliado_id = None
+        if not para_quien:
+            para_quien = 'Departamento'
+
+    # Calcular total si no se ingresó
     if total == 0:
-        total = precio
+        total = precio * cantidad
 
     creado_por = session.get('usuario')
-    ok = bd.crear_gasto_lona(herramienta, uso, precio, para_quien, total, comentario, creado_por)
+    ok = bd.crear_gasto_lona(
+        herramienta=herramienta,
+        uso=uso,
+        precio=precio,
+        para_quien=para_quien,
+        total=total,
+        comentario=comentario,
+        creado_por=creado_por,
+        categoria=categoria,
+        aliado_id=aliado_id,
+        cantidad=cantidad
+    )
 
     if ok:
-        flash(f' Insumo/Lona para "{para_quien}" registrado correctamente.', 'exito')
-        bd.registrar_accion_auditoria(creado_por, 'Registrar Gasto Lona', f'Lona para {para_quien} registrada por ${total:.2f}')
+        flash(f' Gasto registrado correctamente en "{categoria}": {herramienta} por ${total:.2f}.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Registrar Gasto Lona/Insumo', f'Gasto ({categoria}): {herramienta} para {para_quien} por ${total:.2f}')
     else:
-        flash(' Error al guardar el gasto de lona en la base de datos.', 'error')
+        flash(' Error al guardar el gasto de insumos en la base de datos.', 'error')
 
     return redirect(url_for('ver_gastos'))
 
