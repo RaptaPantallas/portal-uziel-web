@@ -398,29 +398,29 @@
                 </div>
                 
                 <div class="form-group" id="form-group-para-quien" style="display:none;">
-                    <label for="lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
+                    <label for="lon-para-quien" id="lbl-lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
                     <input type="text" name="para_quien" id="lon-para-quien" class="form-control" placeholder="Ej: Departamento de Marketing, Línea Oficina">
                 </div>
 
                 <div class="form-group">
-                    <label for="lon-herramienta">Concepto / Material / Insumo <span class="req">*</span></label>
+                    <label for="lon-herramienta" id="lbl-lon-herramienta">Concepto / Material / Insumo <span class="req">*</span></label>
                     <input type="text" name="herramienta" id="lon-herramienta" class="form-control" placeholder="Ej: Gorras bordadas, Lona publicitaria, Pago Plan Movil" required>
                 </div>
                 <div class="form-group">
-                    <label for="lon-uso">Uso / Propósito <span class="req">*</span></label>
+                    <label for="lon-uso" id="lbl-lon-uso">Uso / Propósito <span class="req">*</span></label>
                     <input type="text" name="uso" id="lon-uso" class="form-control" placeholder="Ej: Campaña marca, Letrero exterior, Línea de contacto" required>
                 </div>
-                <div class="form-group">
-                    <label for="lon-cantidad">Cantidad <span class="req">*</span></label>
+                <div class="form-group" id="form-group-cantidad">
+                    <label for="lon-cantidad" id="lbl-lon-cantidad">Cantidad <span class="req">*</span></label>
                     <input type="number" name="cantidad" id="lon-cantidad" class="form-control" value="1" min="1" step="1" required oninput="calcularTotalLona()">
                 </div>
                 <div class="form-group">
-                    <label for="lon-precio">Precio / Costo Unitario ($) <span class="req">*</span></label>
+                    <label for="lon-precio" id="lbl-lon-precio">Precio / Costo Unitario ($) <span class="req">*</span></label>
                     <input type="number" name="precio" id="lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" required oninput="calcularTotalLona()">
                 </div>
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label for="lon-total">Monto Total ($)</label>
-                    <input type="number" name="total" id="lon-total" class="form-control" min="0" step="0.01" placeholder="Se calcula automáticamente (Cantidad × Unitario) o ingresa valor fijo">
+                    <input type="number" name="total" id="lon-total" class="form-control" min="0" step="0.01" placeholder="Se calcula automáticamente o ingresa valor fijo">
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label for="lon-comentario">Comentario / Notas adicionales</label>
@@ -480,24 +480,116 @@
         if (modal) modal.classList.remove('open');
     }
     
-    // --- MOSTRAR/OCULTAR CAMPOS DINÁMICOS DE LONAS ---
+    // --- MOSTRAR/OCULTAR Y CONFIGURAR CAMPOS DINÁMICOS ---
     function toggleLonaCampos(categoria) {
         const grpAliado = document.getElementById('form-group-aliado');
         const grpParaQuien = document.getElementById('form-group-para-quien');
+        const grpCantidad = document.getElementById('form-group-cantidad');
         const selectAliado = document.getElementById('lon-aliado-id');
         const inputParaQuien = document.getElementById('lon-para-quien');
+        const inputCantidad = document.getElementById('lon-cantidad');
+        
+        // Elementos de texto de etiquetas y placeholders
+        const lblHerramienta = document.getElementById('lbl-lon-herramienta');
+        const inputHerramienta = document.getElementById('lon-herramienta');
+        const lblUso = document.getElementById('lbl-lon-uso');
+        const inputUso = document.getElementById('lon-uso');
+        const lblParaQuien = document.getElementById('lbl-lon-para-quien');
+        const lblPrecio = document.getElementById('lbl-lon-precio');
+        const inputPrecio = document.getElementById('lon-precio');
+        
+        // Estado por defecto (habilitar cantidad)
+        if (grpCantidad) grpCantidad.style.display = 'block';
+        if (inputCantidad) inputCantidad.setAttribute('required', 'true');
         
         if (categoria === 'Material para Aliado') {
             if (grpAliado) grpAliado.style.display = 'block';
             if (grpParaQuien) grpParaQuien.style.display = 'none';
             if (selectAliado) selectAliado.setAttribute('required', 'true');
             if (inputParaQuien) inputParaQuien.removeAttribute('required');
-        } else {
+            
+            // Labels y placeholders
+            if (lblHerramienta) lblHerramienta.innerHTML = 'Concepto / Material / Lona <span class="req">*</span>';
+            if (inputHerramienta) inputHerramienta.placeholder = 'Ej: Lona front 2x3m, Vinil autoadhesivo';
+            if (lblUso) lblUso.innerHTML = 'Uso / Propósito <span class="req">*</span>';
+            if (inputUso) inputUso.placeholder = 'Ej: Letrero fachada, Banner stand';
+            if (lblPrecio) lblPrecio.innerHTML = 'Precio / Costo Unitario ($) <span class="req">*</span>';
+            if (inputPrecio) inputPrecio.placeholder = 'Ej: 45.00';
+            
+        } else if (categoria === 'Servicio del Departamento') {
             if (grpAliado) grpAliado.style.display = 'none';
             if (grpParaQuien) grpParaQuien.style.display = 'block';
             if (selectAliado) selectAliado.removeAttribute('required');
             if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+            
+            // Ocultar campo de cantidad ya que para servicios es un pago único de factura
+            if (grpCantidad) grpCantidad.style.display = 'none';
+            if (inputCantidad) {
+                inputCantidad.removeAttribute('required');
+                inputCantidad.value = '1';
+            }
+            
+            // Labels y placeholders
+            if (lblHerramienta) lblHerramienta.innerHTML = 'Concepto / Servicio o Factura <span class="req">*</span>';
+            if (inputHerramienta) inputHerramienta.placeholder = 'Ej: Pago Plan Movistar Ventas, Envío Zoom Repuestos';
+            if (lblUso) lblUso.innerHTML = 'Propósito / Detalle del Pago <span class="req">*</span>';
+            if (inputUso) inputUso.placeholder = 'Ej: Factura telefonía mes de junio, Envío mercancía urgente';
+            if (lblParaQuien) lblParaQuien.innerHTML = 'Destinatario / Línea o Concepto <span class="req">*</span>';
+            if (inputParaQuien) inputParaQuien.placeholder = 'Ej: Teléfono Ventas, Courier Zoom';
+            if (lblPrecio) lblPrecio.innerHTML = 'Monto del Servicio / Factura ($) <span class="req">*</span>';
+            if (inputPrecio) inputPrecio.placeholder = 'Ej: 30.00';
+            
+        } else if (categoria === 'Implementos / Herramientas') {
+            if (grpAliado) grpAliado.style.display = 'none';
+            if (grpParaQuien) grpParaQuien.style.display = 'block';
+            if (selectAliado) selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+            
+            // Labels y placeholders
+            if (lblHerramienta) lblHerramienta.innerHTML = 'Concepto / Herramienta o Insumo <span class="req">*</span>';
+            if (inputHerramienta) inputHerramienta.placeholder = 'Ej: Parales para Banner, Trípode fotográfico, Disco duro';
+            if (lblUso) lblUso.innerHTML = 'Uso / Propósito <span class="req">*</span>';
+            if (inputUso) inputUso.placeholder = 'Ej: Soporte de eventos, Respaldo de fotos de productos';
+            if (lblParaQuien) lblParaQuien.innerHTML = 'Responsable / Oficina de destino <span class="req">*</span>';
+            if (inputParaQuien) inputParaQuien.placeholder = 'Ej: Diseñador Gráfico, Oficina Principal';
+            if (lblPrecio) lblPrecio.innerHTML = 'Precio / Costo Unitario ($) <span class="req">*</span>';
+            if (inputPrecio) inputPrecio.placeholder = 'Ej: 15.00';
+            
+        } else if (categoria === 'Material POP / Promocional') {
+            if (grpAliado) grpAliado.style.display = 'none';
+            if (grpParaQuien) grpParaQuien.style.display = 'block';
+            if (selectAliado) selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+            
+            // Labels y placeholders
+            if (lblHerramienta) lblHerramienta.innerHTML = 'Concepto / Material POP <span class="req">*</span>';
+            if (inputHerramienta) inputHerramienta.placeholder = 'Ej: Gorras bordadas, Bolígrafos corporativos, Llaveros';
+            if (lblUso) lblUso.innerHTML = 'Uso / Propósito <span class="req">*</span>';
+            if (inputUso) inputUso.placeholder = 'Ej: Regalos para clientes VIP, Material POP stand feria';
+            if (lblParaQuien) lblParaQuien.innerHTML = 'Destinatario / Evento / Destino <span class="req">*</span>';
+            if (inputParaQuien) inputParaQuien.placeholder = 'Ej: Feria Expomotor 2026, Clientes Mayoristas';
+            if (lblPrecio) lblPrecio.innerHTML = 'Precio / Costo Unitario ($) <span class="req">*</span>';
+            if (inputPrecio) inputPrecio.placeholder = 'Ej: 4.50';
+            
+        } else { // Otros
+            if (grpAliado) grpAliado.style.display = 'none';
+            if (grpParaQuien) grpParaQuien.style.display = 'block';
+            if (selectAliado) selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+            
+            // Labels y placeholders
+            if (lblHerramienta) lblHerramienta.innerHTML = 'Concepto / Material / Insumo <span class="req">*</span>';
+            if (inputHerramienta) inputHerramienta.placeholder = 'Ej: Gorras bordadas, Lona publicitaria';
+            if (lblUso) lblUso.innerHTML = 'Uso / Propósito <span class="req">*</span>';
+            if (inputUso) inputUso.placeholder = 'Ej: Campaña marca, Letrero exterior';
+            if (lblParaQuien) lblParaQuien.innerHTML = '¿Para quién? (Destinatario) <span class="req">*</span>';
+            if (inputParaQuien) inputParaQuien.placeholder = 'Ej: Inversiones 2020 C.A., Sucursal Valencia';
+            if (lblPrecio) lblPrecio.innerHTML = 'Precio / Costo Unitario ($) <span class="req">*</span>';
+            if (inputPrecio) inputPrecio.placeholder = 'Ej: 45.00';
         }
+        
+        // Recalcular total con el nuevo estado de los campos
+        calcularTotalLona();
     }
 
     function abrirModalLona() {
