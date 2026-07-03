@@ -177,6 +177,7 @@
                         <th style="text-align: right;">Costo/Día</th>
                         <th style="text-align: right;">Total Campaña</th>
                         <th>Fechas</th>
+                        <th>Rendimiento / Métricas</th>
                         <th>Comentario</th>
                         <th>Por</th>
                         {% if puede('gastos', 'gestionar') %}
@@ -186,7 +187,7 @@
                 </thead>
                 <tbody>
                     {% for g in gastos_publicidad %}
-                    {# g = (id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion) #}
+                    {# g = (id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion, alcance, clics, conversiones, ingresos) #}
                     <tr>
                         <td><strong>{{ g[1] }}</strong></td>
                         <td><span class="tipo-badge" style="background:#dbeafe; color:#1e40af;">{{ g[2] }}</span></td>
@@ -198,15 +199,52 @@
                                 {{ g[6] }} al {{ g[7] }}
                             </div>
                         </td>
+                        <td style="font-size: 12px; line-height: 1.4; min-width: 160px;">
+                            {% if g[11] is not none or g[12] is not none or g[13] is not none or g[14] is not none %}
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    {% if g[11] is not none %}
+                                        <div><span style="color:var(--text-muted);">Alcance:</span> <strong>{{ "{:,}".format(g[11]) }}</strong></div>
+                                    {% endif %}
+                                    {% if g[12] is not none %}
+                                        <div><span style="color:var(--text-muted);">Clics:</span> <strong>{{ "{:,}".format(g[12]) }}</strong>
+                                            {% if g[11] and g[11] > 0 %}
+                                                <span style="color:#2563eb; font-size:11px; margin-left:4px; font-weight:600;">({{ "{:.1f}%".format((g[12] / g[11]) * 100) }} CTR)</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    {% if g[13] is not none %}
+                                        <div><span style="color:var(--text-muted);">Resultados:</span> <strong>{{ "{:,}".format(g[13]) }}</strong>
+                                            {% if g[13] > 0 %}
+                                                <span style="color:#059669; font-size:11px; margin-left:4px; font-weight:600;">(${{ "{:.2f}".format(g[5] / g[13]) }} CPA)</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    {% if g[14] is not none %}
+                                        <div style="margin-top:2px; border-top: 1px dashed #e2e8f0; padding-top: 2px;">
+                                            <span style="color:var(--text-muted);">Retorno (ROAS):</span> <strong style="color:#059669;">{{ "{:.1f}x".format(g[14] / g[5]) if g[5] > 0 else '—' }}</strong> 
+                                            <span style="color:var(--text-muted); font-size:11px;">(${{ "{:,.2f}".format(g[14]) }})</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span style="color:var(--text-muted); font-style:italic;">Sin estadísticas</span>
+                            {% endif %}
+                        </td>
                         <td style="max-width: 250px; white-space: normal; font-size: 13px; color: var(--text-muted);">
                             {{ g[8] if g[8] else '—' }}
                         </td>
                         <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[9].capitalize() }}</span></td>
                         {% if puede('gastos', 'gestionar') %}
                         <td style="text-align: center;">
-                            <form action="{{ url_for('eliminar_gasto_publicidad', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar esta pauta de publicidad?');">
-                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕ Eliminar</button>
-                            </form>
+                            <div style="display:flex; gap:6px; justify-content:center;">
+                                <button type="button" class="btn btn-sm" style="padding: 4px 8px; font-size: 11px; background:#2563eb; border-color:#2563eb; color:#fff;" 
+                                        onclick="abrirModalEstadisticas({{ g[0] }}, '{{ g[1] | escape }}', {{ g[11] if g[11] is not none else 'null' }}, {{ g[12] if g[12] is not none else 'null' }}, {{ g[13] if g[13] is not none else 'null' }}, {{ g[14] if g[14] is not none else 'null' }})">
+                                    📈 Métricas
+                                </button>
+                                <form action="{{ url_for('eliminar_gasto_publicidad', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar esta pauta de publicidad?');">
+                                    <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕</button>
+                                </form>
+                            </div>
                         </td>
                         {% endif %}
                     </tr>
@@ -434,6 +472,43 @@
         </form>
     </div>
 </div>
+
+<!-- MODAL: REGISTRAR/EDITAR ESTADÍSTICAS -->
+<div class="modal-overlay" id="modalEstadisticas">
+    <div class="modal">
+        <div class="modal-header">
+            <span id="meta-modal-title">Métricas de Rendimiento Campaña</span>
+            <button class="modal-close" onclick="cerrarModalEstadisticas()">✕</button>
+        </div>
+        <form id="form-estadisticas" method="POST" action="">
+            <div style="display:grid;grid-template-columns:1fr;gap:16px; padding:8px 0;">
+                <p style="font-size:13px; color:var(--text-muted); margin:0;">
+                    Registra los resultados obtenidos de la plataforma de anuncios (Meta, Google, TikTok, etc.) una vez finalizada la pauta.
+                </p>
+                <div class="form-group">
+                    <label for="meta-alcance">Alcance (Personas alcanzadas / Impresiones)</label>
+                    <input type="number" name="alcance" id="meta-alcance" class="form-control" min="0" placeholder="Ej: 25000">
+                </div>
+                <div class="form-group">
+                    <label for="meta-clics">Clics en el enlace / Visitas</label>
+                    <input type="number" name="clics" id="meta-clics" class="form-control" min="0" placeholder="Ej: 1200">
+                </div>
+                <div class="form-group">
+                    <label for="meta-conversiones">Conversiones / Mensajes / Leads</label>
+                    <input type="number" name="conversiones" id="meta-conversiones" class="form-control" min="0" placeholder="Ej: 85">
+                </div>
+                <div class="form-group">
+                    <label for="meta-ingresos">Ingresos Generados por la Campaña ($)</label>
+                    <input type="number" name="ingresos" id="meta-ingresos" class="form-control" min="0" step="0.01" placeholder="Ej: 450.00 (opcional, para medir ROAS)">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalEstadisticas()">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background:#2563eb; border-color:#2563eb;">Guardar Estadísticas</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -639,6 +714,30 @@
         } else {
             totalInput.value = '';
         }
+    }
+
+    // --- METRICAS Y ESTADISTICAS ---
+    function abrirModalEstadisticas(id, nombre, alcance, clics, conversiones, ingresos) {
+        const modal = document.getElementById('modalEstadisticas');
+        const form = document.getElementById('form-estadisticas');
+        const title = document.getElementById('meta-modal-title');
+        
+        if (modal && form && title) {
+            title.textContent = `Métricas: ${nombre}`;
+            form.action = `/gastos/publicidad/estadisticas/${id}`;
+            
+            document.getElementById('meta-alcance').value = alcance !== null ? alcance : '';
+            document.getElementById('meta-clics').value = clics !== null ? clics : '';
+            document.getElementById('meta-conversiones').value = conversiones !== null ? conversiones : '';
+            document.getElementById('meta-ingresos').value = ingresos !== null ? ingresos : '';
+            
+            modal.classList.add('open');
+        }
+    }
+    
+    function cerrarModalEstadisticas() {
+        const modal = document.getElementById('modalEstadisticas');
+        if (modal) modal.classList.remove('open');
     }
 
     // --- AL CARGAR LA PÁGINA ---

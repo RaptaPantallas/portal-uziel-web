@@ -2371,6 +2371,36 @@ def eliminar_gasto_publicidad(gasto_id):
     return redirect(request.referrer or url_for('ver_gastos'))
 
 
+@app.route('/gastos/publicidad/estadisticas/<int:gasto_id>', methods=['POST'])
+@login_requerido
+def guardar_estadisticas_publicidad(gasto_id):
+    """Guarda o actualiza las estadísticas (alcance, clics, conversiones, ingresos) de una pauta."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    alcance_val = request.form.get('alcance', '').strip()
+    clics_val = request.form.get('clics', '').strip()
+    conversiones_val = request.form.get('conversiones', '').strip()
+    ingresos_val = request.form.get('ingresos', '').strip()
+
+    alcance = int(alcance_val) if alcance_val and alcance_val.isdigit() else None
+    clics = int(clics_val) if clics_val and clics_val.isdigit() else None
+    conversiones = int(conversiones_val) if conversiones_val and conversiones_val.isdigit() else None
+    ingresos = float(ingresos_val) if ingresos_val else None
+
+    creado_por = session.get('usuario')
+    ok = bd.actualizar_estadisticas_publicidad(gasto_id, alcance, clics, conversiones, ingresos)
+
+    if ok:
+        flash(' Estadísticas de la pauta actualizadas correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Actualizar Estadísticas Publicidad', f'Actualizó estadísticas del gasto publicitario #{gasto_id}')
+    else:
+        flash(' Error al actualizar las estadísticas en la base de datos.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+
 @app.route('/gastos/lona/nuevo', methods=['POST'])
 @login_requerido
 def nuevo_gasto_lona():

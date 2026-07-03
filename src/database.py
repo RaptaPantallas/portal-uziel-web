@@ -3943,6 +3943,17 @@ El equipo de Importadora Uziel C.A."""
                 print(f" [Gastos] Error al agregar nuevas columnas a gastos_lonas: {e}")
                 conexion.rollback()
 
+            # Agregar columnas de estadísticas a gastos_publicidad
+            try:
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS alcance INTEGER DEFAULT NULL")
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS clics INTEGER DEFAULT NULL")
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS conversiones INTEGER DEFAULT NULL")
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS ingresos NUMERIC(12,2) DEFAULT NULL")
+                conexion.commit()
+            except Exception as e:
+                print(f" [Gastos] Error al agregar columnas de estadísticas a gastos_publicidad: {e}")
+                conexion.rollback()
+
             return True
         except Error as e:
             print(f" [Gastos] Error al inicializar tablas de gastos: {e}")
@@ -3981,7 +3992,8 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion
+                SELECT id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, 
+                       comentario, creado_por, fecha_creacion, alcance, clics, conversiones, ingresos
                 FROM gastos_publicidad
                 WHERE EXTRACT(MONTH FROM fecha_creacion) = %s AND EXTRACT(YEAR FROM fecha_creacion) = %s
                 ORDER BY fecha_creacion DESC
@@ -3993,6 +4005,27 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
         return resultado
+
+    def actualizar_estadisticas_publicidad(self, gasto_id, alcance, clics, conversiones, ingresos):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE gastos_publicidad
+                SET alcance = %s, clics = %s, conversiones = %s, ingresos = %s
+                WHERE id = %s
+            """, (alcance, clics, conversiones, ingresos, gasto_id))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al actualizar estadísticas de publicidad #{gasto_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
 
     def eliminar_gasto_publicidad(self, gasto_id):
         conexion = self.conectar()
