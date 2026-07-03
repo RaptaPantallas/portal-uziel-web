@@ -130,6 +130,20 @@
     </div>
 </div>
 
+<!-- Guía de Uso del Módulo -->
+<div class="ayuda-modulo" data-ayuda-key="gastos_marketing" style="margin-bottom: 20px;">
+    <button class="ayuda-modulo-toggle" onclick="toggleAyudaModulo(this, 'gastos_marketing')">✕ Ocultar Guía</button>
+    <div class="ayuda-modulo-titulo"><i data-lucide="info" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;"></i> Guía de Uso: Gastos de Marketing</div>
+    <div class="ayuda-modulo-contenido">
+        <p>Este panel centraliza la administración y medición del presupuesto invertido por el departamento en pautas digitales y compras físicas:</p>
+        <ul style="margin-left: 20px; margin-top: 8px; list-style-type: disc; display: flex; flex-direction: column; gap: 6px;">
+            <li><strong>Publicidad Digital:</strong> Registra campañas en Meta Ads, Google Ads o TikTok. Cuando finalicen, pulsa en el botón <strong>"📈 Métricas"</strong> para ingresar el rendimiento (Alcance, Clics, Conversiones/Mensajes e Ingresos). El sistema calculará de forma automática las tasas de efectividad (CTR, CPA y ROAS) para evaluar el retorno de inversión.</li>
+            <li><strong>Lonas e Insumos Físicos:</strong> Registra la adquisición de materiales corporativos (gorras, material POP, parales), implementos del departamento o pago de servicios (como líneas telefónicas o envíos). Al cambiar la categoría del gasto, el formulario adaptará de forma inteligente sus etiquetas y placeholders.</li>
+            <li><strong>Cálculos Automáticos e Historial:</strong> Los montos totales se calculan multiplicando cantidad por costo unitario de manera automática. Para consultar meses previos, usa el selector de meses; el sistema creará de forma autónoma el nuevo mes de consulta conforme avance el año.</li>
+        </ul>
+    </div>
+</div>
+
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
