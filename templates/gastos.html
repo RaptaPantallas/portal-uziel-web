@@ -1,0 +1,488 @@
+{% extends base_template %}
+{% block title %}Gastos Marketing — Importadora Uziel{% endblock %}
+{% block head_extra %}
+<style>
+    .gastos-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    
+    .gastos-card {
+        background: var(--card-bg);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .gastos-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .gastos-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 4px;
+    }
+    
+    .gastos-card.card-pub::before { background: #3b82f6; }
+    .gastos-card.card-lon::before { background: #10b981; }
+    .gastos-card.card-tot::before { background: var(--primary); }
+    
+    .gastos-card-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+    
+    .gastos-card-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text);
+        line-height: 1.2;
+    }
+    
+    .gastos-tabs {
+        display: flex;
+        gap: 2px;
+        background: #e2e8f0;
+        padding: 4px;
+        border-radius: 24px;
+        margin-bottom: 20px;
+        max-width: fit-content;
+    }
+    
+    .gastos-tab-btn {
+        padding: 8px 24px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .gastos-tab-btn.active {
+        background: var(--card-bg);
+        color: var(--text);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .panel-gastos {
+        display: none;
+    }
+    
+    .panel-gastos.active {
+        display: block;
+        animation: fadeIn 0.25s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fecha-rango-badge {
+        font-size: 11px;
+        color: var(--text-muted);
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        margin-top: 4px;
+        white-space: nowrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Gastos de Marketing</h1>
+        <p class="subtitulo">Registra y realiza el seguimiento de la inversión publicitaria digital y física.</p>
+    </div>
+</div>
+
+<!-- Tarjetas Resumen -->
+<div class="gastos-summary-grid">
+    <div class="gastos-card card-pub">
+        <div class="gastos-card-title">Publicidad Digital</div>
+        <div class="gastos-card-value">${{ "{:,.2f}".format(total_publicidad) }}</div>
+    </div>
+    <div class="gastos-card card-lon">
+        <div class="gastos-card-title">Lonas y Físicos</div>
+        <div class="gastos-card-value">${{ "{:,.2f}".format(total_lonas) }}</div>
+    </div>
+    <div class="gastos-card card-tot" style="background: var(--primary-subtle);">
+        <div class="gastos-card-title" style="color: var(--primary-dark);">Gran Total Mensual</div>
+        <div class="gastos-card-value" style="color: var(--primary-dark);">${{ "{:,.2f}".format(total_general) }}</div>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="flash-msg {% if category == 'exito' %}flash-exito{% else %}flash-error{% endif %}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Panel de Filtro y Acciones -->
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+        <label for="filtro-mes-select" style="font-size:14px; font-weight:600; color:var(--text-muted);">Mes de consulta:</label>
+        <select id="filtro-mes-select" class="form-control" style="width:200px; padding: 6px 12px; border-radius: 20px; font-size: 14px;" onchange="filtrarPorMes(this.value)">
+            {% for f in meses_filtros %}
+            <option value="{{ f.mes }}-{{ f.anio }}" {% if f.mes == mes_seleccionado and f.anio == anio_seleccionado %}selected{% endif %}>{{ f.nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div style="display:flex; gap:12px;">
+        {% if puede('gastos', 'gestionar') %}
+        <button class="btn btn-primary" onclick="abrirModalPublicidad()">+ Publicidad</button>
+        <button class="btn btn-primary" style="background:#10b981; border-color:#10b981;" onclick="abrirModalLona()">+ Lona / Físico</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tabs para cambiar de vista -->
+<div class="gastos-tabs">
+    <button class="gastos-tab-btn active" id="tab-pub" onclick="cambiarTab('publicidad')">Publicidad Digital ({{ gastos_publicidad | length }})</button>
+    <button class="gastos-tab-btn" id="tab-lon" onclick="cambiarTab('lonas')">Lonas y Otros ({{ gastos_lonas | length }})</button>
+</div>
+
+<!-- PESTAÑA 1: PUBLICIDAD DIGITAL -->
+<div class="panel-gastos active" id="panel-publicidad">
+    <div class="card" style="overflow-x: auto; padding: 0; border-radius: var(--radius-lg);">
+        {% if gastos_publicidad %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Post / Campaña</th>
+                        <th>Objetivo</th>
+                        <th>Metodología / Plataforma</th>
+                        <th style="text-align: right;">Costo/Día</th>
+                        <th style="text-align: right;">Total Campaña</th>
+                        <th>Fechas</th>
+                        <th>Comentario</th>
+                        <th>Por</th>
+                        {% if puede('gastos', 'gestionar') %}
+                        <th style="text-align: center;">Acción</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in gastos_publicidad %}
+                    {# g = (id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion) #}
+                    <tr>
+                        <td><strong>{{ g[1] }}</strong></td>
+                        <td><span class="tipo-badge" style="background:#dbeafe; color:#1e40af;">{{ g[2] }}</span></td>
+                        <td><strong>{{ g[3] }}</strong></td>
+                        <td style="text-align: right; font-weight: 600;">${{ "{:,.2f}".format(g[4]) }}</td>
+                        <td style="text-align: right; font-weight: 700; color: var(--primary);">${{ "{:,.2f}".format(g[5]) }}</td>
+                        <td>
+                            <div class="fecha-rango-badge">
+                                {{ g[6] }} al {{ g[7] }}
+                            </div>
+                        </td>
+                        <td style="max-width: 250px; white-space: normal; font-size: 13px; color: var(--text-muted);">
+                            {{ g[8] if g[8] else '—' }}
+                        </td>
+                        <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[9].capitalize() }}</span></td>
+                        {% if puede('gastos', 'gestionar') %}
+                        <td style="text-align: center;">
+                            <form action="{{ url_for('eliminar_gasto_publicidad', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar esta pauta de publicidad?');">
+                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕ Eliminar</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 40px 20px;">
+            <i data-lucide="facebook" class="icon" style="width:48px;height:48px;color:var(--text-light);margin-bottom:12px;"></i>
+            <p style="color:var(--text-muted); font-size: 15px;">No hay pautas de publicidad digital registradas para este mes.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- PESTAÑA 2: LONAS Y OTROS INSUMOS -->
+<div class="panel-gastos" id="panel-lonas">
+    <div class="card" style="overflow-x: auto; padding: 0; border-radius: var(--radius-lg);">
+        {% if gastos_lonas %}
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Insumo / Material</th>
+                        <th>Uso / Detalle</th>
+                        <th>Destinatario (¿Para quién?)</th>
+                        <th style="text-align: right;">Precio</th>
+                        <th style="text-align: right;">Total Lona</th>
+                        <th>Comentario</th>
+                        <th>Por</th>
+                        {% if puede('gastos', 'gestionar') %}
+                        <th style="text-align: center;">Acción</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in gastos_lonas %}
+                    {# g = (id, herramienta, uso, precio, para_quien, total, comentario, creado_por, fecha_creacion) #}
+                    <tr>
+                        <td><strong>{{ g[1] }}</strong></td>
+                        <td>{{ g[2] }}</td>
+                        <td><span class="tipo-badge" style="background:#d1fae5; color:#065f46; font-size:12px;">{{ g[4] }}</span></td>
+                        <td style="text-align: right; font-weight: 600;">${{ "{:,.2f}".format(g[3]) }}</td>
+                        <td style="text-align: right; font-weight: 700; color: #10b981;">${{ "{:,.2f}".format(g[5]) }}</td>
+                        <td style="max-width: 250px; white-space: normal; font-size: 13px; color: var(--text-muted);">
+                            {{ g[6] if g[6] else '—' }}
+                        </td>
+                        <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[7].capitalize() }}</span></td>
+                        {% if puede('gastos', 'gestionar') %}
+                        <td style="text-align: center;">
+                            <form action="{{ url_for('eliminar_gasto_lona', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este registro de lona?');">
+                                <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕ Eliminar</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding: 40px 20px;">
+            <i data-lucide="image" class="icon" style="width:48px;height:48px;color:var(--text-light);margin-bottom:12px;"></i>
+            <p style="color:var(--text-muted); font-size: 15px;">No hay lonas o insumos registrados en este mes.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- MODAL: REGISTRAR PUBLICIDAD -->
+<div class="modal-overlay" id="modalPublicidad">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>Registrar Pauta de Publicidad Digital</span>
+            <button class="modal-close" onclick="cerrarModalPublicidad()">✕</button>
+        </div>
+        <form action="{{ url_for('nuevo_gasto_publicidad') }}" method="POST">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label for="pub-post">Post / Campaña <span class="req">*</span></label>
+                    <input type="text" name="post" id="pub-post" class="form-control" placeholder="Ej: Promo Dia del Padre" required>
+                </div>
+                <div class="form-group">
+                    <label for="pub-objetivo">Objetivo <span class="req">*</span></label>
+                    <select name="objetivo" id="pub-objetivo" class="form-control" required>
+                        <option value="">— Seleccionar —</option>
+                        <option value="Tráfico">Tráfico / Visitas</option>
+                        <option value="Conversión / Ventas">Conversión / Ventas</option>
+                        <option value="Mensajes / Leads">Mensajes / Prospectos</option>
+                        <option value="Interacción">Interacción / Likes</option>
+                        <option value="Reconocimiento">Reconocimiento / Alcance</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="pub-metodo">Plataforma / Canal <span class="req">*</span></label>
+                    <select name="metodo" id="pub-metodo" class="form-control" required>
+                        <option value="">— Seleccionar —</option>
+                        <option value="Meta Ads (FB/IG)">Meta Ads (Facebook/Instagram)</option>
+                        <option value="Google Ads">Google Ads / YouTube</option>
+                        <option value="TikTok Ads">TikTok Ads</option>
+                        <option value="MercadoLibre Product Ads">MercadoLibre Product Ads</option>
+                        <option value="Pauta Influencer">Pauta con Influencer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="pub-costo">Costo por Día ($) <span class="req">*</span></label>
+                    <input type="number" name="costo_dia" id="pub-costo" class="form-control" min="0" step="0.01" placeholder="Ej: 5.00" required oninput="calcularTotalPublicidad()">
+                </div>
+                <div class="form-group">
+                    <label for="pub-fecha-ini">Fecha Inicio <span class="req">*</span></label>
+                    <input type="date" name="fecha_inicio" id="pub-fecha-ini" class="form-control" required oninput="calcularTotalPublicidad()">
+                </div>
+                <div class="form-group">
+                    <label for="pub-fecha-fin">Fecha Fin <span class="req">*</span></label>
+                    <input type="date" name="fecha_fin" id="pub-fecha-fin" class="form-control" required oninput="calcularTotalPublicidad()">
+                </div>
+                <div class="form-group">
+                    <label for="pub-total">Monto Total Calculado ($)</label>
+                    <input type="number" name="total" id="pub-total" class="form-control" min="0" step="0.01" placeholder="Se calcula solo, o ingresa valor fijo">
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label for="pub-comentario">Comentario / Notas adicionales</label>
+                    <textarea name="comentario" id="pub-comentario" class="form-control" placeholder="Detalla enlaces, segmentación u observaciones..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalPublicidad()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Registrar Gasto</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: REGISTRAR LONA -->
+<div class="modal-overlay" id="modalLona">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>Registrar Lona / Insumo Físico</span>
+            <button class="modal-close" onclick="cerrarModalLona()">✕</button>
+        </div>
+        <form action="{{ url_for('nuevo_gasto_lona') }}" method="POST">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                    <label for="lon-herramienta">Herramienta / Material / Tipo <span class="req">*</span></label>
+                    <input type="text" name="herramienta" id="lon-herramienta" class="form-control" placeholder="Ej: Lona front, Vinil autoadhesivo" required>
+                </div>
+                <div class="form-group">
+                    <label for="lon-uso">Uso / Propósito <span class="req">*</span></label>
+                    <input type="text" name="uso" id="lon-uso" class="form-control" placeholder="Ej: Letrero fachada, Banner stand" required>
+                </div>
+                <div class="form-group">
+                    <label for="lon-precio">Precio / Costo Unitario ($)</label>
+                    <input type="number" name="precio" id="lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" oninput="calcularTotalLona()">
+                </div>
+                <div class="form-group">
+                    <label for="lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
+                    <input type="text" name="para_quien" id="lon-para-quien" class="form-control" placeholder="Ej: Inversiones 2020 C.A., Sucursal Valencia" required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="lon-total">Monto Total ($) <span class="req">*</span></label>
+                    <input type="number" name="total" id="lon-total" class="form-control" min="0" step="0.01" placeholder="Total a registrar (si no se especifica, toma el precio unitario)" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label for="lon-comentario">Comentario / Notas adicionales</label>
+                    <textarea name="comentario" id="lon-comentario" class="form-control" placeholder="Detalle de medidas (ej. 2x3m), material específico..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalLona()">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background:#10b981; border-color:#10b981;">Registrar Gasto</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // --- MANEJO DE TABS ---
+    function cambiarTab(tabName) {
+        document.querySelectorAll('.gastos-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.panel-gastos').forEach(panel => panel.classList.remove('active'));
+        
+        if (tabName === 'publicidad') {
+            document.getElementById('tab-pub').classList.add('active');
+            document.getElementById('panel-publicidad').classList.add('active');
+            localStorage.setItem('active_gasto_tab', 'publicidad');
+        } else {
+            document.getElementById('tab-lon').classList.add('active');
+            document.getElementById('panel-lonas').classList.add('active');
+            localStorage.setItem('active_gasto_tab', 'lonas');
+        }
+    }
+    
+    // --- FILTRAR POR MES/AÑO ---
+    function filtrarPorMes(value) {
+        const parts = value.split('-');
+        if(parts.length === 2) {
+            const mes = parts[0];
+            const anio = parts[1];
+            const url = `{{ url_for('ver_gastos') }}?mes=${mes}&anio=${anio}`;
+            if (typeof cargarContenido === 'function') {
+                cargarContenido(url, true);
+            } else {
+                window.location.href = url;
+            }
+        }
+    }
+    
+    // --- MODALES ---
+    function abrirModalPublicidad() {
+        const modal = document.getElementById('modalPublicidad');
+        if (modal) modal.classList.add('open');
+    }
+    
+    function cerrarModalPublicidad() {
+        const modal = document.getElementById('modalPublicidad');
+        if (modal) modal.classList.remove('open');
+    }
+    
+    function abrirModalLona() {
+        const modal = document.getElementById('modalLona');
+        if (modal) modal.classList.add('open');
+    }
+    
+    function cerrarModalLona() {
+        const modal = document.getElementById('modalLona');
+        if (modal) modal.classList.remove('open');
+    }
+    
+    // --- AUTO-CÁLCULO DE TOTAL PUBLICIDAD ---
+    function calcularTotalPublicidad() {
+        const costoDia = parseFloat(document.getElementById('pub-costo').value) || 0;
+        const fechaIniVal = document.getElementById('pub-fecha-ini').value;
+        const fechaFinVal = document.getElementById('pub-fecha-fin').value;
+        const totalInput = document.getElementById('pub-total');
+        
+        if (costoDia > 0 && fechaIniVal && fechaFinVal) {
+            const f1 = new Date(fechaIniVal);
+            const f2 = new Date(fechaFinVal);
+            const diffTime = f2.getTime() - f1.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            
+            if (diffDays > 0) {
+                totalInput.value = (costoDia * diffDays).toFixed(2);
+            } else {
+                totalInput.value = '';
+            }
+        }
+    }
+    
+    // --- AUTO-CÁLCULO DE TOTAL LONA ---
+    function calcularTotalLona() {
+        const precio = parseFloat(document.getElementById('lon-precio').value) || 0;
+        const totalInput = document.getElementById('lon-total');
+        
+        if (precio > 0 && (!totalInput.value || totalInput.value == 0)) {
+            totalInput.value = precio.toFixed(2);
+        }
+    }
+
+    // --- AL CARGAR LA PÁGINA ---
+    document.addEventListener('DOMContentLoaded', function() {
+        // Restaurar pestaña activa guardada en localStorage
+        const activeTab = localStorage.getItem('active_gasto_tab');
+        if (activeTab === 'lonas') {
+            cambiarTab('lonas');
+        } else {
+            cambiarTab('publicidad');
+        }
+        
+        // Crear iconos de Lucide si están cargados
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

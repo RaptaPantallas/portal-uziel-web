@@ -90,6 +90,7 @@ class ConexionBD:
         "reportes":    ["ver"],
         "cotizaciones": ["ver", "crear"],
         "usuarios":    ["gestionar"],
+        "gastos":      ["ver", "gestionar"],
     }
 
     # Pool estático de conexiones (se inicializa una sola vez para toda la aplicación)
@@ -2602,8 +2603,17 @@ El equipo de Importadora Uziel C.A."""
             cursor.execute("""
                 ALTER TABLE usuarios
                 ADD COLUMN IF NOT EXISTS permisos TEXT
-                    DEFAULT 'clientes:ver,editar,agregar,eliminar|productos:ver,editar,agregar,eliminar|activos:ver,subir|tareas:ver,gestionar|reportes:ver|cotizaciones:ver,crear'
+                    DEFAULT 'clientes:ver,editar,agregar,eliminar|productos:ver,editar,agregar,eliminar|activos:ver,subir|tareas:ver,gestionar|reportes:ver|cotizaciones:ver,crear|gastos:ver,gestionar'
             """)
+            conexion.commit()
+
+            # Migración: asegurar que los usuarios existentes tengan el módulo de gastos
+            cursor.execute("SELECT username, permisos FROM usuarios")
+            usuarios = cursor.fetchall()
+            for username, permisos in usuarios:
+                if permisos and 'gastos:' not in permisos:
+                    nuevos_permisos = permisos + "|gastos:ver,gestionar"
+                    cursor.execute("UPDATE usuarios SET permisos = %s WHERE username = %s", (nuevos_permisos, username))
             conexion.commit()
             return True
         except Error as e:
@@ -3817,3 +3827,195 @@ El equipo de Importadora Uziel C.A."""
         finally:
             if cursor: cursor.close()
             conexion.close()
+
+    # =========================================================================
+    # MÓDULO GASTOS MARKETING — Control de gastos de Publicidad y Lonas
+    # =========================================================================
+
+    def inicializar_gastos(self):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Tabla de gastos de publicidad
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS gastos_publicidad (
+                    id             SERIAL PRIMARY KEY,
+                    post           VARCHAR(255)  NOT NULL,
+                    objetivo       VARCHAR(255)  NOT NULL,
+                    metodo         VARCHAR(100)  NOT NULL,
+                    costo_dia      NUMERIC(12,2) NOT NULL,
+                    total          NUMERIC(12,2) NOT NULL,
+                    fecha_inicio   DATE          NOT NULL,
+                    fecha_fin      DATE          NOT NULL,
+                    comentario     TEXT,
+                    creado_por     VARCHAR(100)  NOT NULL,
+                    fecha_creacion TIMESTAMP     DEFAULT NOW()
+                )
+            """)
+            # Tabla de gastos de lonas e insumos físicos
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS gastos_lonas (
+                    id             SERIAL PRIMARY KEY,
+                    herramienta    VARCHAR(255)  NOT NULL,
+                    uso            VARCHAR(255)  NOT NULL,
+                    precio         NUMERIC(12,2) NOT NULL,
+                    para_quien     VARCHAR(255)  NOT NULL,
+                    total          NUMERIC(12,2) NOT NULL,
+                    comentario     TEXT,
+                    creado_por     VARCHAR(100)  NOT NULL,
+                    fecha_creacion TIMESTAMP     DEFAULT NOW()
+                )
+            """)
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al inicializar tablas de gastos: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def crear_gasto_publicidad(self, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO gastos_publicidad (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al crear gasto de publicidad: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_gastos_publicidad(self, mes, anio):
+        """Retorna los gastos de publicidad creados en el mes y año indicados."""
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion
+                FROM gastos_publicidad
+                WHERE EXTRACT(MONTH FROM fecha_creacion) = %s AND EXTRACT(YEAR FROM fecha_creacion) = %s
+                ORDER BY fecha_creacion DESC
+            """, (mes, anio))
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [Gastos] Error al obtener gastos de publicidad: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def eliminar_gasto_publicidad(self, gasto_id):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM gastos_publicidad WHERE id = %s", (gasto_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al eliminar gasto de publicidad #{gasto_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al crear gasto de lona: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_gastos_lonas(self, mes, anio):
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, herramienta, uso, precio, para_quien, total, comentario, creado_por, fecha_creacion
+                FROM gastos_lonas
+                WHERE EXTRACT(MONTH FROM fecha_creacion) = %s AND EXTRACT(YEAR FROM fecha_creacion) = %s
+                ORDER BY fecha_creacion DESC
+            """, (mes, anio))
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [Gastos] Error al obtener gastos de lonas: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def eliminar_gasto_lona(self, gasto_id):
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM gastos_lonas WHERE id = %s", (gasto_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al eliminar gasto de lona #{gasto_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_meses_disponibles_gastos(self):
+        """Retorna una lista de tuplas (mes, anio) que tienen gastos registrados, ordenados desc."""
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT DISTINCT EXTRACT(MONTH FROM fecha_creacion)::int AS mes, EXTRACT(YEAR FROM fecha_creacion)::int AS anio
+                FROM (
+                    SELECT fecha_creacion FROM gastos_publicidad
+                    UNION
+                    SELECT fecha_creacion FROM gastos_lonas
+                ) AS combinados
+                ORDER BY anio DESC, mes DESC
+            """)
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [Gastos] Error al obtener meses disponibles: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado

@@ -239,6 +239,7 @@ def _extraer_ruta_relativa(ruta_archivo):
 bd.inicializar_tareas()
 bd.inicializar_cotizaciones()
 bd.inicializar_permisos_usuarios()
+bd.inicializar_gastos()
 
 
 # =============================================================================
@@ -2174,6 +2175,204 @@ def diagnostico():
     html += f'<p>Total productos en BD: {len(prods)}</p>'
     html += '<p style="color:#666;">Las columnas MARCA [3] y PRECIO [5] estan resaltadas.</p>'
     return html
+
+
+# =============================================================================
+# MÓDULO GASTOS MARKETING
+# =============================================================================
+
+@app.route('/gastos')
+@login_requerido
+def ver_gastos():
+    """
+    Módulo Gastos Marketing — Visualización y registro de gastos.
+    Filtra los gastos por mes y año. Si no se especifican, se usa el mes actual.
+    """
+    if not _puede("gastos", "ver"):
+        flash(' No tienes permisos para ver el módulo de gastos.', 'error')
+        return redirect(url_for('inicio'))
+
+    import datetime
+    hoy = datetime.date.today()
+    
+    # Obtener mes y año seleccionados (por defecto el actual)
+    mes = request.args.get('mes', hoy.month, type=int)
+    anio = request.args.get('anio', hoy.year, type=int)
+
+    # Obtener gastos de la base de datos
+    gastos_pub = bd.obtener_gastos_publicidad(mes, anio)
+    gastos_lon = bd.obtener_gastos_lonas(mes, anio)
+
+    # Calcular totales
+    total_pub = sum(float(g[5]) for g in gastos_pub)
+    total_lon = sum(float(g[5]) for g in gastos_lon)
+    total_general = total_pub + total_lon
+
+    # Meses disponibles para filtrar
+    meses_bd = bd.obtener_meses_disponibles_gastos()
+    
+    # Asegurar que el mes/año actual o el seleccionado estén en la lista de meses para que el usuario pueda seleccionarlos
+    meses_disponibles = []
+    combo_actual = (mes, anio)
+    combo_hoy = (hoy.month, hoy.year)
+    
+    # Convertir a set de tuplas para evitar duplicados
+    set_meses = set((m[0], m[1]) for m in meses_bd)
+    set_meses.add(combo_actual)
+    set_meses.add(combo_hoy)
+    
+    # Nombre de los meses en español para la UI
+    nombres_meses = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+        7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    }
+
+    # Ordenar los meses disponibles (año desc, mes desc)
+    meses_disponibles = sorted(list(set_meses), key=lambda x: (x[1], x[0]), reverse=True)
+    
+    # Formatear la lista para el dropdown
+    lista_meses_formateados = []
+    for m, a in meses_disponibles:
+        lista_meses_formateados.append({
+            'mes': m,
+            'anio': a,
+            'nombre': f"{nombres_meses.get(m, 'Mes')} {a}"
+        })
+
+    return render_template(
+        'gastos.html',
+        gastos_publicidad=gastos_pub,
+        gastos_lonas=gastos_lon,
+        total_publicidad=total_pub,
+        total_lonas=total_lon,
+        total_general=total_general,
+        mes_seleccionado=mes,
+        anio_seleccionado=anio,
+        meses_filtros=lista_meses_formateados
+    )
+
+
+@app.route('/gastos/publicidad/nuevo', methods=['POST'])
+@login_requerido
+def nuevo_gasto_publicidad():
+    """Registra un nuevo gasto de publicidad digital."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    post = request.form.get('post', '').strip()
+    objetivo = request.form.get('objetivo', '').strip()
+    metodo = request.form.get('metodo', '').strip()
+    costo_dia = request.form.get('costo_dia', 0, type=float)
+    total = request.form.get('total', 0, type=float)
+    fecha_inicio = request.form.get('fecha_inicio', '').strip()
+    fecha_fin = request.form.get('fecha_fin', '').strip()
+    comentario = request.form.get('comentario', '').strip()
+
+    if not post or not objetivo or not metodo or not fecha_inicio or not fecha_fin:
+        flash(' Todos los campos (excepto comentario) son obligatorios para publicidad.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    # Si total es 0, calcularlo automáticamente a partir de los días de duración si es posible
+    try:
+        from datetime import datetime
+        d_ini = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        d_fin = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        dias = (d_fin - d_ini).days + 1
+        if dias > 0 and total == 0:
+            total = costo_dia * dias
+    except Exception:
+        pass
+
+    creado_por = session.get('usuario')
+    ok = bd.crear_gasto_publicidad(post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por)
+
+    if ok:
+        flash(f' Gasto de publicidad "{post}" registrado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Registrar Gasto Publicidad', f'Gasto registrado: {post} ({metodo}) por ${total:.2f}')
+    else:
+        flash(' Error al guardar el gasto de publicidad en la base de datos.', 'error')
+
+    try:
+        from datetime import datetime
+        dt = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        return redirect(url_for('ver_gastos', mes=dt.month, anio=dt.year))
+    except Exception:
+        return redirect(url_for('ver_gastos'))
+
+
+@app.route('/gastos/publicidad/eliminar/<int:gasto_id>', methods=['POST'])
+@login_requerido
+def eliminar_gasto_publicidad(gasto_id):
+    """Elimina un registro de gasto de publicidad."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para eliminar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    creado_por = session.get('usuario')
+    ok = bd.eliminar_gasto_publicidad(gasto_id)
+
+    if ok:
+        flash(f' Gasto de publicidad #{gasto_id} eliminado.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Eliminar Gasto Publicidad', f'Eliminó gasto de publicidad #{gasto_id}')
+    else:
+        flash(' Error al eliminar el gasto de publicidad.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+
+@app.route('/gastos/lona/nuevo', methods=['POST'])
+@login_requerido
+def nuevo_gasto_lona():
+    """Registra un nuevo gasto de lona física / insumos."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    herramienta = request.form.get('herramienta', '').strip()
+    uso = request.form.get('uso', '').strip()
+    precio = request.form.get('precio', 0, type=float)
+    para_quien = request.form.get('para_quien', '').strip()
+    total = request.form.get('total', 0, type=float)
+    comentario = request.form.get('comentario', '').strip()
+
+    if not herramienta or not uso or not para_quien:
+        flash(' Todos los campos (excepto comentario) son obligatorios para lonas.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    if total == 0:
+        total = precio
+
+    creado_por = session.get('usuario')
+    ok = bd.crear_gasto_lona(herramienta, uso, precio, para_quien, total, comentario, creado_por)
+
+    if ok:
+        flash(f' Insumo/Lona para "{para_quien}" registrado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Registrar Gasto Lona', f'Lona para {para_quien} registrada por ${total:.2f}')
+    else:
+        flash(' Error al guardar el gasto de lona en la base de datos.', 'error')
+
+    return redirect(url_for('ver_gastos'))
+
+
+@app.route('/gastos/lona/eliminar/<int:gasto_id>', methods=['POST'])
+@login_requerido
+def eliminar_gasto_lona(gasto_id):
+    """Elimina un registro de gasto de lona."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para eliminar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    creado_por = session.get('usuario')
+    ok = bd.eliminar_gasto_lona(gasto_id)
+
+    if ok:
+        flash(f' Gasto de lona #{gasto_id} eliminado.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Eliminar Gasto Lona', f'Eliminó gasto de lona #{gasto_id}')
+    else:
+        flash(' Error al eliminar el gasto de lona.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
 
 
 # =============================================================================

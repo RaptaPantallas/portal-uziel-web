@@ -382,7 +382,8 @@
         tr:last-child td { border-bottom: none; }
         tr:hover td { background: var(--primary-subtle); }
 
-        .badge {
+        .badge,
+        .estado-badge {
             display: inline-block;
             padding: 3px 10px;
             border-radius: 20px;
@@ -401,7 +402,6 @@
         .badge-borrador    { background: #f1f5f9; color: var(--text-muted); }
         .badge-rechazada   { background: var(--error-bg); color: #b91c1c; }
 
-        .estado-badge { .badge; }
         .tipo-badge {
             display: inline-block;
             padding: 2px 9px; border-radius: 5px;
@@ -793,6 +793,11 @@
         {% if puede_ver('cotizaciones') %}
         <a href="{{ url_for('alianzas') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('alianza') %}active{% endif %}">
             <i data-lucide="file-text" class="nav-icon"></i> <span>Alianzas Comerciales</span>
+        </a>
+        {% endif %}
+        {% if puede_ver('gastos') %}
+        <a href="{{ url_for('ver_gastos') }}" class="nav-item {% if request.endpoint == 'ver_gastos' %}active{% endif %}">
+            <i data-lucide="dollar-sign" class="nav-icon"></i> <span>Gastos Marketing</span>
         </a>
         {% endif %}
         <hr class="nav-divider">
