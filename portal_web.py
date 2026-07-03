@@ -1067,7 +1067,12 @@ def cliente_detalle(rif):
         flash(' Cliente no encontrado.', 'error')
         return redirect(url_for('clientes'))
 
-    tareas = bd.obtener_tareas_por_cliente(rif)
+    usuario_actual = session['usuario'].lower()
+    tareas_totales = bd.obtener_tareas_por_cliente(rif)
+    tareas = [
+        t for t in tareas_totales
+        if (t[6] or '').lower() == usuario_actual or (t[5] or '').lower() == usuario_actual
+    ]
 
     # Las alianzas se muestran según permiso
     alianzas = []
@@ -1251,19 +1256,17 @@ def eliminar_producto(sku):
 def tareas():
     """
     Página de gestión de tareas del sistema.
-
-    Los usuarios con permiso tareas:gestionar ven todas las tareas.
-    Los demás ven únicamente sus tareas activas.
+    Cada usuario (incluyendo administradores) ve únicamente las tareas
+    en las que es creador (creado_por) o responsable asignado (asignado_a).
     """
-    # Cargar datos según permisos
+    usuario_actual = session['usuario']
+    lista_tareas = bd.obtener_tareas_visibles_usuario(usuario_actual)
+    
+    # Cargar clientes y usuarios solo para quienes tengan permiso de gestionar
     if _puede("tareas", "gestionar"):
-        # Vista completa de todas las tareas
-        lista_tareas    = bd.obtener_todas_tareas()
         lista_clientes  = bd.obtener_clientes()
         lista_usuarios  = bd.obtener_usuarios()
     else:
-        # Solo sus tareas pendientes
-        lista_tareas    = bd.obtener_tareas_asignadas(session['usuario'])
         lista_clientes  = []
         lista_usuarios  = []
 
@@ -1324,14 +1327,21 @@ def asignar_tarea():
 def actualizar_tarea(tarea_id):
     """
     Actualiza el estado de una tarea (Pendiente → En Progreso → Completada).
-    Cualquier usuario puede actualizar el estado de sus propias tareas.
-
-    Args (URL):
-        tarea_id (int): ID de la tarea a actualizar.
-
-    Datos esperados del formulario (POST):
-        nuevo_estado — 'En Progreso' o 'Completada'
+    Solo el creador o la persona asignada pueden actualizar el estado.
     """
+    tarea = bd.obtener_tarea_por_id(tarea_id)
+    if not tarea:
+        flash(' Tarea no encontrada.', 'error')
+        return redirect(url_for('tareas'))
+
+    usuario_actual = session['usuario'].lower()
+    creado_por = (tarea[8] or '').lower()
+    asignado_a = (tarea[3] or '').lower()
+
+    if usuario_actual != creado_por and usuario_actual != asignado_a:
+        flash(' No tienes permisos para actualizar esta tarea.', 'error')
+        return redirect(url_for('tareas'))
+
     nuevo_estado = request.form.get('nuevo_estado', '').strip()
 
     # Validar que el estado recibido sea uno de los permitidos
@@ -1353,10 +1363,22 @@ def actualizar_tarea(tarea_id):
 def eliminar_tarea(tarea_id):
     """
     Elimina una tarea del tablero.
-    Solo accesible para administradores con el permiso tareas:gestionar.
+    Solo accesible si el usuario tiene permiso 'tareas:gestionar' Y es el creador de la tarea.
     """
     if not _puede("tareas", "gestionar"):
         flash(' No tienes permisos para eliminar tareas.', 'error')
+        return redirect(url_for('tareas'))
+
+    tarea = bd.obtener_tarea_por_id(tarea_id)
+    if not tarea:
+        flash(' Tarea no encontrada.', 'error')
+        return redirect(url_for('tareas'))
+
+    usuario_actual = session['usuario'].lower()
+    creado_por = (tarea[8] or '').lower()
+
+    if usuario_actual != creado_por:
+        flash(' Solo el creador de la tarea puede eliminarla.', 'error')
         return redirect(url_for('tareas'))
 
     if bd.eliminar_tarea(tarea_id):

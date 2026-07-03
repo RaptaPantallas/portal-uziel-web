@@ -3046,6 +3046,51 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
         return tareas
 
+    def obtener_tareas_visibles_usuario(self, usuario):
+        conexion = self.conectar()
+        tareas = []
+        if not conexion: return tareas
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, cliente_rif, cliente_nombre, asignado_a,
+                       tipo_tarea, descripcion, fecha_limite,
+                       estado, creado_por, fecha_creacion
+                FROM tareas
+                WHERE LOWER(creado_por) = LOWER(%s) OR LOWER(asignado_a) = LOWER(%s)
+                ORDER BY fecha_creacion DESC
+            """, (usuario, usuario))
+            tareas = cursor.fetchall()
+        except Error as e:
+            print(f" [Tareas] Error al obtener tareas visibles para '{usuario}': {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return tareas
+
+    def obtener_tarea_por_id(self, tarea_id):
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        tarea = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, cliente_rif, cliente_nombre, asignado_a,
+                       tipo_tarea, descripcion, fecha_limite,
+                       estado, creado_por, fecha_creacion
+                FROM tareas
+                WHERE id = %s
+            """, (tarea_id,))
+            tarea = cursor.fetchone()
+        except Error as e:
+            print(f" [Tareas] Error al obtener tarea #{tarea_id}: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return tarea
+
     def actualizar_estado_tarea(self, tarea_id, nuevo_estado):
         conexion = self.conectar()
         if not conexion: return False
