@@ -431,8 +431,8 @@ def recuperar_verificar():
     if bd.verificar_codigo_recuperacion(username, codigo):
         return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
     else:
-        flash(' Código inválido o expirado. Solicita uno nuevo.', 'error')
-        return redirect(url_for('recuperar'))
+        flash(' Código inválido o expirado. Inténtalo de nuevo.', 'error')
+        return render_template('recuperar.html', paso=2, username=username)
 
 
 @app.route('/recuperar/cambiar', methods=['POST'])
@@ -453,8 +453,8 @@ def recuperar_cambiar():
         flash(' Las contraseñas no coinciden.', 'error')
         return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
 
-    if len(password) < 4:
-        flash(' La contraseña debe tener al menos 4 caracteres.', 'error')
+    if not validar_complejidad_password(password):
+        flash(' La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.', 'error')
         return render_template('recuperar.html', paso=3, username=username, codigo=codigo)
 
     if bd.cambiar_password_con_codigo(username, codigo, password):
