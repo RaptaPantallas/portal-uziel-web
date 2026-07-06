@@ -2376,6 +2376,35 @@ class ConexionBD:
             if cursor: cursor.close()
             conexion.close()
 
+    def obtener_datos_recuperacion(self, identificador: str) -> tuple[str | None, str | None]:
+        """
+        Busca un usuario por su username o por su email.
+        Retorna (username, email) si se encuentra y tiene un email configurado (no vacío),
+        o (None, None) en caso contrario.
+        """
+        conexion = self.conectar()
+        if not conexion: return None, None
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            # Buscar coincidencia insensible a mayúsculas en username o email
+            cursor.execute(
+                "SELECT username, email FROM usuarios "
+                "WHERE LOWER(username) = LOWER(%s) OR LOWER(email) = LOWER(%s)",
+                (identificador, identificador)
+            )
+            fila = cursor.fetchone()
+            if fila and fila[0] and fila[1] and fila[1].strip():
+                return fila[0], fila[1]
+            return None, None
+        except Error as e:
+            print(f" [Seguridad] Error al obtener datos de recuperación para '{identificador}': {e}")
+            return None, None
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+
     def guardar_codigo_recuperacion(self, username: str, codigo: str, expiracion_minutos: int = 15) -> bool:
         """Guarda un código de recuperación con expiración."""
         from datetime import datetime, timedelta

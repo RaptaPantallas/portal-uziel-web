@@ -388,13 +388,13 @@ def recuperar():
     POST: Busca el usuario, si tiene email, envía código de recuperación.
     """
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        if not username:
-            flash(' Ingresa tu nombre de usuario.', 'error')
+        identificador = request.form.get('username', '').strip()
+        if not identificador:
+            flash(' Ingresa tu usuario o correo electrónico.', 'error')
             return render_template('recuperar.html', paso=1)
 
-        email = bd.obtener_email_usuario(username)
-        if not email:
+        username, email = bd.obtener_datos_recuperacion(identificador)
+        if not username or not email:
             flash(' No se encontró un email asociado a esa cuenta. Contacta al administrador.', 'error')
             return render_template('recuperar.html', paso=1)
 
