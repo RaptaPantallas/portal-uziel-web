@@ -2319,7 +2319,7 @@ def nuevo_gasto_publicidad():
     fecha_inicio = request.form.get('fecha_inicio', '').strip()
     fecha_fin = request.form.get('fecha_fin', '').strip()
     comentario = request.form.get('comentario', '').strip()
-    aliado_id = request.form.get('aliado_id', '').strip()
+    aliado_id = None
     cliente_rif = request.form.get('cliente_rif', '').strip()
 
     if not post or not objetivo or not metodo or not fecha_inicio or not fecha_fin:
@@ -2667,7 +2667,7 @@ def exportar_gastos_excel():
     headers_pub = [
         "Post / Campaña", "Objetivo", "Plataforma / Canal", "Costo/Día ($)", "Total Campaña ($)", 
         "Fecha Inicio", "Fecha Fin", "Alcance", "Clics", "CTR", "Resultados", "CPA ($)", 
-        "Ingresos ($)", "ROAS", "Aliado Comercial", "Cliente", "Comentario / Notas", "Creado Por"
+        "Ingresos ($)", "ROAS", "Cliente", "Comentario / Notas", "Creado Por"
     ]
     
     for c_num, header in enumerate(headers_pub, 1):
@@ -2713,7 +2713,6 @@ def exportar_gastos_excel():
             roas_val = float(ingr_val) / total_val
             
         # Relaciones
-        nom_aliado = g[16] if len(g) > 16 and g[16] else ""
         nom_cliente = g[18] if len(g) > 18 and g[18] else ""
 
         row_data = [
@@ -2729,9 +2728,9 @@ def exportar_gastos_excel():
             cell.border = border_thin
             
             # Formatos y alineaciones
-            if col_num in [1, 2, 3, 15, 16, 17]: # Texto
+            if col_num in [1, 2, 3, 15, 16]: # Texto
                 cell.alignment = Alignment(horizontal="left", vertical="center")
-            elif col_num in [6, 7, 18]: # Fechas / Creador
+            elif col_num in [6, 7, 17]: # Fechas / Creador
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif col_num in [4, 5, 12, 13]: # Moneda
                 cell.alignment = Alignment(horizontal="right", vertical="center")
