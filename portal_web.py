@@ -1266,8 +1266,11 @@ def eliminar_producto(sku):
         flash(' No tienes permisos para eliminar productos.', 'error')
         return redirect(url_for('inicio'))
 
+    producto = bd.obtener_producto(sku)
+    nombre = producto[2] if (producto and len(producto) > 2) else "Desconocido"
     if bd.eliminar_producto(sku):
         flash(f' El producto {sku} fue eliminado del inventario.', 'exito')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Eliminar Producto', f"Eliminó producto '{nombre}' (SKU: {sku})")
     else:
         flash(f' No se pudo eliminar el producto {sku}.', 'error')
 

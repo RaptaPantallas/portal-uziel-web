@@ -1068,7 +1068,7 @@ document.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            const pwd = prompt("Por seguridad, ingresa tu contraseña para confirmar esta acción:");
+            const pwd = prompt("Por seguridad, ingresa la contraseña de '{{ session.get('usuario', 'usuario actual') }}' para confirmar esta acción:");
             if (pwd === null) {
                 return; // Cancelado
             }
@@ -1218,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function confirmarEliminarProducto(sku) {
-    const password = prompt("Para eliminar el producto " + sku + ", ingresa tu contraseña:");
+    const password = prompt("Para eliminar el producto " + sku + ", ingresa la contraseña de '{{ session.get('usuario', 'usuario actual') }}':");
     if (password === null) return; // Cancelado
     if (!password.trim()) {
         alert("La contraseña es requerida.");
