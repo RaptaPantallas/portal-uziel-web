@@ -163,7 +163,7 @@
                 {% endfor %}
             </select>
         </div>
-        <a href="{{ url_for('exportar_gastos_excel', mes=mes_seleccionado, anio=anio_seleccionado) }}" class="btn" style="background:#15803d; border-color:#15803d; color:#fff; text-decoration:none; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+        <a href="{{ url_for('exportar_gastos_excel', mes=mes_seleccionado, anio=anio_seleccionado) }}" download class="btn" style="background:#15803d; border-color:#15803d; color:#fff; text-decoration:none; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
             <i data-lucide="file-spreadsheet" style="width:16px;height:16px;"></i> Exportar Excel
         </a>
     </div>

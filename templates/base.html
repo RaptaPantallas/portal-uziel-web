@@ -1022,7 +1022,7 @@ document.addEventListener('click', function(e) {
         return;
     }
 
-    if (href.startsWith('javascript:') || href.startsWith('#') || href.includes('/logout') || href.includes('/pdf') || href.includes('_pdf') || link.classList.contains('btn-logout')) {
+    if (href.startsWith('javascript:') || href.startsWith('#') || href.includes('/logout') || href.includes('/pdf') || href.includes('_pdf') || href.includes('/exportar') || link.classList.contains('btn-logout') || link.hasAttribute('download')) {
         return;
     }
 
