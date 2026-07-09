@@ -2718,7 +2718,7 @@ def exportar_gastos_excel():
         row_data = [
             post_val, obj_val, met_val, costo_val, total_val, 
             f_ini, f_fin, alcance_val, clics_val, ctr_val, 
-            conv_val, cpa_val, ingr_val, roas_val, nom_aliado, nom_cliente,
+            conv_val, cpa_val, ingr_val, roas_val, nom_cliente,
             coment_val, por_val
         ]
 
