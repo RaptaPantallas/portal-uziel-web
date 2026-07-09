@@ -3943,7 +3943,9 @@ El equipo de Importadora Uziel C.A."""
                     fecha_fin      DATE          NOT NULL,
                     comentario     TEXT,
                     creado_por     VARCHAR(100)  NOT NULL,
-                    fecha_creacion TIMESTAMP     DEFAULT NOW()
+                    fecha_creacion TIMESTAMP     DEFAULT NOW(),
+                    aliado_id      INTEGER REFERENCES aliados(id) ON DELETE SET NULL,
+                    cliente_rif    VARCHAR(20) REFERENCES clientes(rif) ON DELETE SET NULL
                 )
             """)
             # Tabla de gastos de lonas e insumos físicos
@@ -3978,9 +3980,11 @@ El equipo de Importadora Uziel C.A."""
                 cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS clics INTEGER DEFAULT NULL")
                 cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS conversiones INTEGER DEFAULT NULL")
                 cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS ingresos NUMERIC(12,2) DEFAULT NULL")
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS aliado_id INTEGER REFERENCES aliados(id) ON DELETE SET NULL")
+                cursor.execute("ALTER TABLE gastos_publicidad ADD COLUMN IF NOT EXISTS cliente_rif VARCHAR(20) REFERENCES clientes(rif) ON DELETE SET NULL")
                 conexion.commit()
             except Exception as e:
-                print(f" [Gastos] Error al agregar columnas de estadísticas a gastos_publicidad: {e}")
+                print(f" [Gastos] Error al agregar columnas/estadísticas a gastos_publicidad: {e}")
                 conexion.rollback()
 
             return True
@@ -3992,16 +3996,21 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_gasto_publicidad(self, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por):
+    def crear_gasto_publicidad(self, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, aliado_id=None, cliente_rif=None):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
+            
+            # Asegurar NULL si vienen vacíos
+            val_aliado = int(aliado_id) if aliado_id and str(aliado_id).strip() != "" else None
+            val_cliente = str(cliente_rif).strip() if cliente_rif and str(cliente_rif).strip() != "" else None
+
             cursor.execute("""
-                INSERT INTO gastos_publicidad (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por))
+                INSERT INTO gastos_publicidad (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, aliado_id, cliente_rif)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, val_aliado, val_cliente))
             conexion.commit()
             return True
         except Error as e:
@@ -4021,11 +4030,14 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, 
-                       comentario, creado_por, fecha_creacion, alcance, clics, conversiones, ingresos
-                FROM gastos_publicidad
-                WHERE EXTRACT(MONTH FROM fecha_creacion) = %s AND EXTRACT(YEAR FROM fecha_creacion) = %s
-                ORDER BY fecha_creacion DESC
+                SELECT gp.id, gp.post, gp.objetivo, gp.metodo, gp.costo_dia, gp.total, gp.fecha_inicio, gp.fecha_fin, 
+                       gp.comentario, gp.creado_por, gp.fecha_creacion, gp.alcance, gp.clics, gp.conversiones, gp.ingresos,
+                       gp.aliado_id, al.nombre_aliado, gp.cliente_rif, cl.nombre_empresa
+                FROM gastos_publicidad gp
+                LEFT JOIN aliados al ON gp.aliado_id = al.id
+                LEFT JOIN clientes cl ON gp.cliente_rif = cl.rif
+                WHERE EXTRACT(MONTH FROM gp.fecha_creacion) = %s AND EXTRACT(YEAR FROM gp.fecha_creacion) = %s
+                ORDER BY gp.fecha_creacion DESC
             """, (mes, anio))
             resultado = cursor.fetchall()
         except Error as e:

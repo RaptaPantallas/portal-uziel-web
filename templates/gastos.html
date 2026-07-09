@@ -154,13 +154,18 @@
 
 <!-- Panel de Filtro y Acciones -->
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
-    <div style="display:flex; align-items:center; gap:8px;">
-        <label for="filtro-mes-select" style="font-size:14px; font-weight:600; color:var(--text-muted);">Mes de consulta:</label>
-        <select id="filtro-mes-select" class="form-control" style="width:200px; padding: 6px 12px; border-radius: 20px; font-size: 14px;" onchange="filtrarPorMes(this.value)">
-            {% for f in meses_filtros %}
-            <option value="{{ f.mes }}-{{ f.anio }}" {% if f.mes == mes_seleccionado and f.anio == anio_seleccionado %}selected{% endif %}>{{ f.nombre }}</option>
-            {% endfor %}
-        </select>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <label for="filtro-mes-select" style="font-size:14px; font-weight:600; color:var(--text-muted);">Mes de consulta:</label>
+            <select id="filtro-mes-select" class="form-control" style="width:200px; padding: 6px 12px; border-radius: 20px; font-size: 14px;" onchange="filtrarPorMes(this.value)">
+                {% for f in meses_filtros %}
+                <option value="{{ f.mes }}-{{ f.anio }}" {% if f.mes == mes_seleccionado and f.anio == anio_seleccionado %}selected{% endif %}>{{ f.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a href="{{ url_for('exportar_gastos_excel', mes=mes_seleccionado, anio=anio_seleccionado) }}" class="btn" style="background:#15803d; border-color:#15803d; color:#fff; text-decoration:none; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+            <i data-lucide="file-spreadsheet" style="width:16px;height:16px;"></i> Exportar Excel
+        </a>
     </div>
     
     <div style="display:flex; gap:12px;">
@@ -203,7 +208,23 @@
                     {% for g in gastos_publicidad %}
                     {# g = (id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion, alcance, clics, conversiones, ingresos) #}
                     <tr>
-                        <td><strong>{{ g[1] }}</strong></td>
+                        <td>
+                            <strong>{{ g[1] }}</strong>
+                            {% if g[16] or g[18] %}
+                                <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px;">
+                                    {% if g[16] %}
+                                        <span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:12px; font-weight:600; width:fit-content; display:inline-flex; align-items:center; gap:4px;">
+                                            <i data-lucide="handshake" style="width:12px; height:12px;"></i> Aliado: {{ g[16] }}
+                                        </span>
+                                    {% endif %}
+                                    {% if g[18] %}
+                                        <span style="font-size:11px; background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:12px; font-weight:600; width:fit-content; display:inline-flex; align-items:center; gap:4px;">
+                                            <i data-lucide="user" style="width:12px; height:12px;"></i> Cliente: {{ g[18] }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </td>
                         <td><span class="tipo-badge" style="background:#dbeafe; color:#1e40af;">{{ g[2] }}</span></td>
                         <td><strong>{{ g[3] }}</strong></td>
                         <td style="text-align: right; font-weight: 600;">${{ "{:,.2f}".format(g[4]) }}</td>
@@ -387,6 +408,7 @@
                         <option value="TikTok Ads">TikTok Ads</option>
                         <option value="MercadoLibre Product Ads">MercadoLibre Product Ads</option>
                         <option value="Pauta Influencer">Pauta con Influencer</option>
+                        <option value="Linktree (Link Directo)">Linktree (Link Directo)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -404,6 +426,24 @@
                 <div class="form-group">
                     <label for="pub-total">Monto Total Calculado ($)</label>
                     <input type="number" name="total" id="pub-total" class="form-control" min="0" step="0.01" placeholder="Se calcula solo, o ingresa valor fijo">
+                </div>
+                <div class="form-group">
+                    <label for="pub-aliado-id">Asociar a un Aliado Comercial</label>
+                    <select name="aliado_id" id="pub-aliado-id" class="form-control">
+                        <option value="">— Ninguno —</option>
+                        {% for aliado in lista_aliados %}
+                        <option value="{{ aliado[0] }}">{{ aliado[2] }} ({{ aliado[1] }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="pub-cliente-rif">Asociar a un Cliente</label>
+                    <select name="cliente_rif" id="pub-cliente-rif" class="form-control">
+                        <option value="">— Ninguno —</option>
+                        {% for cliente in lista_clientes %}
+                        <option value="{{ cliente[0] }}">{{ cliente[1] }} ({{ cliente[0] }})</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="form-group" style="grid-column:1/-1;">
                     <label for="pub-comentario">Comentario / Notas adicionales</label>

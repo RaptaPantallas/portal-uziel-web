@@ -2298,7 +2298,8 @@ def ver_gastos():
         mes_seleccionado=mes,
         anio_seleccionado=anio,
         meses_filtros=lista_meses_formateados,
-        lista_aliados=bd.obtener_todos_aliados()
+        lista_aliados=bd.obtener_todos_aliados(),
+        lista_clientes=bd.obtener_clientes()
     )
 
 
@@ -2318,6 +2319,8 @@ def nuevo_gasto_publicidad():
     fecha_inicio = request.form.get('fecha_inicio', '').strip()
     fecha_fin = request.form.get('fecha_fin', '').strip()
     comentario = request.form.get('comentario', '').strip()
+    aliado_id = request.form.get('aliado_id', '').strip()
+    cliente_rif = request.form.get('cliente_rif', '').strip()
 
     if not post or not objetivo or not metodo or not fecha_inicio or not fecha_fin:
         flash(' Todos los campos (excepto comentario) son obligatorios para publicidad.', 'error')
@@ -2335,7 +2338,10 @@ def nuevo_gasto_publicidad():
         pass
 
     creado_por = session.get('usuario')
-    ok = bd.crear_gasto_publicidad(post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por)
+    ok = bd.crear_gasto_publicidad(
+        post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, 
+        comentario, creado_por, aliado_id=aliado_id, cliente_rif=cliente_rif
+    )
 
     if ok:
         flash(f' Gasto de publicidad "{post}" registrado correctamente.', 'exito')
@@ -2488,6 +2494,389 @@ def eliminar_gasto_lona(gasto_id):
         flash(' Error al eliminar el gasto de lona.', 'error')
 
     return redirect(request.referrer or url_for('ver_gastos'))
+
+
+@app.route('/gastos/exportar')
+@login_requerido
+def exportar_gastos_excel():
+    """Genera y descarga un reporte en Excel con los gastos del mes seleccionado."""
+    if not _puede("gastos", "ver"):
+        flash(' No tienes permisos para exportar gastos.', 'error')
+        return redirect(url_for('inicio'))
+
+    import datetime
+    from datetime import date
+    hoy = date.today()
+    mes = request.args.get('mes', hoy.month, type=int)
+    anio = request.args.get('anio', hoy.year, type=int)
+
+    # Nombres de meses en español
+    nombres_meses = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+        7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    }
+    nombre_mes = nombres_meses.get(mes, "Mes")
+
+    # Obtener gastos de la base de datos
+    gastos_pub = bd.obtener_gastos_publicidad(mes, anio)
+    gastos_lon = bd.obtener_gastos_lonas(mes, anio)
+
+    total_pub = sum(float(g[5]) for g in gastos_pub)
+    total_lon = sum(float(g[5]) for g in gastos_lon)
+    total_general = total_pub + total_lon
+
+    # Creación de Libro Excel
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.drawing.image import Image as OpenpyxlImage
+
+    wb = openpyxl.Workbook()
+
+    # Definición de estilos
+    font_family = "Segoe UI"
+    
+    font_title = Font(name=font_family, size=16, bold=True, color="1E3A8A")
+    font_subtitle = Font(name=font_family, size=11, italic=True, color="475569")
+    font_section = Font(name=font_family, size=13, bold=True, color="1E293B")
+    
+    font_card_title = Font(name=font_family, size=9, bold=True, color="64748B")
+    font_card_value = Font(name=font_family, size=16, bold=True, color="1E293B")
+    
+    font_header = Font(name=font_family, size=11, bold=True, color="FFFFFF")
+    font_data = Font(name=font_family, size=10)
+    font_total = Font(name=font_family, size=11, bold=True, color="000000")
+    
+    fill_pub_header = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+    fill_lon_header = PatternFill(start_color="0F766E", end_color="0F766E", fill_type="solid")
+    fill_card_pub = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid") # light blue
+    fill_card_lon = PatternFill(start_color="F0FDF4", end_color="F0FDF4", fill_type="solid") # light green
+    fill_card_tot = PatternFill(start_color="F5F3FF", end_color="F5F3FF", fill_type="solid") # light purple
+    
+    fill_zebra = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    
+    border_thin = Border(
+        left=Side(style='thin', color='E2E8F0'),
+        right=Side(style='thin', color='E2E8F0'),
+        top=Side(style='thin', color='E2E8F0'),
+        bottom=Side(style='thin', color='E2E8F0')
+    )
+    border_card = Border(
+        left=Side(style='medium', color='CBD5E1'),
+        right=Side(style='medium', color='CBD5E1'),
+        top=Side(style='medium', color='CBD5E1'),
+        bottom=Side(style='medium', color='CBD5E1')
+    )
+    border_total = Border(
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='double', color='000000')
+    )
+
+    # ----------------- HOJA 1: RESUMEN -----------------
+    ws1 = wb.active
+    ws1.title = "Resumen de Gastos"
+    ws1.views.sheetView[0].showGridLines = True
+
+    # Insertar logotipo
+    logo_inserted = False
+    logo_path = os.path.join("almacen_activos", "Logo", "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            img = OpenpyxlImage(logo_path)
+            # Redimensionar el logo para caber bien (alto 55px)
+            aspect_ratio = img.width / img.height
+            img.height = 55
+            img.width = int(55 * aspect_ratio)
+            ws1.add_image(img, "A2")
+            logo_inserted = True
+        except Exception as e:
+            print(f" [Excel] Error al insertar logo: {e}")
+
+    # Títulos y subtítulos
+    col_idx = 3 if logo_inserted else 1
+    
+    ws1.cell(row=2, column=col_idx, value="IMPORTADORA UZIEL C.A.").font = font_title
+    ws1.cell(row=3, column=col_idx, value=f"Reporte Mensual de Gastos de Marketing — {nombre_mes} {anio}").font = font_subtitle
+    ws1.cell(row=4, column=col_idx, value=f"Generado el: {hoy.strftime('%d/%m/%Y')}").font = font_subtitle
+
+    # Tarjetas de Resumen
+    ws1.cell(row=7, column=1, value="RESUMEN EJECUTIVO DEL MES").font = font_section
+    
+    # Tarjeta 1: Publicidad Digital
+    ws1.merge_cells("B9:C9")
+    ws1.merge_cells("B10:C10")
+    ws1.cell(row=9, column=2, value="PUBLICIDAD DIGITAL").font = font_card_title
+    ws1.cell(row=9, column=2).alignment = Alignment(horizontal="center", vertical="center")
+    ws1.cell(row=10, column=2, value=total_pub).font = font_card_value
+    ws1.cell(row=10, column=2).number_format = "$#,##0.00"
+    ws1.cell(row=10, column=2).alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Tarjeta 2: Lonas y Físicos
+    ws1.merge_cells("E9:F9")
+    ws1.merge_cells("E10:F10")
+    ws1.cell(row=9, column=5, value="LONAS Y OTROS FÍSICOS").font = font_card_title
+    ws1.cell(row=9, column=5).alignment = Alignment(horizontal="center", vertical="center")
+    ws1.cell(row=10, column=5, value=total_lon).font = font_card_value
+    ws1.cell(row=10, column=5).number_format = "$#,##0.00"
+    ws1.cell(row=10, column=5).alignment = Alignment(horizontal="center", vertical="center")
+
+    # Tarjeta 3: Gran Total
+    ws1.merge_cells("H9:I9")
+    ws1.merge_cells("H10:I10")
+    ws1.cell(row=9, column=8, value="GRAN TOTAL MENSUAL").font = Font(name=font_family, size=9, bold=True, color="6B21A8")
+    ws1.cell(row=9, column=8).alignment = Alignment(horizontal="center", vertical="center")
+    ws1.cell(row=10, column=8, value=total_general).font = Font(name=font_family, size=16, bold=True, color="6B21A8")
+    ws1.cell(row=10, column=8).number_format = "$#,##0.00"
+    ws1.cell(row=10, column=8).alignment = Alignment(horizontal="center", vertical="center")
+
+    # Aplicar estilos a tarjetas (rellenos y bordes)
+    for r in range(9, 11):
+        for c in range(2, 4): # Col B, C
+            cell = ws1.cell(row=r, column=c)
+            cell.fill = fill_card_pub
+            cell.border = border_card
+        for c in range(5, 7): # Col E, F
+            cell = ws1.cell(row=r, column=c)
+            cell.fill = fill_card_lon
+            cell.border = border_card
+        for c in range(8, 10): # Col H, I
+            cell = ws1.cell(row=r, column=c)
+            cell.fill = fill_card_tot
+            cell.border = border_card
+
+    # Información
+    ws1.cell(row=13, column=1, value="INFORMACIÓN DEL REPORTE").font = font_section
+    ws1.cell(row=14, column=1, value="• Este reporte consolida la inversión publicitaria digital en redes/plataformas y los consumibles físicos.").font = font_data
+    ws1.cell(row=15, column=1, value="• Puedes navegar en las pestañas inferiores para revisar el desglose y las métricas de rendimiento correspondientes.").font = font_data
+
+    # Dimensiones de columnas Hoja 1
+    ws1.column_dimensions['A'].width = 30
+    ws1.column_dimensions['B'].width = 15
+    ws1.column_dimensions['C'].width = 15
+    ws1.column_dimensions['D'].width = 5
+    ws1.column_dimensions['E'].width = 15
+    ws1.column_dimensions['F'].width = 15
+    ws1.column_dimensions['G'].width = 5
+    ws1.column_dimensions['H'].width = 15
+    ws1.column_dimensions['I'].width = 15
+
+    # ----------------- HOJA 2: PUBLICIDAD DIGITAL -----------------
+    ws2 = wb.create_sheet(title="Publicidad Digital")
+    ws2.views.sheetView[0].showGridLines = True
+    
+    headers_pub = [
+        "Post / Campaña", "Objetivo", "Plataforma / Canal", "Costo/Día ($)", "Total Campaña ($)", 
+        "Fecha Inicio", "Fecha Fin", "Alcance", "Clics", "CTR", "Resultados", "CPA ($)", 
+        "Ingresos ($)", "ROAS", "Aliado Comercial", "Cliente", "Comentario / Notas", "Creado Por"
+    ]
+    
+    for c_num, header in enumerate(headers_pub, 1):
+        cell = ws2.cell(row=1, column=c_num, value=header)
+        cell.font = font_header
+        cell.fill = fill_pub_header
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws2.row_dimensions[1].height = 28
+
+    # Filas de datos
+    row_idx = 2
+    for g in gastos_pub:
+        # g = (id, post, objetivo, metodo, costo_dia, total, fecha_inicio, fecha_fin, comentario, creado_por, fecha_creacion, alcance, clics, conversiones, ingresos, aliado_id, nombre_aliado, cliente_rif, nombre_empresa)
+        post_val = g[1]
+        obj_val = g[2]
+        met_val = g[3]
+        costo_val = float(g[4])
+        total_val = float(g[5])
+        
+        f_ini = g[6].strftime('%d/%m/%Y') if hasattr(g[6], 'strftime') else str(g[6])
+        f_fin = g[7].strftime('%d/%m/%Y') if hasattr(g[7], 'strftime') else str(g[7])
+        
+        coment_val = g[8] if g[8] else ""
+        por_val = g[9].capitalize() if g[9] else ""
+        
+        alcance_val = g[11]
+        clics_val = g[12]
+        
+        ctr_val = None
+        if alcance_val and clics_val and alcance_val > 0:
+            ctr_val = clics_val / alcance_val
+            
+        conv_val = g[13]
+        
+        cpa_val = None
+        if conv_val and conv_val > 0:
+            cpa_val = total_val / conv_val
+            
+        ingr_val = g[14]
+        
+        roas_val = None
+        if ingr_val is not None and total_val > 0:
+            roas_val = float(ingr_val) / total_val
+            
+        # Relaciones
+        nom_aliado = g[16] if len(g) > 16 and g[16] else ""
+        nom_cliente = g[18] if len(g) > 18 and g[18] else ""
+
+        row_data = [
+            post_val, obj_val, met_val, costo_val, total_val, 
+            f_ini, f_fin, alcance_val, clics_val, ctr_val, 
+            conv_val, cpa_val, ingr_val, roas_val, nom_aliado, nom_cliente,
+            coment_val, por_val
+        ]
+
+        for col_num, val in enumerate(row_data, 1):
+            cell = ws2.cell(row=row_idx, column=col_num, value=val)
+            cell.font = font_data
+            cell.border = border_thin
+            
+            # Formatos y alineaciones
+            if col_num in [1, 2, 3, 15, 16, 17]: # Texto
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            elif col_num in [6, 7, 18]: # Fechas / Creador
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_num in [4, 5, 12, 13]: # Moneda
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "$#,##0.00"
+            elif col_num in [8, 9, 11]: # Enteros
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if val is not None:
+                    cell.number_format = "#,##0"
+            elif col_num == 10: # Porcentaje (CTR)
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if val is not None:
+                    cell.number_format = "0.0%"
+            elif col_num == 14: # Factor ROAS
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if val is not None:
+                    cell.number_format = '0.0"x"'
+            
+            # Colores alternos
+            if row_idx % 2 == 0:
+                cell.fill = fill_zebra
+                
+        row_idx += 1
+
+    # Fila de Totales
+    total_row = row_idx
+    ws2.cell(row=total_row, column=1, value="Total Publicidad").font = font_total
+    ws2.cell(row=total_row, column=1).alignment = Alignment(horizontal="left")
+    ws2.cell(row=total_row, column=1).border = border_total
+
+    for c in range(1, len(headers_pub) + 1):
+        ws2.cell(row=total_row, column=c).border = border_total
+        ws2.cell(row=total_row, column=c).font = font_total
+
+    ws2.cell(row=total_row, column=5, value=f"=SUM(E2:E{total_row-1})").number_format = "$#,##0.00"
+    ws2.cell(row=total_row, column=5).alignment = Alignment(horizontal="right")
+
+    # Autoajuste de columnas
+    for col in ws2.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val_str = str(cell.value or '')
+            if val_str.startswith('='):
+                val_str = "$999,999.00"
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws2.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    # ----------------- HOJA 3: LONAS Y FÍSICOS -----------------
+    ws3 = wb.create_sheet(title="Lonas y Físicos")
+    ws3.views.sheetView[0].showGridLines = True
+    
+    headers_lon = [
+        "Categoría", "Concepto / Material", "Uso / Propósito", "Cantidad", 
+        "Precio Unitario ($)", "Total ($)", "Destinatario", "Aliado Comercial", 
+        "Comentario / Notas", "Creado Por"
+    ]
+
+    for c_num, header in enumerate(headers_lon, 1):
+        cell = ws3.cell(row=1, column=c_num, value=header)
+        cell.font = font_header
+        cell.fill = fill_lon_header
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws3.row_dimensions[1].height = 28
+
+    # Filas de datos
+    row_idx = 2
+    for g in gastos_lon:
+        cat_val = g[9] if g[9] else "Otros"
+        herr_val = g[1]
+        uso_val = g[2]
+        cant_val = int(g[11]) if g[11] is not None else 1
+        prec_val = float(g[3])
+        tot_val = float(g[5])
+        dest_val = g[4]
+        nom_aliado = g[12] if len(g) > 12 and g[12] else ""
+        coment_val = g[6] if g[6] else ""
+        por_val = g[7].capitalize() if g[7] else ""
+
+        row_data = [
+            cat_val, herr_val, uso_val, cant_val, 
+            prec_val, tot_val, dest_val, nom_aliado, 
+            coment_val, por_val
+        ]
+
+        for col_num, val in enumerate(row_data, 1):
+            cell = ws3.cell(row=row_idx, column=col_num, value=val)
+            cell.font = font_data
+            cell.border = border_thin
+            
+            if col_num in [1, 2, 3, 7, 8, 9]:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            elif col_num == 10:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_num == 4:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.number_format = "#,##0"
+            elif col_num in [5, 6]:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "$#,##0.00"
+            
+            if row_idx % 2 == 0:
+                cell.fill = fill_zebra
+                
+        row_idx += 1
+
+    # Totales Lonas
+    total_row = row_idx
+    ws3.cell(row=total_row, column=1, value="Total Lonas y Físicos").font = font_total
+    ws3.cell(row=total_row, column=1).alignment = Alignment(horizontal="left")
+    ws3.cell(row=total_row, column=1).border = border_total
+
+    for c in range(1, len(headers_lon) + 1):
+        ws3.cell(row=total_row, column=c).border = border_total
+        ws3.cell(row=total_row, column=c).font = font_total
+
+    ws3.cell(row=total_row, column=6, value=f"=SUM(F2:F{total_row-1})").number_format = "$#,##0.00"
+    ws3.cell(row=total_row, column=6).alignment = Alignment(horizontal="right")
+
+    for col in ws3.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val_str = str(cell.value or '')
+            if val_str.startswith('='):
+                val_str = "$999,999.00"
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws3.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"Reporte_Gastos_Marketing_{nombre_mes}_{anio}.xlsx"
+    
+    creado_por = session.get('usuario')
+    bd.registrar_accion_auditoria(creado_por, 'Exportar Excel Gastos', f'Exportó gastos de {nombre_mes} {anio} a Excel ({filename})')
+
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 # =============================================================================
