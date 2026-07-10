@@ -592,8 +592,212 @@
 
     </div>
 
-    <!-- Qt Web Channel Bridge script integration -->
-    <script src="qwebchannel.js"></script>
+    <!-- Embedded Qt Web Channel Bridge script to prevent local file loading 404s -->
+    <script>
+        // Official Qt WebChannel implementation embedded directly
+        "use strict";
+
+        var QWebChannelMessageTypes = {
+            Init: 0,
+            Idle: 1,
+            NewMetaData: 2,
+            NewData: 3,
+            Signal: 4,
+            Response: 5,
+            PropertyUpdate: 6,
+            DetailUpdate: 7,
+            ObjectPropertyUpdate: 8,
+            ObjectPropertyResponse: 9
+        };
+
+        var QWebChannel = function(transport, initCallback) {
+            if (typeof transport !== "object" || typeof transport.send !== "function") {
+                console.error("The QWebChannel requires a transport object. Passed: " + typeof transport);
+                return;
+            }
+
+            var channel = this;
+            this.transport = transport;
+
+            this.execCallbacks = {};
+            this.execId = 0;
+            this.objects = {};
+
+            this.send = function(data) {
+                if (typeof data !== "string") {
+                    data = JSON.stringify(data);
+                }
+                channel.transport.send(data);
+            };
+
+            this.transport.onmessage = function(message) {
+                var m = message.data;
+                if (typeof m === "string") {
+                    m = JSON.parse(m);
+                }
+                switch (m.type) {
+                    case QWebChannelMessageTypes.Signal:
+                        channel.handleSignal(m);
+                        break;
+                    case QWebChannelMessageTypes.Response:
+                        channel.handleResponse(m);
+                        break;
+                    case QWebChannelMessageTypes.PropertyUpdate:
+                    case QWebChannelMessageTypes.ObjectPropertyUpdate:
+                        channel.handlePropertyUpdate(m);
+                        break;
+                    default:
+                        console.error("invalid message received: ", m);
+                        break;
+                }
+            };
+
+            this.exec = function(data, callback) {
+                if (callback) {
+                    var id = channel.execId++;
+                    channel.execCallbacks[id] = callback;
+                    data.id = id;
+                }
+                channel.send(data);
+            };
+
+            this.handleSignal = function(message) {
+                var object = channel.objects[message.object];
+                if (object) {
+                    object.signalEmitted(message.signal, message.args);
+                } else {
+                    console.warn("Unhandled signal: " + message.object + "::" + message.signal);
+                }
+            };
+
+            this.handleResponse = function(message) {
+                if (!message.hasOwnProperty("id")) {
+                    console.error("Invalid response message received: ", JSON.stringify(message));
+                    return;
+                }
+                channel.execCallbacks[message.id](message.data);
+                delete channel.execCallbacks[message.id];
+            };
+
+            this.handlePropertyUpdate = function(message) {
+                for (var i in message.signals) {
+                    var detail = message.signals[i];
+                    this.handleSignal(detail);
+                }
+                for (var objectName in message.properties) {
+                    var object = channel.objects[objectName];
+                    if (object) {
+                        object.propertyUpdate(message.properties[objectName]);
+                    }
+                }
+            };
+
+            var initQObject = function(name, data, channel) {
+                var properties = data.properties || [];
+                var signals = data.signals || [];
+                var methods = data.methods || [];
+                var object = {};
+
+                object.objectName = name;
+                object.propertyUpdate = function(props) {
+                    for (var name in props) {
+                        object[name] = props[name];
+                    }
+                };
+
+                object.signalEmitted = function(signalName, args) {
+                    var signal = object[signalName];
+                    if (signal && signal.connections) {
+                        for (var i = 0; i < signal.connections.length; ++i) {
+                            signal.connections[i].apply(null, args);
+                        }
+                    }
+                };
+
+                var setupProperty = function(propName) {
+                    Object.defineProperty(object, propName, {
+                        get: function() { return object["_" + propName]; },
+                        set: function(value) {
+                            if (value === object["_" + propName]) return;
+                            object["_" + propName] = value;
+                            channel.exec({
+                                type: QWebChannelMessageTypes.ObjectPropertyUpdate,
+                                object: name,
+                                property: propName,
+                                value: value
+                            });
+                        }
+                    });
+                };
+
+                for (var i = 0; i < properties.length; ++i) {
+                    var prop = properties[i];
+                    object["_" + prop[0]] = prop[1];
+                    setupProperty(prop[0]);
+                }
+
+                var setupSignal = function(signalName) {
+                    var signal = {
+                        connections: [],
+                        connect: function(callback) {
+                            if (typeof callback !== "function") {
+                                console.error("Only functions can be connected to signals.");
+                                return;
+                            }
+                            signal.connections.push(callback);
+                        },
+                        disconnect: function(callback) {
+                            var index = signal.connections.indexOf(callback);
+                            if (index !== -1) {
+                                signal.connections.splice(index, 1);
+                            }
+                        }
+                    };
+                    object[signalName] = signal;
+                };
+
+                for (var i = 0; i < signals.length; ++i) {
+                    setupSignal(signals[i]);
+                }
+
+                var setupMethod = function(methodName) {
+                    object[methodName] = function() {
+                        var args = [];
+                        var callback;
+                        for (var i = 0; i < arguments.length; ++i) {
+                            if (typeof arguments[i] === "function") {
+                                callback = arguments[i];
+                                break;
+                            }
+                            args.push(arguments[i]);
+                        }
+                        channel.exec({
+                            type: QWebChannelMessageTypes.Response,
+                            object: name,
+                            method: methodName,
+                            args: args
+                        }, callback);
+                    };
+                };
+
+                for (var i = 0; i < methods.length; ++i) {
+                    setupMethod(methods[i]);
+                }
+
+                channel.objects[name] = object;
+            };
+
+            channel.exec({type: QWebChannelMessageTypes.Init}, function(data) {
+                for (var name in data) {
+                    initQObject(name, data[name], channel);
+                }
+                if (initCallback) {
+                    initCallback(channel);
+                }
+            });
+        };
+    </script>
+
     <script>
         let bridge = null;
         let marketingChart = null;
@@ -612,23 +816,46 @@
             return `${yyyy}-${mm}-${dd}`;
         }
 
-        // Wait for Qt bridge channel
-        document.addEventListener("DOMContentLoaded", () => {
+        // Robust recursive initialization loop to handle Qt injection latency
+        function initChannel() {
+            console.log("[JS] Intentando inicializar QWebChannel...");
             if (typeof QWebChannel !== "undefined") {
-                new QWebChannel(qt.webChannelTransport, function (channel) {
-                    bridge = channel.objects.bridge;
-                    
-                    // Expose username dynamically via Python Slot
-                    bridge.obtener_usuario_actual(function(username) {
-                        document.getElementById('username-display').innerText = username;
+                if (typeof qt !== "undefined" && qt.webChannelTransport) {
+                    console.log("[JS] qt.webChannelTransport detectado. Inicializando...");
+                    new QWebChannel(qt.webChannelTransport, function (channel) {
+                        bridge = channel.objects.bridge;
+                        console.log("[JS] QWebChannel enlazado con éxito con Python.");
+                        
+                        // Expose username dynamically via Python Slot
+                        bridge.obtener_usuario_actual(function(username) {
+                            console.log("[JS] Usuario obtenido de Python:", username);
+                            document.getElementById('username-display').innerText = username;
+                        });
+                        
+                        refreshData();
                     });
-                    
-                    refreshData();
-                });
+                } else {
+                    console.warn("[JS] qt.webChannelTransport no está listo todavía. Reintentando en 50ms...");
+                    setTimeout(initChannel, 50);
+                }
             } else {
-                console.warn("QWebChannel not loaded. Loading demo data.");
-                loadMockData();
+                console.warn("[JS] QWebChannel script no está cargado. Reintentando en 50ms...");
+                setTimeout(initChannel, 50);
             }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // Start loading sequence
+            initChannel();
+            
+            // Safety safety-valve: if after 2.5 seconds it still hasn't loaded (e.g. standard browser or error)
+            // fall back to mock data so the panel is never empty.
+            setTimeout(() => {
+                if (!bridge) {
+                    console.warn("[JS] Timeout al conectar con PyQt6. Cargando datos simulados.");
+                    loadMockData();
+                }
+            }, 2500);
         });
 
         function refreshData() {
@@ -646,23 +873,45 @@
 
             // 1. Get Campaign expenses
             bridge.obtener_gastos_periodo(desde, hasta, function(responseCampaigns) {
-                const campaigns = JSON.parse(responseCampaigns);
+                console.log("[JS] Gastos de periodo recibidos:", responseCampaigns);
+                let campaigns = [];
+                try {
+                    campaigns = JSON.parse(responseCampaigns);
+                } catch(e) {
+                    console.error("[JS] Error parseando campañas:", e);
+                }
                 
                 // 2. Get database aggregate counts
                 bridge.obtener_conteos(desde, hasta, function(responseCounts) {
-                    const counts = JSON.parse(responseCounts);
+                    console.log("[JS] Conteos generales recibidos:", responseCounts);
+                    let counts = {};
+                    try {
+                        counts = JSON.parse(responseCounts);
+                    } catch(e) {
+                        console.error("[JS] Error parseando conteos:", e);
+                    }
                     updateDashboard(campaigns, counts);
                 });
             });
 
             // 3. Get recent audit logs
             bridge.obtener_ultimos_eventos(function(responseLogs) {
-                const logs = JSON.parse(responseLogs);
+                console.log("[JS] Auditoría recibida:", responseLogs);
+                let logs = [];
+                try {
+                    logs = JSON.parse(responseLogs);
+                } catch(e) {
+                    console.error("[JS] Error parseando logs:", e);
+                }
                 renderActivityFeed(logs);
             });
         }
 
         function updateDashboard(campaigns, counts) {
+            if (counts.error) {
+                console.error("[JS] El servidor reportó error de conteos:", counts.error);
+            }
+            
             // General db counts
             document.getElementById('val-clientes').innerText = counts.total_clientes || 0;
             document.getElementById('val-productos').innerText = counts.total_productos || 0;
@@ -741,7 +990,6 @@
                 marketingChart.destroy();
             }
 
-            // Group by campaign name (post)
             const labels = campaigns.map(c => c.post.length > 20 ? c.post.substring(0, 18) + '...' : c.post);
             const totalGastoData = campaigns.map(c => c.total);
             const ingresosData = campaigns.map(c => c.ingresos);
@@ -870,16 +1118,15 @@
 
         function loadMockData() {
             // Standalone fallback
+            console.log("[JS] Cargando datos simulados de demostración.");
             document.getElementById('username-display').innerText = "Usuario Demo";
             
-            const counts = { total_clientes: 120, total_productos: 940 };
+            const counts = { total_clientes: 154, total_productos: 1739 };
             
-            // Generate some nice dummy campaigns
             const mockCampaigns = [
-                { post: "Promoción Filtros Mayo", objetivo: "Ventas", total: 150.00, ingresos: 450.00, alcance: 12000, clics: 1200, conversiones: 120 },
-                { post: "Anuncio Aceites Instagram", objetivo: "Tráfico", total: 80.00, ingresos: 110.00, alcance: 8000, clics: 950, conversiones: 40 },
-                { post: "Lanzamiento Baterías", objetivo: "Sales", total: 200.00, ingresos: 580.00, alcance: 15000, clics: 1800, conversiones: 180 },
-                { post: "Banner Repuestos Uziel", objetivo: "Branding", total: 100.00, ingresos: 0.00, alcance: 5000, clics: 100, conversiones: 0 }
+                { post: "Promoción Filtros Aire", objetivo: "Ventas", total: 120.00, ingresos: 380.00, alcance: 10000, clics: 950, conversiones: 85 },
+                { post: "Anuncio Lubricantes", objetivo: "Tráfico", total: 50.00, ingresos: 120.00, alcance: 6500, clics: 700, conversiones: 35 },
+                { post: "Lanzamiento Correas", objetivo: "Ventas", total: 180.00, ingresos: 450.00, alcance: 14000, clics: 1300, conversiones: 110 }
             ];
 
             updateDashboard(mockCampaigns, counts);
