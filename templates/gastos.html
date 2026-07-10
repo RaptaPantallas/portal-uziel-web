@@ -755,7 +755,14 @@
     }
 
     // --- METRICAS Y ESTADISTICAS ---
-    function abrirModalEstadisticas(id, nombre, alcance, clics, conversiones, ingresos) {
+    function abrirModalEstadisticas(button) {
+        const id = button.dataset.id;
+        const nombre = button.dataset.nombre;
+        const alcance = button.dataset.alcance || '';
+        const clics = button.dataset.clics || '';
+        const conversiones = button.dataset.conversiones || '';
+        const ingresos = button.dataset.ingresos || '';
+
         const modal = document.getElementById('modalEstadisticas');
         const form = document.getElementById('form-estadisticas');
         const title = document.getElementById('meta-modal-title');
@@ -764,10 +771,10 @@
             title.textContent = `Métricas: ${nombre}`;
             form.action = `/gastos/publicidad/estadisticas/${id}`;
             
-            document.getElementById('meta-alcance').value = alcance !== null ? alcance : '';
-            document.getElementById('meta-clics').value = clics !== null ? clics : '';
-            document.getElementById('meta-conversiones').value = conversiones !== null ? conversiones : '';
-            document.getElementById('meta-ingresos').value = ingresos !== null ? ingresos : '';
+            document.getElementById('meta-alcance').value = alcance;
+            document.getElementById('meta-clics').value = clics;
+            document.getElementById('meta-conversiones').value = conversiones;
+            document.getElementById('meta-ingresos').value = ingresos;
             
             modal.classList.add('open');
         }
