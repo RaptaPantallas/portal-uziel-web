@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Inicio — Importadora Uziel</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --color-primary: #0ea5e9; /* matching main.py sky blue */
+            --color-primary-light: #f0f9ff;
+            --color-success: #10b981;
+            --color-success-light: #ecfdf5;
+            --color-warning: #f59e0b;
+            --color-warning-light: #fffbeb;
+            --color-purple: #8b5cf6;
+            --color-purple-light: #f5f3ff;
+            --color-danger: #ef4444;
+            --color-danger-light: #fef2f2;
+            --border-color: #e2e8f0;
+            --font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.04), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+            --transition: all 0.2s ease-in-out;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Compact Header Styles */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-info h1 {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+            margin-bottom: 2px;
+        }
+
+        .header-info p {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        /* Compact Date Controls */
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-primary);
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .date-input-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .date-input-group label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .date-input-group input {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 3px 6px;
+            font-size: 11px;
+            font-family: var(--font-family);
+            font-weight: 600;
+            color: var(--text-main);
+            outline: none;
+            background-color: white;
+        }
+
+        .date-input-group input:focus {
+            border-color: var(--color-primary);
+        }
+
+        .btn-filter {
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-filter:hover {
+            background-color: #0284c7;
+        }
+
+        /* Compact Navigation Toolbar (Sleek horizontal pills) */
+        .quick-actions-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            background: #ffffff;
+            padding: 8px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .toolbar-label {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-right: 6px;
+            border-right: 1px solid var(--border-color);
+            padding-right: 12px;
+        }
+
+        .action-pill {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+
+        .action-pill i {
+            font-size: 12px;
+            color: var(--color-primary);
+        }
+
+        .action-pill span {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .action-pill:hover {
+            border-color: var(--color-primary);
+            background-color: var(--color-primary-light);
+            transform: translateY(-1px);
+        }
+
+        /* Metrics Grid (6 columns compact layout) */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-icon-small {
+            font-size: 12px;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .metric-card.blue .metric-icon-small { background: var(--color-primary-light); color: var(--color-primary); }
+        .metric-card.green .metric-icon-small { background: var(--color-success-light); color: var(--color-success); }
+        .metric-card.purple .metric-icon-small { background: var(--color-purple-light); color: var(--color-purple); }
+        .metric-card.orange .metric-icon-small { background: var(--color-warning-light); color: var(--color-warning); }
+        .metric-card.danger .metric-icon-small { background: var(--color-danger-light); color: var(--color-danger); }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .metric-footer {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .card-header h2 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-header h2 i {
+            color: var(--color-primary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 260px;
+            width: 100%;
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .empty-state i {
+            font-size: 40px;
+            color: var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        .empty-state h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .empty-state p {
+            font-size: 11px;
+            max-width: 320px;
+        }
+
+        /* Activity List */
+        .activity-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            transition: var(--transition);
+        }
+
+        .activity-item:hover {
+            background-color: #f1f5f9;
+        }
+
+        .activity-icon-wrapper {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            background-color: white;
+            border: 1px solid var(--border-color);
+        }
+
+        .activity-item.create .activity-icon-wrapper { color: var(--color-success); border-color: var(--color-success-light); }
+        .activity-item.update .activity-icon-wrapper { color: var(--color-primary); border-color: var(--color-primary-light); }
+        .activity-item.delete .activity-icon-wrapper { color: var(--color-danger); border-color: var(--color-danger-light); }
+        .activity-item.auth .activity-icon-wrapper { color: var(--color-purple); border-color: var(--color-purple-light); }
+
+        .activity-details {
+            flex-grow: 1;
+        }
+
+        .activity-user-action {
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 1px;
+            font-size: 12px;
+        }
+
+        .activity-desc {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+
+        .activity-time {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1000px) {
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-info">
+                <h1>Panel de Rendimiento de Marketing</h1>
+                <p>Bienvenido de nuevo, <span id="username-display" style="color: var(--color-primary); font-weight:700;">Cargando...</span></p>
+            </div>
+            
+            <div class="date-controls">
+                <div class="date-input-group">
+                    <label for="input-desde">Desde</label>
+                    <input type="date" id="input-desde">
+                </div>
+                <div class="date-input-group">
+                    <label for="input-hasta">Hasta</label>
+                    <input type="date" id="input-hasta">
+                </div>
+                <button class="btn-filter" onclick="applyFilters()">
+                    <i class="fa-solid fa-filter"></i> Filtrar
+                </button>
+            </div>
+        </header>
+
+        <!-- Compact Navigation Toolbar -->
+        <section class="quick-actions-toolbar">
+            <div class="toolbar-label">Módulos Rápidos</div>
+            <div class="action-pill" onclick="navigateTo(1)">
+                <i class="fa-solid fa-users"></i>
+                <span>Gestión CRM</span>
+            </div>
+            <div class="action-pill" onclick="navigateTo(2)">
+                <i class="fa-solid fa-box-archive"></i>
+                <span>Catálogo PIM</span>
+            </div>
+            <div class="action-pill" onclick="navigateTo(3)">
+                <i class="fa-solid fa-images"></i>
+                <span>Banco DAM (Fotos)</span>
+            </div>
+        </section>
+
+        <!-- Metrics Grid (6 Columns) -->
+        <section class="metrics-grid">
+            
+            <!-- CRM Card -->
+            <div class="metric-card blue">
+                <div class="metric-header">
+                    <span class="metric-label">Clientes</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-clientes">0</div>
+                <div class="metric-footer">
+                    <i class="fa-solid fa-circle-info"></i> Base CRM total
+                </div>
+            </div>
+
+            <!-- PIM Card -->
+            <div class="metric-card green">
+                <div class="metric-header">
+                    <span class="metric-label">Catálogo PIM</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-box-archive"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-productos">0</div>
+                <div class="metric-footer">
+                    <i class="fa-solid fa-circle-info"></i> Items registrados
+                </div>
+            </div>
+
+            <!-- Inversión Card -->
+            <div class="metric-card orange">
+                <div class="metric-header">
+                    <span class="metric-label">Inversión Pub.</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-gasto-total">$0.00</div>
+                <div class="metric-footer" id="val-gasto-periodo">
+                    Gasto total en periodo
+                </div>
+            </div>
+
+            <!-- Retorno Card -->
+            <div class="metric-card green">
+                <div class="metric-header">
+                    <span class="metric-label">Ingresos Pub.</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-circle-dollar-to-slot"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-ingreso-total">$0.00</div>
+                <div class="metric-footer" id="val-ingreso-periodo">
+                    Ingresos en periodo
+                </div>
+            </div>
+
+            <!-- ROI Card -->
+            <div class="metric-card purple" id="card-roi">
+                <div class="metric-header">
+                    <span class="metric-label">ROI Publicidad</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-roi">0.0%</div>
+                <div class="metric-footer">
+                    Retorno de inversión
+                </div>
+            </div>
+
+            <!-- CTR Card -->
+            <div class="metric-card blue">
+                <div class="metric-header">
+                    <span class="metric-label">CTR Medio</span>
+                    <div class="metric-icon-small">
+                        <i class="fa-solid fa-arrow-pointer"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="val-ctr">0.00%</div>
+                <div class="metric-footer">
+                    Tasa de clics/alcance
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Content Grid (Charts and Audit Log) -->
+        <div class="content-grid">
+            
+            <!-- Activity Chart Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-chart-column"></i> Comparación de Rendimiento por Campaña (Inversión vs Ingresos)</h2>
+                    <span id="chart-period-lbl" style="font-size:11px; font-weight:600; color:var(--text-muted);">Cargando...</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="marketingChart" style="display: none;"></canvas>
+                    <div id="chart-empty-state" class="empty-state">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <h3>Sin Campañas de Publicidad</h3>
+                        <p>No hay gastos de publicidad registrados en este rango de fechas. Registra nuevos gastos en el módulo de Reportes para ver comparativas.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left"></i> Bitácora de Auditoría</h2>
+                </div>
+                <div class="activity-feed" id="activity-feed-container">
+                    <div style="text-align:center; padding: 20px; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Cargando auditoría...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Qt Web Channel Bridge script integration -->
+    <script src="qwebchannel.js"></script>
+    <script>
+        let bridge = null;
+        let marketingChart = null;
+
+        // Set date inputs to first day of year to today to catch campaigns
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        
+        document.getElementById('input-desde').value = formatDate(startOfYear);
+        document.getElementById('input-hasta').value = formatDate(now);
+
+        function formatDate(date) {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // Wait for Qt bridge channel
+        document.addEventListener("DOMContentLoaded", () => {
+            if (typeof QWebChannel !== "undefined") {
+                new QWebChannel(qt.webChannelTransport, function (channel) {
+                    bridge = channel.objects.bridge;
+                    
+                    // Expose username dynamically via Python Slot
+                    bridge.obtener_usuario_actual(function(username) {
+                        document.getElementById('username-display').innerText = username;
+                    });
+                    
+                    refreshData();
+                });
+            } else {
+                console.warn("QWebChannel not loaded. Loading demo data.");
+                loadMockData();
+            }
+        });
+
+        function refreshData() {
+            if (!bridge) return;
+
+            const desde = document.getElementById('input-desde').value;
+            const hasta = document.getElementById('input-hasta').value;
+
+            document.getElementById('chart-period-lbl').innerText = `Periodo: ${desde} a ${hasta}`;
+
+            // Fetch username again in case it changes
+            bridge.obtener_usuario_actual(function(username) {
+                document.getElementById('username-display').innerText = username;
+            });
+
+            // 1. Get Campaign expenses
+            bridge.obtener_gastos_periodo(desde, hasta, function(responseCampaigns) {
+                const campaigns = JSON.parse(responseCampaigns);
+                
+                // 2. Get database aggregate counts
+                bridge.obtener_conteos(desde, hasta, function(responseCounts) {
+                    const counts = JSON.parse(responseCounts);
+                    updateDashboard(campaigns, counts);
+                });
+            });
+
+            // 3. Get recent audit logs
+            bridge.obtener_ultimos_eventos(function(responseLogs) {
+                const logs = JSON.parse(responseLogs);
+                renderActivityFeed(logs);
+            });
+        }
+
+        function updateDashboard(campaigns, counts) {
+            // General db counts
+            document.getElementById('val-clientes').innerText = counts.total_clientes || 0;
+            document.getElementById('val-productos').innerText = counts.total_productos || 0;
+
+            // Totals from campaigns
+            let totalGasto = 0;
+            let totalIngresos = 0;
+            let totalAlcance = 0;
+            let totalClics = 0;
+            let totalConversiones = 0;
+
+            if (campaigns && Array.isArray(campaigns)) {
+                campaigns.forEach(c => {
+                    totalGasto += c.total || 0;
+                    totalIngresos += c.ingresos || 0;
+                    totalAlcance += c.alcance || 0;
+                    totalClics += c.clics || 0;
+                    totalConversiones += c.conversiones || 0;
+                });
+            }
+
+            document.getElementById('val-gasto-total').innerText = `$${totalGasto.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('val-ingreso-total').innerText = `$${totalIngresos.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            // ROI calculation
+            let roi = 0;
+            const roiCard = document.getElementById('card-roi');
+            if (totalGasto > 0) {
+                roi = ((totalIngresos - totalGasto) / totalGasto) * 100;
+                roiCard.style.borderLeft = roi >= 0 ? "3px solid var(--color-success)" : "3px solid var(--color-danger)";
+            } else {
+                roiCard.style.borderLeft = "none";
+            }
+            
+            const valRoi = document.getElementById('val-roi');
+            valRoi.innerText = `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%`;
+            valRoi.style.color = totalGasto > 0 ? (roi >= 0 ? 'var(--color-success)' : 'var(--color-danger)') : 'var(--text-main)';
+
+            // CTR calculation
+            let ctr = 0;
+            if (totalAlcance > 0) {
+                ctr = (totalClics / totalAlcance) * 100;
+            }
+            document.getElementById('val-ctr').innerText = `${ctr.toFixed(2)}%`;
+
+            // Draw Campaign Chart
+            renderMarketingChart(campaigns);
+        }
+
+        function applyFilters() {
+            refreshData();
+        }
+
+        function navigateTo(tabIndex) {
+            if (bridge) {
+                bridge.cambiar_pestana(tabIndex);
+            }
+        }
+
+        function renderMarketingChart(campaigns) {
+            const canvas = document.getElementById('marketingChart');
+            const emptyState = document.getElementById('chart-empty-state');
+
+            if (!campaigns || campaigns.length === 0) {
+                canvas.style.display = 'none';
+                emptyState.style.display = 'flex';
+                return;
+            }
+
+            canvas.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            const ctx = canvas.getContext('2d');
+            
+            if (marketingChart) {
+                marketingChart.destroy();
+            }
+
+            // Group by campaign name (post)
+            const labels = campaigns.map(c => c.post.length > 20 ? c.post.substring(0, 18) + '...' : c.post);
+            const totalGastoData = campaigns.map(c => c.total);
+            const ingresosData = campaigns.map(c => c.ingresos);
+
+            marketingChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Inversión (Costo)',
+                            data: totalGastoData,
+                            backgroundColor: 'rgba(14, 165, 233, 0.85)', // Sky blue matching main app
+                            borderColor: '#0ea5e9',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Ingresos (Retorno)',
+                            data: ingresosData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.85)', // Green
+                            borderColor: '#10b981',
+                            borderWidth: 1.5,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: "'Plus Jakarta Sans', sans-serif",
+                                    weight: 600,
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            padding: 10,
+                            backgroundColor: '#0f172a',
+                            titleFont: { size: 12, weight: 'bold' },
+                            bodyFont: { size: 11 },
+                            cornerRadius: 6,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += '$' + context.parsed.y.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                font: { family: "'Plus Jakarta Sans', sans-serif", weight: 600, size: 10 },
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString('es-VE');
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                font: { family: "'Plus Jakarta Sans', sans-serif", weight: 600, size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderActivityFeed(logs) {
+            const container = document.getElementById('activity-feed-container');
+            container.innerHTML = '';
+
+            if (!logs || logs.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size:12px;">No hay acciones de auditoría registradas.</div>`;
+                return;
+            }
+
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'activity-item';
+                
+                let actionClass = 'update';
+                let iconClass = 'fa-solid fa-pen-to-square';
+                const actionUpper = log.accion.toUpperCase();
+                
+                if (actionUpper.includes('CREAR') || actionUpper.includes('REGISTRAR') || actionUpper.includes('NUEVO') || actionUpper.includes('IMPORTAR')) {
+                    actionClass = 'create';
+                    iconClass = 'fa-solid fa-circle-plus';
+                } else if (actionUpper.includes('ELIMINAR') || actionUpper.includes('BORRAR')) {
+                    actionClass = 'delete';
+                    iconClass = 'fa-solid fa-trash';
+                } else if (actionUpper.includes('INICIO') || actionUpper.includes('SESION') || actionUpper.includes('LOGIN') || actionUpper.includes('AUTENTIC')) {
+                    actionClass = 'auth';
+                    iconClass = 'fa-solid fa-shield-halved';
+                }
+
+                item.classList.add(actionClass);
+                item.innerHTML = `
+                    <div class="activity-icon-wrapper">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-user-action">${log.usuario} &bull; ${log.accion}</div>
+                        <div class="activity-desc">${log.detalle}</div>
+                        <div class="activity-time">${log.fecha_hora}</div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function loadMockData() {
+            // Standalone fallback
+            document.getElementById('username-display').innerText = "Usuario Demo";
+            
+            const counts = { total_clientes: 120, total_productos: 940 };
+            
+            // Generate some nice dummy campaigns
+            const mockCampaigns = [
+                { post: "Promoción Filtros Mayo", objetivo: "Ventas", total: 150.00, ingresos: 450.00, alcance: 12000, clics: 1200, conversiones: 120 },
+                { post: "Anuncio Aceites Instagram", objetivo: "Tráfico", total: 80.00, ingresos: 110.00, alcance: 8000, clics: 950, conversiones: 40 },
+                { post: "Lanzamiento Baterías", objetivo: "Sales", total: 200.00, ingresos: 580.00, alcance: 15000, clics: 1800, conversiones: 180 },
+                { post: "Banner Repuestos Uziel", objetivo: "Branding", total: 100.00, ingresos: 0.00, alcance: 5000, clics: 100, conversiones: 0 }
+            ];
+
+            updateDashboard(mockCampaigns, counts);
+
+            const mockLogs = [
+                { usuario: "supervisor", accion: "Inicio Sesión", detalle: "Inició sesión en la aplicación de escritorio", fecha_hora: "10/07/2026 10:15" },
+                { usuario: "supervisor", accion: "Crear Producto", detalle: "Registró el SKU UZ-9018 (Filtro Aire)", fecha_hora: "10/07/2026 10:20" },
+                { usuario: "administrador", accion: "Registrar Cliente", detalle: "Añadió cliente Comercial Uziel S.A.", fecha_hora: "10/07/2026 10:22" }
+            ];
+            renderActivityFeed(mockLogs);
+        }
+    </script>
+</body>
+</html>
