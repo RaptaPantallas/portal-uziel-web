@@ -2504,6 +2504,56 @@ def eliminar_gasto_lona(gasto_id):
     return redirect(request.referrer or url_for('ver_gastos'))
 
 
+@app.route('/gastos/lona/<int:gasto_id>/pago/nuevo', methods=['POST'])
+@login_requerido
+def nuevo_pago_lona(gasto_id):
+    """Registra un nuevo pago parcial o total a un gasto de lona/insumo."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar pagos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    monto = request.form.get('monto', 0, type=float)
+    metodo = request.form.get('metodo_pago', '').strip()
+    referencia = request.form.get('referencia', '').strip()
+
+    if monto <= 0 or not metodo:
+        flash(' Monto y método de pago son obligatorios.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    creado_por = session.get('usuario')
+    ok = bd.registrar_pago_lona(gasto_id, monto, metodo, referencia, creado_por)
+
+    if ok:
+        flash(f' Abono de ${monto:.2f} registrado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Registrar Abono Lona', f'Abono de ${monto:.2f} (Método: {metodo}) para gasto #{gasto_id}')
+    else:
+        flash(' Error al registrar el abono.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+
+@app.route('/gastos/lona/<int:gasto_id>/pagos', methods=['GET'])
+@login_requerido
+def ver_pagos_lona(gasto_id):
+    """Devuelve el historial de pagos de un gasto de lona (JSON)."""
+    from flask import jsonify
+    if not _puede("gastos", "ver"):
+        return jsonify({'error': 'No tienes permisos para ver pagos.'}), 403
+        
+    pagos = bd.obtener_pagos_por_lona(gasto_id)
+    lista = []
+    for p in pagos:
+        lista.append({
+            'id': p[0],
+            'monto': p[1],
+            'metodo_pago': p[2],
+            'referencia': p[3],
+            'fecha_pago': p[4].strftime('%Y-%m-%d %H:%M') if p[4] else '',
+            'registrado_por': p[5]
+        })
+    return jsonify(lista)
+
+
 @app.route('/gastos/exportar')
 @login_requerido
 def exportar_gastos_excel():
