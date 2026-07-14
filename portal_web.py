@@ -2427,8 +2427,7 @@ def nuevo_gasto_lona():
     
     # Nuevos campos de segmentación
     categoria = request.form.get('categoria', 'Otros').strip()
-    aliado_id_val = request.form.get('aliado_id', '').strip()
-    aliado_id = int(aliado_id_val) if aliado_id_val and aliado_id_val.isdigit() else None
+    aliado_rif = request.form.get('aliado_rif', '').strip()
     cantidad = request.form.get('cantidad', 1, type=int)
 
     # Validaciones y asignaciones según categoría
@@ -2436,16 +2435,22 @@ def nuevo_gasto_lona():
         flash(' El concepto y el uso son campos obligatorios.', 'error')
         return redirect(url_for('ver_gastos'))
 
+    aliado_id = None
     if categoria == 'Material para Aliado':
-        if not aliado_id:
-            flash(' Debes seleccionar un aliado comercial para esta categoría.', 'error')
+        if not aliado_rif:
+            flash(' Debes seleccionar un cliente/aliado para esta categoría.', 'error')
             return redirect(url_for('ver_gastos'))
-        # Recuperar nombre del aliado para guardarlo como texto (compatibilidad)
-        aliado_datos = bd.obtener_aliado(aliado_id)
-        if aliado_datos:
-            para_quien = aliado_datos[2] # nombre_aliado
+        # Recuperar o crear el aliado por su RIF
+        cliente_datos = bd.obtener_cliente(aliado_rif)
+        nombre_aliado = cliente_datos[1] if cliente_datos else aliado_rif
+        
+        # En database, necesitamos obtener el aliado_id o crearlo
+        aliado_id_bd = bd.obtener_o_crear_aliado_por_rif(aliado_rif, nombre_aliado)
+        if aliado_id_bd:
+            aliado_id = aliado_id_bd
+            para_quien = nombre_aliado
         else:
-            para_quien = f"Aliado #{aliado_id}"
+            para_quien = f"Aliado {aliado_rif}"
     else:
         # Para servicios, herramientas o POP se usa el campo de texto ingresado
         aliado_id = None

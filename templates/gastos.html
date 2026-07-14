@@ -333,7 +333,17 @@
                         </td>
                         <td style="text-align: center; font-weight: 600;">{{ g[11] if g[11] is not none else 1 }}</td>
                         <td style="text-align: right; font-weight: 600;">${{ "{:,.2f}".format(g[3]) }}</td>
-                        <td style="text-align: right; font-weight: 700; color: #10b981;">${{ "{:,.2f}".format(g[5]) }}</td>
+                        <td style="text-align: right; font-weight: 700;">
+                            <span style="color: #10b981;">${{ "{:,.2f}".format(g[5]) }}</span>
+                            {% if g[13] > 0 %}
+                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Pagado: ${{ "{:,.2f}".format(g[13]) }}</div>
+                            {% endif %}
+                            {% if g[5] > g[13] %}
+                                <div style="font-size: 11px; color: #ef4444; margin-top: 2px;">Resta: ${{ "{:,.2f}".format(g[5] - g[13]) }}</div>
+                            {% elif g[13] > 0 and g[5] <= g[13] %}
+                                <span class="badge" style="background: #ccfbf1; color: #0f766e; font-size: 10px;">Pagado</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if g[10] %}
                                 <span style="font-weight: 600; color: var(--primary); display: inline-flex; align-items: center; gap: 4px;">
@@ -349,6 +359,7 @@
                         <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[7].capitalize() }}</span></td>
                         {% if puede('gastos', 'gestionar') %}
                         <td style="text-align: center;">
+                            <button type="button" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 11px; margin-bottom: 4px;" onclick="abrirModalPagos({{ g[0] }}, '{{ g[1] }}', {{ g[5] }}, {{ g[13] }})">Pagos</button>
                             <form action="{{ url_for('eliminar_gasto_lona', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este gasto?');">
                                 <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕</button>
                             </form>
@@ -464,11 +475,11 @@
                 
                 <!-- Campos dinámicos de destinatario -->
                 <div class="form-group" id="form-group-aliado">
-                    <label for="lon-aliado-id">Seleccionar Aliado Comercial <span class="req">*</span></label>
-                    <select name="aliado_id" id="lon-aliado-id" class="form-control" required>
-                        <option value="">— Seleccionar Aliado —</option>
-                        {% for aliado in lista_aliados %}
-                        <option value="{{ aliado[0] }}">{{ aliado[2] }} ({{ aliado[1] }})</option>
+                    <label for="lon-aliado-id">Seleccionar Cliente/Aliado <span class="req">*</span></label>
+                    <select name="aliado_rif" id="lon-aliado-id" class="form-control" required>
+                        <option value="">— Seleccionar Cliente —</option>
+                        {% for cliente in lista_clientes %}
+                        <option value="{{ cliente[0] }}">{{ cliente[1] }} ({{ cliente[0] }})</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -547,11 +558,109 @@
         </form>
     </div>
 </div>
+<!-- MODAL: GESTIÓN DE PAGOS LONAS -->
+<div class="modal-overlay" id="modalPagos">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <span id="pagos-modal-title">Gestión de Pagos</span>
+            <button class="modal-close" onclick="cerrarModalPagos()">✕</button>
+        </div>
+        <div style="padding: 16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom: 16px; background:#f8fafc; padding:12px; border-radius:8px;">
+                <div><span style="color:var(--text-muted);font-size:13px;">Concepto:</span> <strong id="lbl-pago-concepto"></strong></div>
+                <div><span style="color:var(--text-muted);font-size:13px;">Total:</span> <strong id="lbl-pago-total" style="color:var(--primary);"></strong></div>
+                <div><span style="color:var(--text-muted);font-size:13px;">Pagado:</span> <strong id="lbl-pago-pagado" style="color:#10b981;"></strong></div>
+            </div>
+            
+            <h4 style="margin-top:0; margin-bottom:12px; font-size:14px;">Registrar Nuevo Pago</h4>
+            <form id="form-nuevo-pago" method="POST" action="">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label>Monto a Pagar ($) <span class="req">*</span></label>
+                        <input type="number" name="monto" id="pago-monto" class="form-control" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago <span class="req">*</span></label>
+                        <select name="metodo_pago" class="form-control" required>
+                            <option value="Pago Móvil">Pago Móvil</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Zelle / Binace">Zelle / Binance</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>Referencia / Nota (Opcional)</label>
+                        <input type="text" name="referencia" class="form-control" placeholder="Ej: Ref 1234, Abono inicial">
+                    </div>
+                </div>
+                <div style="text-align: right; margin-top: 12px; margin-bottom: 24px;">
+                    <button type="submit" class="btn btn-primary" style="background:#10b981; border-color:#10b981;">+ Registrar Pago</button>
+                </div>
+            </form>
+            
+            <h4 style="margin-top:0; margin-bottom:12px; font-size:14px; border-top:1px solid var(--border); padding-top:16px;">Historial de Pagos</h4>
+            <div id="historial-pagos-container" style="max-height: 200px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted); font-size:13px; margin: 20px 0;">Cargando pagos...</p>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     // --- MANEJO DE TABS ---
+    // --- MANEJO DE TABS ---
+    function abrirModalPagos(gastoId, concepto, total, pagado) {
+        document.getElementById('lbl-pago-concepto').innerText = concepto;
+        document.getElementById('lbl-pago-total').innerText = "$" + total.toFixed(2);
+        document.getElementById('lbl-pago-pagado').innerText = "$" + pagado.toFixed(2);
+        document.getElementById('form-nuevo-pago').action = `/gastos/lona/${gastoId}/pago/nuevo`;
+        document.getElementById('pago-monto').max = (total - pagado).toFixed(2);
+        if (total - pagado > 0) {
+            document.getElementById('pago-monto').value = (total - pagado).toFixed(2);
+        } else {
+            document.getElementById('pago-monto').value = "";
+        }
+        
+        // Fetch historial
+        const container = document.getElementById('historial-pagos-container');
+        container.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px; margin: 20px 0;">Cargando pagos...</p>';
+        fetch(`/gastos/lona/${gastoId}/pagos`)
+            .then(res => res.json())
+            .then(pagos => {
+                if (pagos.error) {
+                    container.innerHTML = `<p style="color:red; text-align:center;">${pagos.error}</p>`;
+                    return;
+                }
+                if (pagos.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px; margin: 20px 0;">No hay pagos registrados aún.</p>';
+                    return;
+                }
+                let html = '<table style="width:100%; font-size:13px;"><thead><tr><th style="padding:6px; border-bottom:1px solid var(--border);">Fecha</th><th style="padding:6px; border-bottom:1px solid var(--border);">Método</th><th style="padding:6px; border-bottom:1px solid var(--border);">Referencia</th><th style="padding:6px; border-bottom:1px solid var(--border); text-align:right;">Monto</th></tr></thead><tbody>';
+                pagos.forEach(p => {
+                    html += `<tr>
+                        <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.fecha_pago}</td>
+                        <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.metodo_pago}</td>
+                        <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.referencia || '—'}</td>
+                        <td style="padding:6px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600; color:#10b981;">$${p.monto.toFixed(2)}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = '<p style="color:red; text-align:center;">Error al cargar el historial.</p>';
+            });
+
+        document.getElementById('modalPagos').classList.add('open');
+    }
+
+    function cerrarModalPagos() {
+        document.getElementById('modalPagos').classList.remove('open');
+    }
+
     function cambiarTab(tabName) {
         document.querySelectorAll('.gastos-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.panel-gastos').forEach(panel => panel.classList.remove('active'));

@@ -3729,6 +3729,33 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
         return resultado
 
+    def obtener_o_crear_aliado_por_rif(self, aliado_rif: str, nombre_aliado: str) -> int | None:
+        conexion = self.conectar()
+        if not conexion: return None
+        cursor = None
+        aliado_id = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id FROM aliados WHERE LOWER(rif) = LOWER(%s)", (aliado_rif.strip(),))
+            aliado_row = cursor.fetchone()
+            if not aliado_row:
+                cursor.execute("""
+                    INSERT INTO aliados (rif, nombre_aliado, tipo)
+                    VALUES (%s, %s, 'Taller')
+                    RETURNING id
+                """, (aliado_rif.strip(), nombre_aliado.strip()))
+                aliado_id = cursor.fetchone()[0]
+                conexion.commit()
+            else:
+                aliado_id = aliado_row[0]
+        except Error as e:
+            print(f" [GAAE] Error al obtener o crear aliado '{aliado_rif}': {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return aliado_id
+
     def obtener_alianza_con_items(self, orden_id: int) -> dict | None:
         conexion = self.conectar()
         if not conexion: return None
@@ -3962,6 +3989,18 @@ El equipo de Importadora Uziel C.A."""
                     fecha_creacion TIMESTAMP     DEFAULT NOW()
                 )
             """)
+            # Tabla de pagos de lonas
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pagos_lonas (
+                    id             SERIAL PRIMARY KEY,
+                    gasto_lona_id  INTEGER REFERENCES gastos_lonas(id) ON DELETE CASCADE,
+                    monto          NUMERIC(12,2) NOT NULL,
+                    metodo_pago    VARCHAR(100)  NOT NULL,
+                    referencia     VARCHAR(255),
+                    fecha_pago     TIMESTAMP     DEFAULT NOW(),
+                    registrado_por VARCHAR(100)  NOT NULL
+                )
+            """)
             conexion.commit()
 
             # Agregar nuevas columnas de segmentación a gastos_lonas de forma segura
@@ -4114,7 +4153,8 @@ El equipo de Importadora Uziel C.A."""
             cursor = conexion.cursor()
             cursor.execute("""
                 SELECT gl.id, gl.herramienta, gl.uso, gl.precio, gl.para_quien, gl.total, gl.comentario, gl.creado_por, gl.fecha_creacion,
-                       gl.categoria, gl.aliado_id, gl.cantidad, a.nombre_aliado
+                       gl.categoria, gl.aliado_id, gl.cantidad, a.nombre_aliado,
+                       COALESCE((SELECT SUM(monto) FROM pagos_lonas WHERE gasto_lona_id = gl.id), 0) AS total_pagado
                 FROM gastos_lonas gl
                 LEFT JOIN aliados a ON gl.aliado_id = a.id
                 WHERE EXTRACT(MONTH FROM gl.fecha_creacion) = %s AND EXTRACT(YEAR FROM gl.fecha_creacion) = %s
@@ -4123,6 +4163,47 @@ El equipo de Importadora Uziel C.A."""
             resultado = cursor.fetchall()
         except Error as e:
             print(f" [Gastos] Error al obtener gastos de lonas: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def registrar_pago_lona(self, gasto_lona_id: int, monto: float, metodo_pago: str, referencia: str, registrado_por: str) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al registrar pago para lona #{gasto_lona_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_pagos_por_lona(self, gasto_lona_id: int) -> list:
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, monto, metodo_pago, referencia, fecha_pago, registrado_por
+                FROM pagos_lonas
+                WHERE gasto_lona_id = %s
+                ORDER BY fecha_pago DESC
+            """, (gasto_lona_id,))
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [Gastos] Error al obtener pagos de lona #{gasto_lona_id}: {e}")
         finally:
             if cursor: cursor.close()
             conexion.close()
