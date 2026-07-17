@@ -190,16 +190,12 @@
                 <label>Rol</label>
                 <select name="rol" class="form-control" id="nuevoRol" onchange="togglePermisos('nuevoRol','nuevosPermisos')">
                     <option value="Empleado">Empleado</option>
+                    <option value="Supervisor">Supervisor</option>
                     <option value="Admin">Admin</option>
                 </select>
             </div>
             {% if session.get('es_superadmin') %}
-            <div class="form-group-block">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
-                    <input type="checkbox" name="superadmin" value="true" style="width:16px;height:16px;accent-color:var(--primary);">
-                    <span>Es Superadministrador (Acceso total)</span>
-                </label>
-            </div>
+
             <div class="form-group-block">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
                     <input type="checkbox" name="bloqueado" value="true" style="width:16px;height:16px;accent-color:#ef4444;">
@@ -283,16 +279,12 @@
                 <label>Rol</label>
                 <select name="rol" class="form-control" id="editRol" onchange="togglePermisos('editRol','editPermisos')">
                     <option value="Empleado">Empleado</option>
+                    <option value="Supervisor">Supervisor</option>
                     <option value="Admin">Admin</option>
                 </select>
             </div>
             {% if session.get('es_superadmin') %}
-            <div class="form-group-block">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
-                    <input type="checkbox" name="superadmin" id="editSuperadmin" value="true" style="width:16px;height:16px;accent-color:var(--primary);">
-                    <span>Es Superadministrador (Acceso total)</span>
-                </label>
-            </div>
+
             <div class="form-group-block">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;">
                     <input type="checkbox" name="bloqueado" id="editBloqueado" value="true" style="width:16px;height:16px;accent-color:#ef4444;">
@@ -453,9 +445,6 @@
         document.getElementById('editEmail').value = email || '';
         document.getElementById('editRol').value = rol;
         
-        if (document.getElementById('editSuperadmin')) {
-            document.getElementById('editSuperadmin').checked = (superadmin === 'true');
-        }
         if (document.getElementById('editBloqueado')) {
             document.getElementById('editBloqueado').checked = (bloqueado === 'true');
         }

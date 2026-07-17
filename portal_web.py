@@ -2048,11 +2048,15 @@ def admin_usuario_nuevo():
         flash(' La contraseña no cumple con los requisitos de seguridad (mínimo 8 caracteres, mayúsculas, minúsculas, números y caracteres especiales).', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    superadmin = False
     bloqueado = False
     if session.get('es_superadmin'):
-        superadmin = request.form.get('superadmin') in ('true', 'on')
         bloqueado = request.form.get('bloqueado') in ('true', 'on')
+    
+    # Solo un superadmin existente puede crear otro Admin
+    if rol == 'Admin' and not session.get('es_superadmin'):
+        rol = 'Supervisor'
+    
+    superadmin = (rol == 'Admin')
 
     ok = bd.crear_usuario(username, password, rol, permisos, email, superadmin, bloqueado)
     if ok:
@@ -2091,14 +2095,16 @@ def admin_usuario_editar(username):
         flash(' El nombre de usuario no puede quedar vacío.', 'error')
         return redirect(url_for('admin_usuarios'))
 
-    superadmin = False
     bloqueado = False
     if session.get('es_superadmin'):
-        superadmin = request.form.get('superadmin') in ('true', 'on')
         bloqueado = request.form.get('bloqueado') in ('true', 'on')
+        superadmin = (nuevo_rol == 'Admin')
     else:
+        if nuevo_rol == 'Admin':
+            nuevo_rol = 'Supervisor'  # Prevenir escalada de privilegios
         # Recuperar valores existentes para no sobreescribirlos
         datos_ex = bd.obtener_datos_completos_usuario(username)
+        superadmin = bd.es_superadmin(username)
         if datos_ex:
             bloqueado = bool(datos_ex[4])
             superadmin = bool(datos_ex[5])
