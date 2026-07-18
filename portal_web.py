@@ -272,11 +272,8 @@ def inyectar_notificaciones():
     def puede_ver(modulo: str) -> bool:
         """
         Devuelve True si el usuario actual puede acceder al módulo indicado.
-        El superadmin siempre tiene acceso total.
         """
         _refrescar_si_es_antigua()
-        if session.get('es_superadmin'):
-            return True
         return modulo in session.get('permisos', [])
 
     def puede(modulo: str, accion: str = "ver") -> bool:

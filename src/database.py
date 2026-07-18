@@ -534,20 +534,7 @@ class ConexionBD:
                 return resultado
             rol, permisos_raw = fila
 
-            # superadmin bypass — tiene acceso total
-            # También obtener el flag superadmin para no hacer otra query
-            cursor.execute(
-                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
-                (usuario,)
-            )
-            sa_fila = cursor.fetchone()
-            es_super = bool(sa_fila and sa_fila[0])
-            if es_super:
-                for mod in resultado:
-                    for acc in resultado[mod]:
-                        resultado[mod][acc] = True
-                return resultado
-
+            # Se removió el bypass del superadmin para que respeten los permisos asignados
             if not permisos_raw:
                 return resultado
 
@@ -2720,16 +2707,7 @@ El equipo de Importadora Uziel C.A."""
             fila = cursor.fetchone()
             if not fila: return []
             rol, permisos_raw = fila
-            cursor.execute(
-                "SELECT superadmin FROM usuarios WHERE LOWER(username) = LOWER(%s)",
-                (username,)
-            )
-            sa_fila = cursor.fetchone()
-            if sa_fila and sa_fila[0]:
-                if cursor: cursor.close()
-                conexion.close()
-                return list(self.MODULOS_ACCIONES.keys())
-
+            # Se removió el override del superadmin aquí también.
             if not permisos_raw:
                 return []
             # Formato granular: modulo:accion1,accion2|modulo:accion1

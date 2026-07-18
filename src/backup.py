@@ -4,6 +4,7 @@ from datetime import datetime
 import threading
 import time
 from src.database import ConexionBD
+from decimal import Decimal
 
 def crear_respaldo():
     """Crea un respaldo de todas las tablas principales de la base de datos en formato JSON."""
@@ -26,6 +27,8 @@ def crear_respaldo():
                             for i, val in enumerate(fila):
                                 if isinstance(val, datetime):
                                     fila_dict[columnas[i]] = val.isoformat()
+                                elif isinstance(val, Decimal):
+                                    fila_dict[columnas[i]] = float(val)
                                 else:
                                     fila_dict[columnas[i]] = val
                             filas_procesadas.append(fila_dict)
