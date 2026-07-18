@@ -346,10 +346,13 @@
     document.getElementById('btn-anterior').addEventListener('click', function () { cambiarPagina(-1); });
     document.getElementById('btn-siguiente').addEventListener('click', function () { cambiarPagina(1); });
 
+    renderFiltrosCategoria();
+    if (contarFilasReales('#tabla-productos tbody tr') > 0) {
+        aplicarFiltros();
+    }
+    
     document.addEventListener('DOMContentLoaded', function () {
-        renderFiltrosCategoria();
-        const total = contarFilasReales('#tabla-productos tbody tr');
-        if (total > 0) aplicarFiltros();
+        // En caso de que se necesite algo adicional
     });
 </script>
 {% endblock %}

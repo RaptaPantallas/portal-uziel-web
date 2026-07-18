@@ -815,6 +815,7 @@
         {% endblock %}
     </nav>
     <div class="sidebar-footer">
+        <a href="{{ url_for('generar_respaldo_manual') }}" class="btn-logout" style="margin-bottom: 8px; color: var(--primary);"><i data-lucide="database" class="nav-icon" style="width: 16px;"></i> <span>Respaldar BD</span></a>
         <a href="{{ url_for('logout') }}" class="btn-logout"><i data-lucide="log-out" class="nav-icon" style="width: 16px;"></i> <span>Cerrar Sesión</span></a>
     </div>
 </aside>

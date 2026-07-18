@@ -52,7 +52,14 @@ from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
-from src.generador_pdf import generar_pdf_alianza, generar_reporte_pdf
+from src.generador_pdf import generar_pdf_alianza, generar_ficha_tecnica, generar_pdf_catalogo, generar_reporte_pdf
+from src.backup import iniciar_hilo_respaldos, crear_respaldo
+
+# Iniciar hilo de respaldos automáticos
+try:
+    iniciar_hilo_respaldos()
+except Exception as e:
+    print("Error iniciando hilo de respaldos:", e)
 
 # =============================================================================
 # ██████████████ CONFIGURACIÓN - EDITAR AQUÍ ██████████████
@@ -2079,10 +2086,7 @@ def admin_usuario_editar(username):
         flash(' No tienes permiso para editar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
-    # Evitar que no-superadmins modifiquen a un superadmin
-    if bd.es_superadmin(username) and not session.get('es_superadmin'):
-        flash(' Solo el superadmin puede modificar a otro superadmin.', 'error')
-        return redirect(url_for('admin_usuarios'))
+    # (Se eliminó la restricción de que solo un superadmin puede modificar a otro superadmin, ahora cualquier Admin puede hacerlo)
 
     nuevo_username = request.form.get('nuevo_username', '').strip()
     nuevo_rol      = request.form.get('rol', 'Empleado').strip()
@@ -2096,7 +2100,7 @@ def admin_usuario_editar(username):
         return redirect(url_for('admin_usuarios'))
 
     bloqueado = False
-    if session.get('es_superadmin'):
+    if session.get('es_superadmin') or session.get('rol') == 'Admin':
         bloqueado = request.form.get('bloqueado') in ('true', 'on')
         superadmin = (nuevo_rol == 'Admin')
     else:
@@ -2190,10 +2194,7 @@ def admin_usuario_borrar(username):
         flash(' No tienes permiso para eliminar usuarios.', 'error')
         return redirect(url_for('inicio'))
 
-    # Evitar que no-superadmins eliminen a un superadmin
-    if bd.es_superadmin(username) and not session.get('es_superadmin'):
-        flash(' Solo el superadmin puede eliminar a otro superadmin.', 'error')
-        return redirect(url_for('admin_usuarios'))
+    # (Se eliminó la restricción de borrar admins por otros admins)
 
     ok = bd.eliminar_usuario(username)
     if ok:
@@ -2204,6 +2205,19 @@ def admin_usuario_borrar(username):
 
     return redirect(url_for('admin_usuarios'))
 
+
+@app.route('/respaldo', methods=['GET', 'POST'])
+@login_requerido
+def generar_respaldo_manual():
+    """Ruta para generar y descargar un respaldo manual de la BD (para todos los usuarios)."""
+    filepath = crear_respaldo()
+    if filepath and os.path.exists(filepath):
+        flash('Respaldo generado correctamente.', 'success')
+        bd.registrar_accion_auditoria(session.get('usuario'), 'Respaldo DB', 'Generó un respaldo manual de la base de datos.')
+        return send_file(filepath, as_attachment=True)
+    else:
+        flash('Error al generar el respaldo de la base de datos.', 'error')
+        return redirect(url_for('inicio'))
 
 # =============================================================================
 # DIAGNÓSTICO — Ver datos crudos desde el navegador

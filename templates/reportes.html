@@ -142,7 +142,7 @@
 {% endwith %}
 
 <!-- Selector de Fechas -->
-<form method="GET" action="{{ url_for('reportes') }}" style="margin-bottom:20px;">
+<form method="GET" action="{{ url_for('reportes') }}" style="margin-bottom:20px;" onsubmit="return validarFechas(event)">
 <div class="card" style="margin-bottom:0;">
     <div class="card-header">
         <span class="card-title">Seleccionar Periodo</span>
@@ -615,5 +615,24 @@ function buscarAuditoria() {
             }
         });
 }
+
+function validarFechas(e) {
+    var desdeInput = document.getElementById('input-desde');
+    var hastaInput = document.getElementById('input-hasta');
+    var desde = desdeInput.value;
+    var hasta = hastaInput.value;
+    if (desde && hasta) {
+        if (new Date(desde) > new Date(hasta)) {
+            alert('No se puede seleccionar una fecha "Desde" posterior a la fecha "Hasta".');
+            if (e) e.preventDefault();
+            hastaInput.value = ''; // Limpiar la fecha inválida
+            return false;
+        }
+    }
+    return true;
+}
+
+document.getElementById('input-desde').addEventListener('change', function() { validarFechas(null); });
+document.getElementById('input-hasta').addEventListener('change', function() { validarFechas(null); });
 </script>
 {% endblock %}

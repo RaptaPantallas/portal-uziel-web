@@ -126,7 +126,7 @@
             </td>
             <td>
                 <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                    {% if not usuperadmin or session.get('es_superadmin') %}
+                    {% if not usuperadmin or session.get('es_superadmin') or session.get('rol') == 'Admin' %}
                         <button class="btn btn-sm btn-primary" onclick="abrirModalEditar('{{ uname }}','{{ urol }}','{{ u[2] }}','{{ uemail }}','{{ ubloqueado|lower }}','{{ usuperadmin|lower }}')"> Editar</button>
                         <button class="btn btn-sm btn-ghost" onclick="abrirModalPass('{{ uname }}')"> Contraseña</button>
                         {% if ubloqueado %}
