@@ -12,7 +12,7 @@ def crear_respaldo():
     respaldo_data = {}
     
     try:
-        with bd._get_conexion() as conn:
+        with bd.conectar() as conn:
             with conn.cursor() as cur:
                 for tabla in tablas:
                     try:

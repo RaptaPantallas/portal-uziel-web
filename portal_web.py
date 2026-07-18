@@ -310,11 +310,8 @@ def _refrescar_si_es_antigua():
         session['permisos_dict'] = bd.obtener_permisos_desktop(u)
 
 def _puede(modulo: str, accion: str = "ver") -> bool:
-    """Verifica si el usuario en sesión tiene permiso módulo:acción.
-    El superadmin siempre tiene acceso total."""
+    """Verifica si el usuario en sesión tiene permiso módulo:acción."""
     _refrescar_si_es_antigua()
-    if session.get('es_superadmin'):
-        return True
     return session.get('permisos_dict', {}).get(modulo, {}).get(accion, False)
 
 
