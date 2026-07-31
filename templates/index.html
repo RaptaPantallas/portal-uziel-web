@@ -429,7 +429,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
-    const VENEZUELA_DATA = {{ venezuela_data_js | safe }};
+    var VENEZUELA_DATA = {{ venezuela_data_js | safe }};
 
     function poblarEstadosModal() {
         const estadoSelect = document.getElementById("modal-estado-select");
@@ -510,15 +510,17 @@
     });
 
     // Enlazar también a la función de abrir modal para reiniciar el estado
-    const originalAbrirModalNuevoCliente = abrirModalNuevoCliente;
-    abrirModalNuevoCliente = function() {
-        originalAbrirModalNuevoCliente();
-        const pSel = document.getElementById("modal-pais-select");
-        if (pSel) {
-            pSel.value = "Venezuela";
-            actualizarPaisModal("Venezuela");
-        }
-    };
+    if (typeof originalAbrirModalNuevoCliente === 'undefined') {
+        var originalAbrirModalNuevoCliente = abrirModalNuevoCliente;
+        abrirModalNuevoCliente = function() {
+            originalAbrirModalNuevoCliente();
+            const pSel = document.getElementById("modal-pais-select");
+            if (pSel) {
+                pSel.value = "Venezuela";
+                actualizarPaisModal("Venezuela");
+            }
+        };
+    }
 
     function abrirModalTarea() { document.getElementById('modalTarea').classList.add('open'); }
     function cerrarModalTarea() { document.getElementById('modalTarea').classList.remove('open'); }

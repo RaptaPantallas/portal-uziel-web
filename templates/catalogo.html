@@ -218,9 +218,9 @@
         if (e.target === this) cerrarDetalle();
     });
 
-    const POR_PAGINA = 10;
-    let paginaActual = 1;
-    let categoriaActiva = 'todas';
+    var POR_PAGINA = 10;
+    var paginaActual = 1;
+    var categoriaActiva = 'todas';
 
     function normalizar(str) { return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 

@@ -181,17 +181,88 @@
     </div>
     {% endfor %}
 </div>
+
+<div id="galeria-paginacion" class="paginacion" style="display:none;justify-content:center;align-items:center;gap:16px;margin:24px 0 16px;">
+    <button class="btn btn-ghost" id="btn-ant-galeria" onclick="cambiarPaginaGaleria(-1)">← Anterior</button>
+    <span id="info-pagina-galeria" style="font-size:14px;color:var(--text-muted);"></span>
+    <button class="btn btn-ghost" id="btn-sig-galeria" onclick="cambiarPaginaGaleria(1)">Siguiente →</button>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-    const buscador = document.getElementById('buscador-galeria');
-    const grid = document.getElementById('galeria-grid');
-    const contador = document.getElementById('contador-galeria');
-    const limpiarBtn = document.getElementById('btn-limpiar-galeria');
-    let timeoutId = null;
+    var buscador = document.getElementById('buscador-galeria');
+    var grid = document.getElementById('galeria-grid');
+    var contador = document.getElementById('contador-galeria');
+    var limpiarBtn = document.getElementById('btn-limpiar-galeria');
+    var paginacionDiv = document.getElementById('galeria-paginacion');
+    var btnAnterior = document.getElementById('btn-ant-galeria');
+    var btnSiguiente = document.getElementById('btn-sig-galeria');
+    var infoPagina = document.getElementById('info-pagina-galeria');
+
+    var timeoutId = null;
+    var resultadosActuales = [];
+    var paginaActual = 1;
+    var POR_PAGINA = 10;
 
     function normalizar(str) {
         return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+
+    function renderPagina() {
+        if (!resultadosActuales || resultadosActuales.length === 0) {
+            paginacionDiv.style.display = 'none';
+            return;
+        }
+
+        const totalPag = Math.max(1, Math.ceil(resultadosActuales.length / POR_PAGINA));
+        if (paginaActual > totalPag) paginaActual = totalPag;
+        
+        const inicio = (paginaActual - 1) * POR_PAGINA;
+        const items = resultadosActuales.slice(inicio, inicio + POR_PAGINA);
+        
+        let html = '';
+        items.forEach(function (item) {
+            let thumbHtml = '';
+            if (item.id_activo) {
+                const imgUrl = '{{ url_for("servir_preview", activo_id=0) }}'.replace('/0', '/' + item.id_activo);
+                thumbHtml = '<img src="' + imgUrl + '" alt="' + item.sku + '" loading="lazy">';
+            } else {
+                thumbHtml = '<span class="placeholder"></span>';
+            }
+
+            html += '<a href="' + item.url + '" class="galeria-card" data-sku="' + item.sku + '" data-nombre="' + item.nombre + '">'
+                + '<div class="thumb-wrap">'
+                + thumbHtml
+                + '</div>'
+                + '<div class="card-info">'
+                + '<div class="sku-line">'
+                + '<span class="sku-badge">' + item.sku + '</span>'
+                + '<span class="foto-count">' + item.total_fotos + ' foto' + (item.total_fotos !== 1 ? 's' : '') + '</span>'
+                + '</div>'
+                + '<div class="prod-name">' + item.nombre + '</div>'
+                + '</div>'
+                + '</a>';
+        });
+        grid.innerHTML = html;
+
+        if (resultadosActuales.length > POR_PAGINA) {
+            paginacionDiv.style.display = 'flex';
+            infoPagina.textContent = 'Página ' + paginaActual + ' de ' + totalPag;
+            btnAnterior.disabled = paginaActual <= 1;
+            btnSiguiente.disabled = paginaActual >= totalPag;
+        } else {
+            paginacionDiv.style.display = 'none';
+        }
+    }
+
+    function cambiarPaginaGaleria(delta) {
+        const totalPag = Math.ceil(resultadosActuales.length / POR_PAGINA);
+        const nueva = paginaActual + delta;
+        if (nueva >= 1 && nueva <= totalPag) {
+            paginaActual = nueva;
+            renderPagina();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     }
 
     function buscarRemoto(texto) {
@@ -208,32 +279,13 @@
                         + '<p>Sin resultados para "' + texto + '"</p>'
                         + '</div>';
                     contador.textContent = '0 producto(s) para "' + texto + '"';
+                    paginacionDiv.style.display = 'none';
                     return;
                 }
-                let html = '';
-                data.results.forEach(function (item) {
-                    let thumbHtml = '';
-                    if (item.id_activo) {
-                        const imgUrl = '{{ url_for("servir_preview", activo_id=0) }}'.replace('/0', '/' + item.id_activo);
-                        thumbHtml = '<img src="' + imgUrl + '" alt="' + item.sku + '" loading="lazy">';
-                    } else {
-                        thumbHtml = '<span class="placeholder"></span>';
-                    }
-
-                    html += '<a href="' + item.url + '" class="galeria-card" data-sku="' + item.sku + '" data-nombre="' + item.nombre + '">'
-                        + '<div class="thumb-wrap">'
-                        + thumbHtml
-                        + '</div>'
-                        + '<div class="card-info">'
-                        + '<div class="sku-line">'
-                        + '<span class="sku-badge">' + item.sku + '</span>'
-                        + '<span class="foto-count">' + item.total_fotos + ' foto' + (item.total_fotos !== 1 ? 's' : '') + '</span>'
-                        + '</div>'
-                        + '<div class="prod-name">' + item.nombre + '</div>'
-                        + '</div>'
-                        + '</a>';
-                });
-                grid.innerHTML = html;
+                
+                resultadosActuales = data.results;
+                paginaActual = 1;
+                renderPagina();
                 
                 if (data.es_reciente) {
                     contador.innerHTML = 'Mostrando ' + data.total + ' producto(s) recientes — <strong>usa el buscador para encontrar productos específicos</strong>';
