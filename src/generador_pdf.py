@@ -171,6 +171,7 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
                 if os.path.exists(ruta_alt):
                     ruta_local = ruta_alt
 
+    has_thumb = False
     if ruta_local:
         try:
             c.drawImage(
@@ -182,9 +183,30 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
                 preserveAspectRatio=True,
                 mask="auto"
             )
+            has_thumb = True
         except Exception:
-            _dibujar_placeholder_imagen(c, X_IMAGEN, alto - Y_IMAGEN_OFFSET, ANCHO_IMAGEN, ALTO_IMAGEN)
-    else:
+            pass
+
+    if not has_thumb:
+        try:
+            bd = ConexionBD()
+            preview_bytes = bd.obtener_preview_principal_por_sku(sku)
+            if preview_bytes:
+                from reportlab.lib.utils import ImageReader
+                c.drawImage(
+                    ImageReader(io.BytesIO(preview_bytes)),
+                    X_IMAGEN,
+                    alto - Y_IMAGEN_OFFSET,
+                    width=ANCHO_IMAGEN,
+                    height=ALTO_IMAGEN,
+                    preserveAspectRatio=True,
+                    mask="auto"
+                )
+                has_thumb = True
+        except Exception as e:
+            pass
+
+    if not has_thumb:
         _dibujar_placeholder_imagen(c, X_IMAGEN, alto - Y_IMAGEN_OFFSET, ANCHO_IMAGEN, ALTO_IMAGEN)
 
     # ---- Pie de página ----
@@ -246,15 +268,32 @@ def _dibujar_fila_producto(c, sku: str, nombre: str, marca: str,
                 if os.path.exists(ruta_alt):
                     ruta_local = ruta_alt
 
+    has_thumb = False
     if ruta_local:
         try:
             c.roundRect(MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB, 4, fill=False, stroke=True)
             c.drawImage(ruta_local, MARGEN_X, thumb_y,
                         width=ANCHO_THUMB, height=ALTO_THUMB,
                         preserveAspectRatio=True, mask="auto")
+            has_thumb = True
         except Exception:
-            _dibujar_placeholder_imagen(c, MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB)
-    else:
+            pass
+            
+    if not has_thumb:
+        try:
+            bd = ConexionBD()
+            preview_bytes = bd.obtener_preview_principal_por_sku(sku)
+            if preview_bytes:
+                from reportlab.lib.utils import ImageReader
+                c.roundRect(MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB, 4, fill=False, stroke=True)
+                c.drawImage(ImageReader(io.BytesIO(preview_bytes)), MARGEN_X, thumb_y,
+                            width=ANCHO_THUMB, height=ALTO_THUMB,
+                            preserveAspectRatio=True, mask="auto")
+                has_thumb = True
+        except Exception:
+            pass
+
+    if not has_thumb:
         _dibujar_placeholder_imagen(c, MARGEN_X, thumb_y, ANCHO_THUMB, ALTO_THUMB)
 
     # ---- Información del producto ----

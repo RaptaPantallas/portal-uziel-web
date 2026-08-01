@@ -1433,157 +1433,34 @@ def generar_pdf():
         flash(' Selecciona al menos un producto (casilla PDF) antes de generar.', 'error')
         return redirect(url_for('catalogo'))
 
-    # Colores corporativos (RGB 0.0-1.0) — idénticos al generador de escritorio
-    AZUL_EMP   = (0.18, 0.27, 0.86)
-    NEGRO      = (0.17, 0.22, 0.31)
-    VERDE_PREC = (0.15, 0.68, 0.37)
-    GRIS       = (0.55, 0.60, 0.68)
-    LINEA      = (0.87, 0.88, 0.93)
-
-    MARGEN_X = 50
-    ANCHO_PAG, ALTO_PAG = letter
-    ALTO_FILA = 72
-
-    buffer = io.BytesIO()
-    c = pdf_canvas.Canvas(buffer, pagesize=letter)
     from datetime import datetime
+    import tempfile
+    import os
+    from src.generador_pdf import generar_pdf_catalogo
 
-    def encabezado():
-        c.setFillColorRGB(*AZUL_EMP)
-        c.rect(0, ALTO_PAG - 80, ANCHO_PAG, 80, fill=True, stroke=False)
-        c.setFillColorRGB(1, 1, 1)
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(MARGEN_X, ALTO_PAG - 48, "IMPORTADORA UZIEL C.A.")
-        c.setFont("Helvetica", 9)
-        c.setFillColorRGB(0.8, 0.88, 1.0)
-        c.drawString(MARGEN_X, ALTO_PAG - 65, "Catálogo de Productos — Listado General")
-        c.drawString(MARGEN_X, ALTO_PAG - 75, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-
-    def pie():
-        c.setFont("Helvetica", 8)
-        c.setFillColorRGB(*GRIS)
-        c.drawString(MARGEN_X, 35, "Documento generado automáticamente por el Sistema de Información Uziel.")
-        c.drawRightString(ANCHO_PAG - MARGEN_X, 35, datetime.now().strftime("Generado el %d/%m/%Y a las %H:%M"))
-
-    def dibujar_fila(sku, nombre, marca, compatibilidad, precio, ruta_img, y, idx):
-        # Fondo alternado
-        c.setFillColorRGB(0.97, 0.98, 1.0) if idx % 2 == 0 else c.setFillColorRGB(1, 1, 1)
-        c.rect(MARGEN_X, y - ALTO_FILA, ANCHO_PAG - 2 * MARGEN_X, ALTO_FILA, fill=True, stroke=False)
-
-        # Dibujar thumbnail
-        thumb_ancho = 50
-        thumb_alto = 50
-        thumb_x = MARGEN_X + 10
-        thumb_y = y - thumb_alto - 11
-
-        # Resolver ruta local en el servidor
-        ruta_local = None
-        if ruta_img:
-            ruta_rel = _extraer_ruta_relativa(ruta_img)
-            carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-            ruta_local = os.path.join(carpeta_activos, ruta_rel) if ruta_rel else None
-
-        has_thumb = False
-        if ruta_local and os.path.exists(ruta_local):
-            try:
-                # Dibujar borde y la imagen
-                c.setStrokeColorRGB(*LINEA)
-                c.setLineWidth(0.5)
-                c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=False, stroke=True)
-                c.drawImage(ruta_local, thumb_x, thumb_y, width=thumb_ancho, height=thumb_alto, preserveAspectRatio=True, mask="auto")
-                has_thumb = True
-            except Exception as e:
-                print(f"[PDF Gen] Error al dibujar imagen local {ruta_local}: {e}")
-                pass
-
-        # Fallback: Obtener bytes de la imagen directamente de la base de datos si no existe el archivo local
-        if not has_thumb:
-            try:
-                preview_bytes = bd.obtener_preview_principal_por_sku(sku)
-                if preview_bytes:
-                    c.setStrokeColorRGB(*LINEA)
-                    c.setLineWidth(0.5)
-                    c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=False, stroke=True)
-                    # ReportLab permite usar un objeto tipo archivo como BytesIO para la imagen
-                    c.drawImage(io.BytesIO(preview_bytes), thumb_x, thumb_y, width=thumb_ancho, height=thumb_alto, preserveAspectRatio=True, mask="auto")
-                    has_thumb = True
-            except Exception as e:
-                print(f"[PDF Gen] Error al dibujar imagen desde la BD para {sku}: {e}")
-                pass
-
-        if not has_thumb:
-            # Dibujar placeholder
-            c.setStrokeColorRGB(*LINEA)
-            c.setLineWidth(0.5)
-            c.setFillColorRGB(0.96, 0.97, 0.99)
-            c.roundRect(thumb_x, thumb_y, thumb_ancho, thumb_alto, 4, fill=True, stroke=True)
-            c.setFont("Helvetica-Oblique", 7)
-            c.setFillColorRGB(*GRIS)
-            c.drawCentredString(thumb_x + thumb_ancho / 2, thumb_y + thumb_alto / 2 - 2, "Sin imagen")
-
-        labels = ["SKU:", "Producto:", "Marca:", "Compatibilidad:", "Precio:"]
-        valores = [str(sku), str(nombre), str(marca), str(compatibilidad), f"$ {precio}" if precio is not None else "—"]
-        ancho_label = 68
-        y_linea = y - 16
-        x_texto = MARGEN_X + 70
-
-        for i, (label, valor) in enumerate(zip(labels, valores)):
-            c.setFont("Helvetica-Bold", 8)
-            c.setFillColorRGB(*GRIS)
-            c.drawString(x_texto, y_linea, label)
-            c.setFont("Helvetica", 8.5)
-            if i == 4:
-                c.setFillColorRGB(*VERDE_PREC)
-                c.setFont("Helvetica-Bold", 9)
-            else:
-                c.setFillColorRGB(*NEGRO)
-
-            texto = str(valor)
-            limite_ancho = ANCHO_PAG - MARGEN_X - ancho_label - MARGEN_X - 70
-            if c.stringWidth(texto, "Helvetica", 8.5) > limite_ancho:
-                while c.stringWidth(texto + "...", "Helvetica", 8.5) > limite_ancho:
-                    texto = texto[:-1]
-                texto += "..."
-
-            c.drawString(x_texto + ancho_label, y_linea, texto)
-            y_linea -= 12
-
-        c.setStrokeColorRGB(*LINEA)
-        c.setLineWidth(0.5)
-        c.line(MARGEN_X, y - ALTO_FILA, ANCHO_PAG - MARGEN_X, y - ALTO_FILA)
-
-    encabezado()
-    y = ALTO_PAG - 115
-    idx = 0
-
-    for sku in skus_seleccionados:
-        prod = bd.obtener_producto(sku)
-        if not prod:
-            continue
-        if y < ALTO_FILA + 50:
-            pie()
-            c.showPage()
-            encabezado()
-            y = ALTO_PAG - 115
-
-        # Obtener ruta de la imagen
-        ruta_img = bd.obtener_activo_principal(sku)
-        if not ruta_img:
-            prod_img_data = bd.obtener_producto_con_imagen(sku)
-            ruta_img = prod_img_data[4] if prod_img_data and len(prod_img_data) > 4 else None
-
-        dibujar_fila(prod.sku, prod.nombre, prod.marca, prod.compatibilidad, prod.precio, ruta_img, y, idx)
-        y -= ALTO_FILA
-        idx += 1
-
-    pie()
-    c.save()
-    buffer.seek(0)
-
-    response = make_response(buffer.getvalue())
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename="{NOMBRE_ARCHIVO_PDF}"'
-    return response
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    nombre_pdf = f"Catalogo_Uziel_{timestamp}.pdf"
+    
+    tmp_dir = tempfile.gettempdir()
+    ruta_guardar = os.path.join(tmp_dir, nombre_pdf)
+    
+    exito, ruta = generar_pdf_catalogo(skus_seleccionados, ruta_guardar)
+    
+    if exito and os.path.exists(ruta):
+        with open(ruta, "rb") as f:
+            pdf_data = f.read()
+        try:
+            os.remove(ruta)
+        except Exception:
+            pass
+        
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{nombre_pdf}"'
+        return response
+    else:
+        flash(' Error al generar el catálogo PDF.', 'error')
+        return redirect(url_for('catalogo'))
 
 
 # =============================================================================
