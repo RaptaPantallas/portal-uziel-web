@@ -62,12 +62,12 @@ X_DETALLE       = 120         # X donde empieza el texto del producto
 ANCHO_LABEL     = 85          # Ancho de las etiquetas (SKU:, Marca:, etc.)
 
 # Colores RGB (valores 0.0 – 1.0)
-COLOR_AZUL_EMP   = (0.18, 0.27, 0.86)   # Encabezado empresa  (#2e45db)
+COLOR_AZUL_EMP   = (0.06, 0.09, 0.16)   # Encabezado empresa  (Slate-900 oscuro)
 COLOR_NEGRO      = (0.17, 0.22, 0.31)   # Texto general       (#2c3850)
 COLOR_VERDE_PREC = (0.15, 0.68, 0.37)   # Precio destacado    (#27ae5f)
 COLOR_GRIS       = (0.55, 0.60, 0.68)   # Textos secundarios
 COLOR_LINEA      = (0.87, 0.88, 0.93)   # Líneas divisorias   (#dde1ec)
-COLOR_BADGE_BG   = (0.23, 0.36, 0.86)   # Fondo badge SKU     (#3b5bdb)
+COLOR_BADGE_BG   = (0.05, 0.65, 0.91)   # Fondo badge SKU     (Sky-500)
 
 # Fuentes
 FUENTE_EMP  = 22
@@ -100,19 +100,29 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
     c.setFillColorRGB(*COLOR_AZUL_EMP)
     c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
 
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", FUENTE_EMP)
-    c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+    logo_path = os.path.join("almacen_activos", "Logo", "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(logo_path, MARGEN_X, alto - 70, width=130, height=45, preserveAspectRatio=True, mask="auto")
+        except Exception:
+            c.setFillColorRGB(1, 1, 1)
+            c.setFont("Helvetica-Bold", FUENTE_EMP)
+            c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+    else:
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", FUENTE_EMP)
+        c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+
     c.setFont("Helvetica", 10)
     c.setFillColorRGB(0.8, 0.88, 1.0)
-    c.drawString(MARGEN_X, alto - 72, "Catálogo de Productos — Ficha Técnica")
+    c.drawRightString(ancho - MARGEN_X, alto - 52, "Catálogo de Productos — Ficha Técnica")
 
     # ---- Badge de SKU ----
     badge_x = ancho - 160
     badge_y = alto - 68
     c.setFillColorRGB(1, 1, 1)
     c.roundRect(badge_x, badge_y, 130, 22, 5, fill=True, stroke=False)
-    c.setFillColorRGB(*COLOR_AZUL_EMP)
+    c.setFillColorRGB(*COLOR_BADGE_BG)
     c.setFont("Helvetica-Bold", 10)
     c.drawCentredString(badge_x + 65, badge_y + 7, f"SKU: {sku}")
 
@@ -292,18 +302,28 @@ def _dibujar_encabezado_catalogo(c, ancho: float, alto: float, primera: bool = F
     c.setFillColorRGB(*COLOR_AZUL_EMP)
     c.rect(0, alto - 90, ancho, 90, fill=True, stroke=False)
 
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", FUENTE_EMP)
-    c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+    logo_path = os.path.join("almacen_activos", "Logo", "logo.png")
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(logo_path, MARGEN_X, alto - 70, width=130, height=45, preserveAspectRatio=True, mask="auto")
+        except Exception:
+            c.setFillColorRGB(1, 1, 1)
+            c.setFont("Helvetica-Bold", FUENTE_EMP)
+            c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+    else:
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", FUENTE_EMP)
+        c.drawString(MARGEN_X, alto - 52, NOMBRE_EMPRESA)
+
     c.setFont("Helvetica", 10)
     c.setFillColorRGB(0.8, 0.88, 1.0)
-    c.drawString(MARGEN_X, alto - 72, "Catálogo de Productos — Listado General")
+    c.drawRightString(ancho - MARGEN_X, alto - 45, "Catálogo de Productos — Listado General")
 
     # Subtítulo
     if primera:
         c.setFont("Helvetica-Oblique", 8)
         c.setFillColorRGB(0.85, 0.90, 1.0)
-        c.drawString(MARGEN_X, alto - 82, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        c.drawRightString(ancho - MARGEN_X, alto - 60, f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
     # Sin encabezados de columna (cada fila ya tiene sus etiquetas)
 

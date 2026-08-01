@@ -66,6 +66,7 @@
                     <th>SKU</th>
                     <th>Nombre</th>
                     <th>Marca</th>
+                    <th>Disponibilidad</th>
                     <th>Precio</th>
                     <th>Acciones</th>
                 </tr>
@@ -80,13 +81,22 @@
                     data-descripcion="{{ producto[2] }}"
                     data-marca="{{ producto[3] }}"
                     data-compatibilidad="{{ producto[4] }}"
-                    data-precio="{{ producto[5] }}">
+                    data-precio="{{ producto[5] }}"
+                    data-existencia="{{ producto[7] }}">
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
                         <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">{{ producto[1] }}</a>
                     </td>
                     <td>{{ producto[3] }}</td>
+                    <td>
+                        {% if producto[7] > 0 %}
+                            <span style="color:var(--primary);font-weight:bold;">Disponible</span> 
+                            <small style="color:var(--text-muted);">({{ producto[7] }} und)</small>
+                        {% else %}
+                            <span style="color:#e74c3c;font-weight:bold;">Agotado</span>
+                        {% endif %}
+                    </td>
                     <td class="precio">${{ producto[5] }}</td>
                     <td>
                         <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Galería</a>
