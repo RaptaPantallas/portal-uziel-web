@@ -111,18 +111,14 @@
                 {% endif %}
             </td>
             <td>
-                {% if usuperadmin %}
-                    <span style="color:var(--text-muted);font-size:12px;font-style:italic;">Acceso total</span>
+                {% for mod_nombre, mod_label in MODULOS_ACCIONES.items() %}
+                    {% if usuperadmin or mod_nombre in upermisos.mods %}
+                        {% set accs = modulos_acciones.get(mod_nombre, []) if usuperadmin else upermisos.mods[mod_nombre] %}
+                        <span class="badge badge-primary" title="{{ ', '.join(accs) }}">{{ mod_label }}</span>
+                    {% endif %}
                 {% else %}
-                    {% for mod_nombre, mod_label in MODULOS_ACCIONES.items() %}
-                        {% if mod_nombre in upermisos.mods %}
-                            {% set accs = upermisos.mods[mod_nombre] %}
-                            <span class="badge badge-primary" title="{{ ', '.join(accs) }}">{{ mod_label }}</span>
-                        {% endif %}
-                    {% else %}
-                        <span style="color:var(--text-muted);font-size:12px;">Sin acceso</span>
-                    {% endfor %}
-                {% endif %}
+                    <span style="color:var(--text-muted);font-size:12px;">Sin acceso</span>
+                {% endfor %}
             </td>
             <td>
                 <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -452,7 +448,9 @@
         const modMap = permisosFromStr(permisosStr);
         document.querySelectorAll('.edit-perm').forEach(cb => {
             const parts = cb.value.split(':');
-            if (parts.length === 2 && modMap[parts[0]] && modMap[parts[0]].includes(parts[1])) {
+            if (superadmin === 'true') {
+                cb.checked = true;
+            } else if (parts.length === 2 && modMap[parts[0]] && modMap[parts[0]].includes(parts[1])) {
                 cb.checked = true;
             } else {
                 cb.checked = false;
