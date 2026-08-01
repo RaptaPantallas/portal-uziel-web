@@ -44,6 +44,8 @@
                 <tr>
                     <th>SKU</th>
                     <th>Nombre</th>
+                    <th>Material</th>
+                    <th>Máquina</th>
                     <th>Tiempo (min)</th>
                     <th>Peso (g)</th>
                     <th>Costo Mat.</th>
@@ -59,6 +61,8 @@
                 <tr>
                     <td><span class="sku-badge">{{ p[1] }}</span></td>
                     <td><strong>{{ p[2] }}</strong></td>
+                    <td><span style="font-size:12px;color:var(--text-muted);">{{ p[11] if p|length > 11 and p[11] else '—' }}</span></td>
+                    <td><span style="font-size:12px;color:var(--text-muted);">{{ p[12] if p|length > 12 and p[12] else '—' }}</span></td>
                     <td>{{ p[3] }} min</td>
                     <td>{{ p[4] }} g</td>
                     <td>${{ p[5] }}</td>
@@ -104,6 +108,32 @@
                 <div class="form-group calc-col" style="flex:2;">
                     <label>Nombre de la Pieza</label>
                     <input type="text" name="nombre" class="form-control" placeholder="Ej: Engranaje Helicoidal" required autocomplete="off">
+                </div>
+            </div>
+
+            <div class="calc-row">
+                <div class="form-group calc-col">
+                    <label>Tipo de Filamento</label>
+                    <input type="text" name="tipo_filamento" class="form-control" list="lista-filamentos" placeholder="Ej: PLA, PETG..." autocomplete="off">
+                    <datalist id="lista-filamentos">
+                        <option value="PLA">
+                        <option value="PETG">
+                        <option value="ABS">
+                        <option value="TPU">
+                        <option value="ASA">
+                    </datalist>
+                </div>
+                <div class="form-group calc-col">
+                    <label>Máquina Usada</label>
+                    <input type="text" name="maquina_usada" class="form-control" list="lista-maquinas" placeholder="Ej: Ender 3, Bambu..." autocomplete="off">
+                    <datalist id="lista-maquinas">
+                        <option value="Creality Ender 3">
+                        <option value="Bambu Lab X1C">
+                        <option value="Bambu Lab P1P">
+                        <option value="Prusa MK3S">
+                        <option value="Prusa MK4">
+                        <option value="Anycubic Kobra">
+                    </datalist>
                 </div>
             </div>
 

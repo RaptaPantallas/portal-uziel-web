@@ -120,14 +120,14 @@ class ConexionBD:
         self.actualizar_esquema_clientes()
         self._asegurar_columna_es_principal()
         self._descubrir_pk_activos()
-        self._sembrar_usuario_supervisor()
+        # self._sembrar_usuario_supervisor() # Comentado a petición del usuario para evitar que reaparezca
         self._asegurar_columna_fecha_creacion_activos()
         self._asegurar_columna_preview_webp()
         self._asegurar_columnas_seguridad()
         self._migrar_password_hash()
         self._migrar_permisos_granulares()
         self._crear_columna_superadmin()
-        self._sembrar_usuario_jefe()
+        # self._sembrar_usuario_jefe() # Comentado a petición del usuario para evitar que reaparezca
         self._crear_tabla_config_correo()
         self._crear_indices_rendimiento()
         self.inicializar_alianzas()
@@ -4253,9 +4253,14 @@ El equipo de Importadora Uziel C.A."""
                     cantidad INTEGER DEFAULT 1,
                     costo_unitario NUMERIC(15,2) DEFAULT 0.00,
                     costo_total NUMERIC(15,2) DEFAULT 0.00,
-                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    tipo_filamento VARCHAR(100) DEFAULT '',
+                    maquina_usada VARCHAR(100) DEFAULT ''
                 )
             """)
+            # Por si la tabla ya existía, añadir las nuevas columnas de forma segura
+            cursor.execute("ALTER TABLE impresion3d_inventario ADD COLUMN IF NOT EXISTS tipo_filamento VARCHAR(100) DEFAULT ''")
+            cursor.execute("ALTER TABLE impresion3d_inventario ADD COLUMN IF NOT EXISTS maquina_usada VARCHAR(100) DEFAULT ''")
             conexion.commit()
             print(" [BD] Tabla impresion3d_inventario verificada.")
         except Error as e:
@@ -4274,7 +4279,8 @@ El equipo de Importadora Uziel C.A."""
             cursor = conexion.cursor()
             cursor.execute("""
                 SELECT id, sku, nombre, tiempo_impresion_minutos, peso_gramos, 
-                       costo_material, gasto_impresion, cantidad, costo_unitario, costo_total, fecha_creacion
+                       costo_material, gasto_impresion, cantidad, costo_unitario, costo_total, fecha_creacion,
+                       tipo_filamento, maquina_usada
                 FROM impresion3d_inventario
                 ORDER BY fecha_creacion DESC
             """)
@@ -4287,7 +4293,8 @@ El equipo de Importadora Uziel C.A."""
         return resultado
 
     def agregar_pieza_3d(self, sku, nombre, tiempo_impresion_minutos, peso_gramos, 
-                         costo_material, gasto_impresion, cantidad, costo_unitario, costo_total) -> bool:
+                         costo_material, gasto_impresion, cantidad, costo_unitario, costo_total,
+                         tipo_filamento='', maquina_usada='') -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
@@ -4295,9 +4302,11 @@ El equipo de Importadora Uziel C.A."""
             cursor = conexion.cursor()
             cursor.execute("""
                 INSERT INTO impresion3d_inventario (sku, nombre, tiempo_impresion_minutos, peso_gramos, 
-                                                    costo_material, gasto_impresion, cantidad, costo_unitario, costo_total)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (sku, nombre, tiempo_impresion_minutos, peso_gramos, costo_material, gasto_impresion, cantidad, costo_unitario, costo_total))
+                                                    costo_material, gasto_impresion, cantidad, costo_unitario, costo_total,
+                                                    tipo_filamento, maquina_usada)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (sku, nombre, tiempo_impresion_minutos, peso_gramos, costo_material, 
+                  gasto_impresion, cantidad, costo_unitario, costo_total, tipo_filamento, maquina_usada))
             conexion.commit()
             return True
         except Error as e:

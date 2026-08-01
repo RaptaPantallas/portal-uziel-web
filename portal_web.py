@@ -2982,12 +2982,17 @@ def agregar_pieza_3d():
         gasto_impresion = float(request.form.get('gasto_impresion', 0.0))
         costo_unitario = float(request.form.get('costo_unitario', 0.0))
         costo_total = float(request.form.get('costo_total', 0.0))
+        
+        tipo_filamento = request.form.get('tipo_filamento', '').strip()
+        maquina_usada = request.form.get('maquina_usada', '').strip()
     except ValueError:
         flash('Error en los valores numéricos.', 'error')
         return redirect(url_for('impresion_3d'))
     
     if sku and nombre:
-        exito = bd.agregar_pieza_3d(sku, nombre, tiempo_min, peso_gramos, costo_material, gasto_impresion, cantidad, costo_unitario, costo_total)
+        exito = bd.agregar_pieza_3d(sku, nombre, tiempo_min, peso_gramos, costo_material, 
+                                    gasto_impresion, cantidad, costo_unitario, costo_total,
+                                    tipo_filamento, maquina_usada)
         if exito:
             flash(f' Pieza {nombre} guardada exitosamente.', 'exito')
         else:
