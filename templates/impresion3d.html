@@ -114,13 +114,13 @@
             <div class="calc-row">
                 <div class="form-group calc-col">
                     <label>Tipo de Filamento</label>
-                    <input type="text" name="tipo_filamento" class="form-control" list="lista-filamentos" placeholder="Ej: PLA, PETG..." autocomplete="off">
+                    <input type="text" name="tipo_filamento" id="tipo_filamento_input" class="form-control" list="lista-filamentos" placeholder="Ej: PLA, PETG..." autocomplete="off" oninput="alCambiarFilamento()">
                     <datalist id="lista-filamentos">
-                        <option value="PLA">
-                        <option value="PETG">
-                        <option value="ABS">
-                        <option value="TPU">
-                        <option value="ASA">
+                        <option value="PLA ($18.00/Kg)">
+                        <option value="PETG ($20.00/Kg)">
+                        <option value="ABS ($15.00/Kg)">
+                        <option value="TPU ($28.00/Kg)">
+                        <option value="ASA ($25.00/Kg)">
                     </datalist>
                 </div>
                 <div class="form-group calc-col">
@@ -208,6 +208,15 @@
     document.querySelectorAll('.modal-overlay').forEach(bg => {
         bg.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
     });
+
+    function alCambiarFilamento() {
+        var inputVal = document.getElementById('tipo_filamento_input').value;
+        var match = inputVal.match(/\(\$([0-9.]+)\/Kg\)/);
+        if (match) {
+            document.getElementById('c_kg').value = parseFloat(match[1]).toFixed(2);
+            calcularCostos();
+        }
+    }
 
     function calcularCostos() {
         const t_min = parseFloat(document.getElementById('t_min').value) || 0;
