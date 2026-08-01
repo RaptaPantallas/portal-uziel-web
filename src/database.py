@@ -91,6 +91,7 @@ class ConexionBD:
         "cotizaciones": ["ver", "crear"],
         "usuarios":    ["gestionar"],
         "gastos":      ["ver", "gestionar"],
+        "impresion3d": ["ver", "editar", "agregar", "eliminar"],
     }
 
     # Pool estático de conexiones (se inicializa una sola vez para toda la aplicación)
@@ -132,6 +133,7 @@ class ConexionBD:
         self.inicializar_alianzas()
         self.inicializar_categorias()
         self._crear_tabla_auditoria_acciones()
+        self._crear_tabla_impresion3d()
 
     def conectar(self):
         """Establece y retorna una conexión activa a PostgreSQL desde el pool, envuelta para liberación segura."""
@@ -4228,3 +4230,97 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
         return resultado
+
+    # =============================================================================
+    # MÓDULO: IMPRESIÓN 3D
+    # =============================================================================
+    def _crear_tabla_impresion3d(self):
+        """Crea la tabla de inventario de piezas 3D si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS impresion3d_inventario (
+                    id SERIAL PRIMARY KEY,
+                    sku VARCHAR(50) UNIQUE NOT NULL,
+                    nombre VARCHAR(255) NOT NULL,
+                    tiempo_impresion_minutos INTEGER DEFAULT 0,
+                    peso_gramos NUMERIC(10,2) DEFAULT 0.00,
+                    costo_material NUMERIC(15,2) DEFAULT 0.00,
+                    gasto_impresion NUMERIC(15,2) DEFAULT 0.00,
+                    cantidad INTEGER DEFAULT 1,
+                    costo_unitario NUMERIC(15,2) DEFAULT 0.00,
+                    costo_total NUMERIC(15,2) DEFAULT 0.00,
+                    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conexion.commit()
+            print(" [BD] Tabla impresion3d_inventario verificada.")
+        except Error as e:
+            print(f" [BD] Error al crear tabla impresion3d_inventario: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_piezas_3d(self) -> list:
+        conexion = self.conectar()
+        resultado = []
+        if not conexion: return resultado
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                SELECT id, sku, nombre, tiempo_impresion_minutos, peso_gramos, 
+                       costo_material, gasto_impresion, cantidad, costo_unitario, costo_total, fecha_creacion
+                FROM impresion3d_inventario
+                ORDER BY fecha_creacion DESC
+            """)
+            resultado = cursor.fetchall()
+        except Error as e:
+            print(f" [BD] Error al obtener piezas 3D: {e}")
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+        return resultado
+
+    def agregar_pieza_3d(self, sku, nombre, tiempo_impresion_minutos, peso_gramos, 
+                         costo_material, gasto_impresion, cantidad, costo_unitario, costo_total) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO impresion3d_inventario (sku, nombre, tiempo_impresion_minutos, peso_gramos, 
+                                                    costo_material, gasto_impresion, cantidad, costo_unitario, costo_total)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (sku, nombre, tiempo_impresion_minutos, peso_gramos, costo_material, gasto_impresion, cantidad, costo_unitario, costo_total))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al agregar pieza 3D: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def eliminar_pieza_3d(self, id_pieza) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM impresion3d_inventario WHERE id = %s", (id_pieza,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al eliminar pieza 3D: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()

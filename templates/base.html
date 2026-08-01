@@ -800,6 +800,11 @@
             <i data-lucide="dollar-sign" class="nav-icon"></i> <span>Gastos Marketing</span>
         </a>
         {% endif %}
+        {% if puede_ver('impresion3d') %}
+        <a href="{{ url_for('impresion_3d') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('impresion_3d') %}active{% endif %}">
+            <i data-lucide="printer" class="nav-icon"></i> <span>Impresión 3D</span>
+        </a>
+        {% endif %}
         <hr class="nav-divider">
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
             <i data-lucide="pie-chart" class="nav-icon"></i> <span>Reportes</span>

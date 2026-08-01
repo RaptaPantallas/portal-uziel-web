@@ -2951,6 +2951,67 @@ def exportar_gastos_excel():
 
 
 # =============================================================================
+# MÓDULO: IMPRESIÓN 3D
+# =============================================================================
+
+@app.route('/impresion3d')
+@login_requerido
+def impresion_3d():
+    if not _puede("impresion3d", "ver"):
+        flash(' No tienes permiso para ver el inventario 3D.', 'error')
+        return redirect(url_for('inicio'))
+    piezas = bd.obtener_piezas_3d()
+    return render_template('impresion3d.html', piezas=piezas)
+
+@app.route('/impresion3d/agregar', methods=['POST'])
+@login_requerido
+def agregar_pieza_3d():
+    if not _puede("impresion3d", "agregar"):
+        flash(' No tienes permiso para agregar piezas 3D.', 'error')
+        return redirect(url_for('impresion_3d'))
+    
+    sku = request.form.get('sku', '').strip()
+    nombre = request.form.get('nombre', '').strip()
+    
+    try:
+        tiempo_min = int(request.form.get('tiempo_minutos', 0))
+        peso_gramos = float(request.form.get('peso_gramos', 0.0))
+        cantidad = int(request.form.get('cantidad', 1))
+        
+        costo_material = float(request.form.get('costo_material', 0.0))
+        gasto_impresion = float(request.form.get('gasto_impresion', 0.0))
+        costo_unitario = float(request.form.get('costo_unitario', 0.0))
+        costo_total = float(request.form.get('costo_total', 0.0))
+    except ValueError:
+        flash('Error en los valores numéricos.', 'error')
+        return redirect(url_for('impresion_3d'))
+    
+    if sku and nombre:
+        exito = bd.agregar_pieza_3d(sku, nombre, tiempo_min, peso_gramos, costo_material, gasto_impresion, cantidad, costo_unitario, costo_total)
+        if exito:
+            flash(f' Pieza {nombre} guardada exitosamente.', 'exito')
+        else:
+            flash(' Error al guardar. Verifica que el SKU no esté duplicado.', 'error')
+    else:
+        flash(' Datos incompletos.', 'error')
+        
+    return redirect(url_for('impresion_3d'))
+
+@app.route('/impresion3d/eliminar/<int:id_pieza>', methods=['POST'])
+@login_requerido
+def eliminar_pieza_3d(id_pieza):
+    if not _puede("impresion3d", "eliminar"):
+        flash(' No tienes permiso para eliminar piezas 3D.', 'error')
+        return redirect(url_for('impresion_3d'))
+    
+    exito = bd.eliminar_pieza_3d(id_pieza)
+    if exito:
+        flash(' Pieza eliminada exitosamente.', 'exito')
+    else:
+        flash(' Error al eliminar la pieza.', 'error')
+    return redirect(url_for('impresion_3d'))
+
+# =============================================================================
 # PUNTO DE ENTRADA (solo para desarrollo local)
 # =============================================================================
 

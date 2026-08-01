@@ -1,0 +1,209 @@
+{% extends base_template %}
+{% block title %}Inventario Impresión 3D — Importadora Uziel C.A.{% endblock %}
+{% block head_extra %}
+<style>
+    .kpi-card { background: var(--primary-light); border: 1px solid var(--primary-subtle); padding: 15px; border-radius: var(--radius); text-align: center; }
+    .kpi-card h3 { margin: 0 0 5px 0; font-size: 12px; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-card p { margin: 0; font-size: 24px; font-weight: 700; color: var(--primary); }
+    .calc-row { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; }
+    .calc-col { flex: 1; min-width: 150px; }
+    .calc-result { background: #f8fafc; padding: 15px; border-radius: var(--radius); border: 1px solid var(--border); margin-top: 15px; }
+    .calc-result div { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+    .calc-result div:last-child { margin-bottom: 0; font-weight: 700; font-size: 16px; border-top: 1px solid var(--border); padding-top: 8px; color: var(--primary); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1> Inventario Impresión 3D</h1>
+        <p class="subtitulo">Gestión de piezas, tiempos y cálculo de costos de impresión</p>
+    </div>
+    {% if puede('impresion3d', 'agregar') %}
+    <div>
+        <button class="btn btn-primary" onclick="abrirModalNuevo()">+ Nueva Pieza</button>
+    </div>
+    {% endif %}
+</div>
+
+{% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+        {% for categoria, msg in mensajes %}
+            <div class="flash-msg {% if categoria in ('exito','success') %}flash-exito{% else %}flash-error{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Listado de Piezas</div>
+    </div>
+    {% if piezas %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Nombre</th>
+                    <th>Tiempo (min)</th>
+                    <th>Peso (g)</th>
+                    <th>Costo Mat.</th>
+                    <th>Gasto Imp.</th>
+                    <th>Costo Unit.</th>
+                    <th>Cant.</th>
+                    <th>Costo Total</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in piezas %}
+                <tr>
+                    <td><span class="sku-badge">{{ p[1] }}</span></td>
+                    <td><strong>{{ p[2] }}</strong></td>
+                    <td>{{ p[3] }} min</td>
+                    <td>{{ p[4] }} g</td>
+                    <td>${{ p[5] }}</td>
+                    <td>${{ p[6] }}</td>
+                    <td><span class="precio">${{ p[8] }}</span></td>
+                    <td>{{ p[7] }}</td>
+                    <td><strong style="color:var(--primary);">${{ p[9] }}</strong></td>
+                    <td>
+                        <div class="actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+                            {% if puede('impresion3d', 'eliminar') %}
+                            <form method="POST" action="{{ url_for('eliminar_pieza_3d', id_pieza=p[0]) }}" onsubmit="return confirm('¿Eliminar esta pieza?');" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body" style="text-align:center;color:var(--text-muted);padding:40px;">
+        <i data-lucide="printer" style="width:48px;height:48px;opacity:0.5;margin-bottom:10px;"></i>
+        <p>No hay piezas registradas en el inventario 3D.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- MODAL: NUEVA PIEZA -->
+<div class="modal-overlay" id="modalNuevo">
+    <div class="modal" style="max-width:600px;">
+        <div class="modal-header">
+            <span> Calculadora y Registro de Pieza 3D</span>
+            <button class="modal-close" onclick="cerrarModal('modalNuevo')" type="button">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('agregar_pieza_3d') }}" id="formCalculadora">
+            <div class="calc-row">
+                <div class="form-group calc-col">
+                    <label>SKU (Código único)</label>
+                    <input type="text" name="sku" class="form-control" placeholder="Ej: ENG-001" required autocomplete="off">
+                </div>
+                <div class="form-group calc-col" style="flex:2;">
+                    <label>Nombre de la Pieza</label>
+                    <input type="text" name="nombre" class="form-control" placeholder="Ej: Engranaje Helicoidal" required autocomplete="off">
+                </div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:5px;">Parámetros de Cálculo</div>
+            
+            <div class="calc-row">
+                <div class="form-group calc-col">
+                    <label>Tiempo de Impresión <small>(Minutos)</small></label>
+                    <input type="number" name="tiempo_minutos" id="t_min" class="form-control" value="0" min="0" oninput="calcularCostos()" required>
+                </div>
+                <div class="form-group calc-col">
+                    <label>Gasto Impresión/Hora ($)</label>
+                    <input type="number" step="0.01" id="c_hora" class="form-control" value="0.50" min="0" oninput="calcularCostos()" required>
+                </div>
+            </div>
+
+            <div class="calc-row">
+                <div class="form-group calc-col">
+                    <label>Peso de la pieza <small>(Gramos)</small></label>
+                    <input type="number" step="0.1" name="peso_gramos" id="p_gramos" class="form-control" value="0" min="0" oninput="calcularCostos()" required>
+                </div>
+                <div class="form-group calc-col">
+                    <label>Precio Filamento/Kg ($)</label>
+                    <input type="number" step="0.01" id="c_kg" class="form-control" value="20.00" min="0" oninput="calcularCostos()" required>
+                </div>
+            </div>
+
+            <div class="calc-row">
+                <div class="form-group calc-col">
+                    <label>Cantidad (Piezas iguales)</label>
+                    <input type="number" name="cantidad" id="cant" class="form-control" value="1" min="1" oninput="calcularCostos()" required>
+                </div>
+            </div>
+
+            <!-- Campos ocultos para enviar al backend los costos calculados -->
+            <input type="hidden" name="costo_material" id="h_costo_material" value="0">
+            <input type="hidden" name="gasto_impresion" id="h_gasto_impresion" value="0">
+            <input type="hidden" name="costo_unitario" id="h_costo_unitario" value="0">
+            <input type="hidden" name="costo_total" id="h_costo_total" value="0">
+
+            <div class="calc-result">
+                <div><span>Costo de Material (por pieza):</span> <span id="lbl_costo_mat">$0.00</span></div>
+                <div><span>Gasto de Impresión (luz/desgaste):</span> <span id="lbl_gasto_imp">$0.00</span></div>
+                <div><span>Costo Unitario Total:</span> <span id="lbl_costo_unit">$0.00</span></div>
+                <div><span>COSTO TOTAL (Todas las piezas):</span> <span id="lbl_costo_total">$0.00</span></div>
+            </div>
+
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalNuevo')">Cancelar</button>
+                <button type="submit" class="btn btn-primary"><i data-lucide="save" style="width:16px;"></i> Guardar Pieza(s)</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+    
+    function abrirModalNuevo() {
+        document.getElementById('modalNuevo').classList.add('open');
+        calcularCostos();
+    }
+    
+    function cerrarModal(id) { 
+        document.getElementById(id).classList.remove('open'); 
+    }
+    
+    document.querySelectorAll('.modal-overlay').forEach(bg => {
+        bg.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+    });
+
+    function calcularCostos() {
+        const t_min = parseFloat(document.getElementById('t_min').value) || 0;
+        const c_hora = parseFloat(document.getElementById('c_hora').value) || 0;
+        const p_gramos = parseFloat(document.getElementById('p_gramos').value) || 0;
+        const c_kg = parseFloat(document.getElementById('c_kg').value) || 0;
+        const cant = parseInt(document.getElementById('cant').value) || 1;
+
+        // Fórmulas
+        const costo_material = (p_gramos / 1000) * c_kg;
+        const horas = t_min / 60;
+        const gasto_impresion = horas * c_hora;
+        const costo_unitario = costo_material + gasto_impresion;
+        const costo_total = costo_unitario * cant;
+
+        // Actualizar UI
+        document.getElementById('lbl_costo_mat').innerText = '$' + costo_material.toFixed(2);
+        document.getElementById('lbl_gasto_imp').innerText = '$' + gasto_impresion.toFixed(2);
+        document.getElementById('lbl_costo_unit').innerText = '$' + costo_unitario.toFixed(2);
+        document.getElementById('lbl_costo_total').innerText = '$' + costo_total.toFixed(2);
+
+        // Actualizar hidden inputs
+        document.getElementById('h_costo_material').value = costo_material.toFixed(2);
+        document.getElementById('h_gasto_impresion').value = gasto_impresion.toFixed(2);
+        document.getElementById('h_costo_unitario').value = costo_unitario.toFixed(2);
+        document.getElementById('h_costo_total').value = costo_total.toFixed(2);
+    }
+</script>
+{% endblock %}
