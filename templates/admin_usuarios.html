@@ -112,8 +112,8 @@
             </td>
             <td>
                 {% for mod_nombre, mod_label in MODULOS_ACCIONES.items() %}
-                    {% if usuperadmin or mod_nombre in upermisos.mods %}
-                        {% set accs = modulos_acciones.get(mod_nombre, []) if usuperadmin else upermisos.mods[mod_nombre] %}
+                    {% if mod_nombre in upermisos.mods %}
+                        {% set accs = upermisos.mods[mod_nombre] %}
                         <span class="badge badge-primary" title="{{ ', '.join(accs) }}">{{ mod_label }}</span>
                     {% endif %}
                 {% else %}
@@ -448,9 +448,7 @@
         const modMap = permisosFromStr(permisosStr);
         document.querySelectorAll('.edit-perm').forEach(cb => {
             const parts = cb.value.split(':');
-            if (superadmin === 'true') {
-                cb.checked = true;
-            } else if (parts.length === 2 && modMap[parts[0]] && modMap[parts[0]].includes(parts[1])) {
+            if (parts.length === 2 && modMap[parts[0]] && modMap[parts[0]].includes(parts[1])) {
                 cb.checked = true;
             } else {
                 cb.checked = false;
