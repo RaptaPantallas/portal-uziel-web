@@ -4055,8 +4055,8 @@ El equipo de Importadora Uziel C.A."""
                 FROM gastos_publicidad gp
                 LEFT JOIN aliados al ON gp.aliado_id = al.id
                 LEFT JOIN clientes cl ON gp.cliente_rif = cl.rif
-                WHERE EXTRACT(MONTH FROM gp.fecha_creacion) = %s AND EXTRACT(YEAR FROM gp.fecha_creacion) = %s
-                ORDER BY gp.fecha_creacion DESC
+                WHERE EXTRACT(MONTH FROM CAST(gp.fecha_inicio AS DATE)) = %s AND EXTRACT(YEAR FROM CAST(gp.fecha_inicio AS DATE)) = %s
+                ORDER BY gp.fecha_inicio DESC
             """, (mes, anio))
             resultado = cursor.fetchall()
         except Error as e:
