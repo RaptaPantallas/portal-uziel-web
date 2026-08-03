@@ -589,9 +589,13 @@
                             <option value="Otro">Otro</option>
                         </select>
                     </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
+                    <div class="form-group">
                         <label>Referencia / Nota (Opcional)</label>
                         <input type="text" name="referencia" class="form-control" placeholder="Ej: Ref 1234, Abono inicial">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha del Pago (Opcional)</label>
+                        <input type="datetime-local" name="fecha_pago" id="pago-fecha" class="form-control">
                     </div>
                 </div>
                 <div style="text-align: right; margin-top: 12px; margin-bottom: 24px;">
@@ -606,6 +610,49 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL: EDITAR PAGO -->
+<div class="modal-overlay" id="modalEditarPago">
+    <div class="modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <span>Editar Pago</span>
+            <button class="modal-close" onclick="cerrarModalEditarPago()">✕</button>
+        </div>
+        <div style="padding: 16px;">
+            <form id="form-editar-pago" method="POST" action="">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label>Monto ($) <span class="req">*</span></label>
+                        <input type="number" name="monto" id="edit-pago-monto" class="form-control" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago <span class="req">*</span></label>
+                        <select name="metodo_pago" id="edit-pago-metodo" class="form-control" required>
+                            <option value="Pago Móvil">Pago Móvil</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Zelle / Binace">Zelle / Binance</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Referencia</label>
+                        <input type="text" name="referencia" id="edit-pago-ref" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Pago</label>
+                        <input type="datetime-local" name="fecha_pago" id="edit-pago-fecha" class="form-control">
+                    </div>
+                </div>
+                <div style="text-align: right; margin-top: 16px;">
+                    <button type="button" class="btn btn-ghost" onclick="cerrarModalEditarPago()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -638,13 +685,18 @@
                     container.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px; margin: 20px 0;">No hay pagos registrados aún.</p>';
                     return;
                 }
-                let html = '<table style="width:100%; font-size:13px;"><thead><tr><th style="padding:6px; border-bottom:1px solid var(--border);">Fecha</th><th style="padding:6px; border-bottom:1px solid var(--border);">Método</th><th style="padding:6px; border-bottom:1px solid var(--border);">Referencia</th><th style="padding:6px; border-bottom:1px solid var(--border); text-align:right;">Monto</th></tr></thead><tbody>';
+                let html = '<table style="width:100%; font-size:13px;"><thead><tr><th style="padding:6px; border-bottom:1px solid var(--border);">Fecha</th><th style="padding:6px; border-bottom:1px solid var(--border);">Método</th><th style="padding:6px; border-bottom:1px solid var(--border);">Referencia</th><th style="padding:6px; border-bottom:1px solid var(--border); text-align:right;">Monto</th><th style="padding:6px; border-bottom:1px solid var(--border); text-align:center;">Acción</th></tr></thead><tbody>';
                 pagos.forEach(p => {
+                    let fechaParaInput = p.fecha_pago ? p.fecha_pago.replace(' ', 'T') : '';
+                    let refLimpia = p.referencia ? p.referencia.replace(/'/g, "\\'") : '';
                     html += `<tr>
                         <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.fecha_pago}</td>
                         <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.metodo_pago}</td>
                         <td style="padding:6px; border-bottom:1px solid #f1f5f9;">${p.referencia || '—'}</td>
                         <td style="padding:6px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:600; color:#10b981;">$${p.monto.toFixed(2)}</td>
+                        <td style="padding:6px; border-bottom:1px solid #f1f5f9; text-align:center;">
+                            <button class="btn btn-sm" style="padding:2px 6px; font-size:11px;" onclick="abrirModalEditarPago(${p.id}, ${p.monto}, '${p.metodo_pago}', '${refLimpia}', '${fechaParaInput}')">✏️</button>
+                        </td>
                     </tr>`;
                 });
                 html += '</tbody></table>';
@@ -655,6 +707,31 @@
             });
 
         document.getElementById('modalPagos').classList.add('open');
+    }
+
+    function abrirModalEditarPago(id, monto, metodo, ref, fecha) {
+        document.getElementById('form-editar-pago').action = `/gastos/lona/pago/${id}/editar`;
+        document.getElementById('edit-pago-monto').value = monto;
+        
+        let selectMetodo = document.getElementById('edit-pago-metodo');
+        let options = Array.from(selectMetodo.options);
+        let found = options.some(opt => opt.value === metodo);
+        if(found) selectMetodo.value = metodo;
+        else selectMetodo.value = 'Otro';
+        
+        document.getElementById('edit-pago-ref').value = ref;
+        
+        if (fecha && fecha.length >= 16) {
+             document.getElementById('edit-pago-fecha').value = fecha.substring(0, 16);
+        } else {
+             document.getElementById('edit-pago-fecha').value = '';
+        }
+        
+        document.getElementById('modalEditarPago').classList.add('open');
+    }
+
+    function cerrarModalEditarPago() {
+        document.getElementById('modalEditarPago').classList.remove('open');
     }
 
     function cerrarModalPagos() {

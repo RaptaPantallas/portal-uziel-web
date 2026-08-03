@@ -4148,20 +4148,54 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
         return resultado
 
-    def registrar_pago_lona(self, gasto_lona_id: int, monto: float, metodo_pago: str, referencia: str, registrado_por: str) -> bool:
+    def registrar_pago_lona(self, gasto_lona_id: int, monto: float, metodo_pago: str, referencia: str, registrado_por: str, fecha_pago: str = None) -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute("""
-                INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por))
+            if fecha_pago:
+                cursor.execute("""
+                    INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por, fecha_pago)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por, fecha_pago))
+            else:
+                cursor.execute("""
+                    INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por))
             conexion.commit()
             return True
         except Error as e:
             print(f" [Gastos] Error al registrar pago para lona #{gasto_lona_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def actualizar_pago_lona(self, pago_id: int, monto: float, metodo_pago: str, referencia: str, fecha_pago: str) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            if fecha_pago:
+                cursor.execute("""
+                    UPDATE pagos_lonas 
+                    SET monto = %s, metodo_pago = %s, referencia = %s, fecha_pago = %s
+                    WHERE id = %s
+                """, (monto, metodo_pago, referencia, fecha_pago, pago_id))
+            else:
+                cursor.execute("""
+                    UPDATE pagos_lonas 
+                    SET monto = %s, metodo_pago = %s, referencia = %s
+                    WHERE id = %s
+                """, (monto, metodo_pago, referencia, pago_id))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al actualizar pago #{pago_id}: {e}")
             conexion.rollback()
             return False
         finally:

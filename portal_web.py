@@ -2414,13 +2414,16 @@ def nuevo_pago_lona(gasto_id):
     monto = request.form.get('monto', 0, type=float)
     metodo = request.form.get('metodo_pago', '').strip()
     referencia = request.form.get('referencia', '').strip()
+    fecha_pago = request.form.get('fecha_pago', '').strip()
+    if not fecha_pago:
+        fecha_pago = None
 
     if monto <= 0 or not metodo:
         flash(' Monto y método de pago son obligatorios.', 'error')
         return redirect(url_for('ver_gastos'))
 
     creado_por = session.get('usuario')
-    ok = bd.registrar_pago_lona(gasto_id, monto, metodo, referencia, creado_por)
+    ok = bd.registrar_pago_lona(gasto_id, monto, metodo, referencia, creado_por, fecha_pago)
 
     if ok:
         flash(f' Abono de ${monto:.2f} registrado correctamente.', 'exito')
@@ -2447,10 +2450,39 @@ def ver_pagos_lona(gasto_id):
             'monto': p[1],
             'metodo_pago': p[2],
             'referencia': p[3],
-            'fecha_pago': p[4].strftime('%Y-%m-%d %H:%M') if p[4] else '',
+            'fecha_pago': p[4].strftime('%Y-%m-%d %H:%M') if hasattr(p[4], 'strftime') else str(p[4]) if p[4] else '',
             'registrado_por': p[5]
         })
     return jsonify(lista)
+
+@app.route('/gastos/lona/pago/<int:pago_id>/editar', methods=['POST'])
+@login_requerido
+def editar_pago_lona(pago_id):
+    """Edita un pago registrado de lona."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar pagos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    monto = request.form.get('monto', 0, type=float)
+    metodo = request.form.get('metodo_pago', '').strip()
+    referencia = request.form.get('referencia', '').strip()
+    fecha_pago = request.form.get('fecha_pago', '').strip()
+    
+    if not fecha_pago:
+        fecha_pago = None
+
+    if monto <= 0 or not metodo:
+        flash(' Monto y método de pago son obligatorios.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    ok = bd.actualizar_pago_lona(pago_id, monto, metodo, referencia, fecha_pago)
+    
+    if ok:
+        flash(' Pago actualizado correctamente.', 'exito')
+    else:
+        flash(' Error al actualizar el pago.', 'error')
+        
+    return redirect(request.referrer or url_for('ver_gastos'))
 
 
 @app.route('/gastos/exportar')
