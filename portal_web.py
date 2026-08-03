@@ -689,7 +689,32 @@ def servir_activo(nombre_archivo):
         return redirect(url_for('login'))
 
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-    return send_from_directory(carpeta_activos, nombre_archivo)
+    ruta_completa = os.path.join(carpeta_activos, nombre_archivo)
+    
+    if os.path.exists(ruta_completa):
+        return send_from_directory(carpeta_activos, nombre_archivo)
+    else:
+        # Fallback to database preview if disk file is missing (e.g. ephemeral Render storage)
+        from flask import Response
+        conexion = bd.conectar()
+        if conexion:
+            cursor = None
+            try:
+                cursor = conexion.cursor()
+                cursor.execute(
+                    "SELECT preview_webp FROM activos_digitales WHERE REPLACE(ruta_archivo, '\\', '/') = %s LIMIT 1",
+                    (nombre_normalizado,)
+                )
+                resultado = cursor.fetchone()
+                if resultado and resultado[0]:
+                    return Response(resultado[0], mimetype='image/webp')
+            except Exception as e:
+                print(f"Error serving fallback image: {e}")
+            finally:
+                if cursor: cursor.close()
+                conexion.close()
+                
+        return "Not found", 404
 
 
 @app.route('/subir_imagen/<sku>', methods=['POST'])
