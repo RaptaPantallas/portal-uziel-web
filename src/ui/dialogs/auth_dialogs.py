@@ -27,6 +27,8 @@ class LoginDialog(QDialog):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 #0f172a, stop:1 #1e293b);
             }
+            QFrame#card { background: transparent; border: none; }
+            QLabel { color: #f8fafc; }
         """)
 
         self.bd = bd or ConexionBD()

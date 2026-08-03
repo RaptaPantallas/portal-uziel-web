@@ -389,7 +389,7 @@ QMessageBox QLabel {
     color: #1e293b;
     font-size: 14px;
 }
-QMessageBox QPushButton {
+QMessageBox QPushButton, QDialogButtonBox QPushButton {
     background-color: #0ea5e9;
     color: white;
     border-radius: 6px;
@@ -400,7 +400,7 @@ QMessageBox QPushButton {
     border: none;
     min-width: 60px;
 }
-QMessageBox QPushButton:hover {
+QMessageBox QPushButton:hover, QDialogButtonBox QPushButton:hover {
     background-color: #0284c7;
 }
 
@@ -443,4 +443,13 @@ QInputDialog QPushButton:hover {
 QDialog {
     background-color: #ffffff;
     color: #1e293b;
+}
+
+/* --- Tooltips --- */
+QToolTip {
+    background: #ffffff;
+    color: #000000;
+    border: 1px solid #334155;
+    padding: 6px;
+    font-size: 13px;
 }
