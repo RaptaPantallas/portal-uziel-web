@@ -625,7 +625,7 @@ def api_galeria_buscar():
             'nombre': r[1],
             'total_fotos': r[3],
             'id_activo': r[4] if len(r) > 4 else None,
-            'url': url_for('detalle_producto', sku=r[0])
+            'url': url_for('detalle_producto', sku=r[0], origen='galeria')
         })
     return {'results': items, 'total': len(items), 'es_reciente': es_reciente}
 
@@ -666,12 +666,15 @@ def detalle_producto(sku):
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
+    
+    origen = request.args.get('origen', 'catalogo')
 
     return render_template(
         'producto_detalle.html',
         producto=producto,
         galeria=galeria,
-        total_fotos=total_fotos
+        total_fotos=total_fotos,
+        origen=origen
     )
 
 
