@@ -1172,6 +1172,9 @@ document.addEventListener('submit', function(e) {
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
+            if (typeof inicializarLimitesFechas === 'function') {
+                inicializarLimitesFechas();
+            }
         }
         hideProgress();
         window.scrollTo({ top: 0 });
@@ -1256,6 +1259,62 @@ function confirmarEliminarProducto(sku) {
     document.body.appendChild(form);
     form.submit();
 }
+
+// --- VALIDACIÓN GLOBAL DE FECHAS (INICIO <= FIN) ---
+document.body.addEventListener('change', function(e) {
+    if (e.target && e.target.type === 'date') {
+        validarFechasGlobal(e.target);
+    }
+});
+
+function validarFechasGlobal(target) {
+    let startInput = null;
+    let endInput = null;
+
+    if (target.id === 'input-desde') {
+        startInput = target;
+        endInput = document.getElementById('input-hasta');
+    } else if (target.id === 'input-hasta') {
+        endInput = target;
+        startInput = document.getElementById('input-desde');
+    } else if (target.id === 'pub-fecha-ini') {
+        startInput = target;
+        endInput = document.getElementById('pub-fecha-fin');
+    } else if (target.id === 'pub-fecha-fin') {
+        endInput = target;
+        startInput = document.getElementById('pub-fecha-ini');
+    } else if (target.name === 'fecha_inicio' || target.name === 'desde') {
+        startInput = target;
+        const form = target.closest('form');
+        if (form) endInput = form.querySelector('input[name="fecha_fin"], input[name="hasta"]');
+    } else if (target.name === 'fecha_fin' || target.name === 'hasta') {
+        endInput = target;
+        const form = target.closest('form');
+        if (form) startInput = form.querySelector('input[name="fecha_inicio"], input[name="desde"]');
+    }
+
+    if (startInput && endInput) {
+        if (startInput.value && endInput.value) {
+            if (startInput.value > endInput.value) {
+                alert('Advertencia: La fecha de inicio no puede ser mayor a la fecha de fin.');
+                target.value = ''; 
+                if (typeof calcularTotalPublicidad === 'function' && (target.id === 'pub-fecha-ini' || target.id === 'pub-fecha-fin')) {
+                    calcularTotalPublicidad();
+                }
+            }
+        }
+        if (startInput.value) endInput.min = startInput.value;
+        if (endInput.value) startInput.max = endInput.value;
+    }
+}
+
+// Inicializar límites en la carga inicial y al cargar contenido SPA
+function inicializarLimitesFechas() {
+    document.querySelectorAll('input[type="date"]').forEach(input => validarFechasGlobal(input));
+}
+
+document.addEventListener('DOMContentLoaded', inicializarLimitesFechas);
+
 </script>
 
 {% block scripts %}{% endblock %}
