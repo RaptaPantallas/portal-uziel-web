@@ -303,6 +303,7 @@
                         <th style="text-align: right;">P. Unitario</th>
                         <th style="text-align: right;">Total</th>
                         <th>Destinatario (¿Para quién?)</th>
+                        <th>Proveedor</th>
                         <th>Comentario</th>
                         <th>Por</th>
                         {% if puede('gastos', 'gestionar') %}
@@ -352,6 +353,9 @@
                             {% else %}
                                 {{ g[4] }}
                             {% endif %}
+                        </td>
+                        <td style="font-size: 13px;">
+                            {{ g[14] if g[14] else '—' }}
                         </td>
                         <td style="max-width: 200px; white-space: normal; font-size: 13px; color: var(--text-muted);">
                             {{ g[6] if g[6] else '—' }}
@@ -504,6 +508,10 @@
                 <div class="form-group">
                     <label for="lon-precio" id="lbl-lon-precio">Precio / Costo Unitario ($) <span class="req">*</span></label>
                     <input type="number" name="precio" id="lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" required oninput="calcularTotalLona()">
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="lon-proveedor" id="lbl-lon-proveedor">Proveedor / Empresa <span class="req">*</span></label>
+                    <input type="text" name="proveedor" id="lon-proveedor" class="form-control" placeholder="Ej: Infinitua, Verartes, Independiente..." required>
                 </div>
                 <div class="form-group" style="grid-column: 1 / -1;">
                     <label for="lon-total">Monto Total ($)</label>

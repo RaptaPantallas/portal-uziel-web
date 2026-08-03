@@ -3988,6 +3988,7 @@ El equipo de Importadora Uziel C.A."""
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS categoria VARCHAR(100) DEFAULT 'Otros'")
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS aliado_id INTEGER REFERENCES aliados(id) ON DELETE SET NULL")
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS cantidad INTEGER DEFAULT 1")
+                cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS proveedor VARCHAR(255) DEFAULT ''")
                 conexion.commit()
             except Exception as e:
                 print(f" [Gastos] Error al agregar nuevas columnas a gastos_lonas: {e}")
@@ -4104,16 +4105,16 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id=None, cantidad=1):
+    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id=None, cantidad=1, proveedor=''):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad))
+                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad, proveedor)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad, proveedor))
             conexion.commit()
             return True
         except Error as e:
@@ -4134,7 +4135,8 @@ El equipo de Importadora Uziel C.A."""
             cursor.execute("""
                 SELECT gl.id, gl.herramienta, gl.uso, gl.precio, gl.para_quien, gl.total, gl.comentario, gl.creado_por, gl.fecha_creacion,
                        gl.categoria, gl.aliado_id, gl.cantidad, a.nombre_aliado,
-                       COALESCE((SELECT SUM(monto) FROM pagos_lonas WHERE gasto_lona_id = gl.id), 0) AS total_pagado
+                       COALESCE((SELECT SUM(monto) FROM pagos_lonas WHERE gasto_lona_id = gl.id), 0) AS total_pagado,
+                       gl.proveedor
                 FROM gastos_lonas gl
                 LEFT JOIN aliados a ON gl.aliado_id = a.id
                 WHERE EXTRACT(MONTH FROM gl.fecha_creacion) = %s AND EXTRACT(YEAR FROM gl.fecha_creacion) = %s

@@ -2328,6 +2328,7 @@ def nuevo_gasto_lona():
     categoria = request.form.get('categoria', 'Otros').strip()
     aliado_rif = request.form.get('aliado_rif', '').strip()
     cantidad = request.form.get('cantidad', 1, type=int)
+    proveedor = request.form.get('proveedor', '').strip()
 
     # Validaciones y asignaciones según categoría
     if not herramienta or not uso:
@@ -2371,7 +2372,8 @@ def nuevo_gasto_lona():
         creado_por=creado_por,
         categoria=categoria,
         aliado_id=aliado_id,
-        cantidad=cantidad
+        cantidad=cantidad,
+        proveedor=proveedor
     )
 
     if ok:
@@ -2792,7 +2794,7 @@ def exportar_gastos_excel():
     headers_lon = [
         "Categoría", "Concepto / Material", "Uso / Propósito", "Cantidad", 
         "Precio Unitario ($)", "Total ($)", "Destinatario", "Aliado Comercial", 
-        "Comentario / Notas", "Creado Por"
+        "Proveedor", "Comentario / Notas", "Creado Por"
     ]
 
     for c_num, header in enumerate(headers_lon, 1):
@@ -2815,11 +2817,12 @@ def exportar_gastos_excel():
         nom_aliado = g[12] if len(g) > 12 and g[12] else ""
         coment_val = g[6] if g[6] else ""
         por_val = g[7].capitalize() if g[7] else ""
+        proveedor_val = g[14] if len(g) > 14 and g[14] else ""
 
         row_data = [
             cat_val, herr_val, uso_val, cant_val, 
             prec_val, tot_val, dest_val, nom_aliado, 
-            coment_val, por_val
+            proveedor_val, coment_val, por_val
         ]
 
         for col_num, val in enumerate(row_data, 1):
