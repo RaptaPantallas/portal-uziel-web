@@ -202,11 +202,18 @@
 {% endblock %}
 {% block scripts %}
 <script>
-    function abrirModalProducto() { document.getElementById('modalNuevoProducto').classList.add('open'); }
-    function cerrarModalProducto() { document.getElementById('modalNuevoProducto').classList.remove('open'); }
-    document.getElementById('modalNuevoProducto').addEventListener('click', function(e) {
-        if (e.target === this) cerrarModalProducto();
-    });
+    function abrirModalProducto() { const m = document.getElementById('modalNuevoProducto'); if (m) m.classList.add('open'); }
+    function cerrarModalProducto() { const m = document.getElementById('modalNuevoProducto'); if (m) m.classList.remove('open'); }
+    window.abrirModalProducto = abrirModalProducto;
+    window.abrirModalNuevoProducto = abrirModalProducto;
+    window.cerrarModalProducto = cerrarModalProducto;
+    window.cerrarModalNuevoProducto = cerrarModalProducto;
+
+    if (document.getElementById('modalNuevoProducto')) {
+        document.getElementById('modalNuevoProducto').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalProducto();
+        });
+    }
 
     function verDetalle(el) {
         const tr = el.closest('tr');

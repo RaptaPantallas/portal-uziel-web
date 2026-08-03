@@ -22,8 +22,18 @@
 <div class="form-card">
     <form method="POST">
         <div class="form-group">
-            <label>RIF del Cliente</label>
-            <input type="text" name="rif" class="form-control" placeholder="Ej: J-12345678-9" required>
+            <label>RIF / Cédula</label>
+            <div style="display: flex; gap: 8px;">
+                <select id="rif-prefix" class="form-control" style="width: 80px;" onchange="updateRif()">
+                    <option value="V-">V-</option>
+                    <option value="E-">E-</option>
+                    <option value="J-">J-</option>
+                    <option value="G-">G-</option>
+                    <option value="P-">P-</option>
+                </select>
+                <input type="text" id="rif-number" class="form-control" placeholder="Ej: 123456789" required pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateRif()">
+                <input type="hidden" name="rif" id="rif-hidden">
+            </div>
         </div>
         <div class="form-group">
             <label>Nombre de la Empresa</label>
@@ -31,7 +41,18 @@
         </div>
         <div class="form-group">
             <label>Teléfono</label>
-            <input type="text" name="telefono" class="form-control" placeholder="Ej: 0414-1234567" required>
+            <div style="display: flex; gap: 8px;">
+                <select id="tel-prefix" class="form-control" style="width: 100px;" onchange="updateTel()">
+                    <option value="0414-">0414</option>
+                    <option value="0424-">0424</option>
+                    <option value="0416-">0416</option>
+                    <option value="0426-">0426</option>
+                    <option value="0412-">0412</option>
+                    <option value="0212-">0212</option>
+                </select>
+                <input type="text" id="tel-number" class="form-control" placeholder="Ej: 1234567" required pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateTel()">
+                <input type="hidden" name="telefono" id="tel-hidden">
+            </div>
         </div>
         <div class="form-group">
             <label>Correo Electrónico <span class="opcional">(opcional)</span></label>
@@ -149,6 +170,20 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         actualizarPaisForm("Venezuela");
+        updateRif();
+        updateTel();
     });
+
+    function updateRif() {
+        const prefix = document.getElementById("rif-prefix").value;
+        const number = document.getElementById("rif-number").value;
+        document.getElementById("rif-hidden").value = number ? prefix + number : "";
+    }
+
+    function updateTel() {
+        const prefix = document.getElementById("tel-prefix").value;
+        const number = document.getElementById("tel-number").value;
+        document.getElementById("tel-hidden").value = number ? prefix + number : "";
+    }
 </script>
 {% endblock %}

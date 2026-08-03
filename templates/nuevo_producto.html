@@ -40,6 +40,23 @@
             <label>Precio Corporativo ($)</label>
             <input type="number" step="0.01" name="precio" class="form-control" placeholder="0.00" required>
         </div>
+        <div class="form-group">
+            <label>Categoría</label>
+            <select name="categoria" class="form-control" required>
+                <option value="Accesorios">Accesorios</option>
+                <option value="Frenos">Frenos</option>
+                <option value="Motor">Motor</option>
+                <option value="Refrigeración">Refrigeración</option>
+                <option value="Sin Categoría" selected>Sin Categoría</option>
+                <option value="Sistema Eléctrico">Sistema Eléctrico</option>
+                <option value="Suspensión">Suspensión</option>
+                <option value="Tren Delantero">Tren Delantero</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Existencia (Stock)</label>
+            <input type="number" name="existencia" class="form-control" value="0" min="0" required>
+        </div>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary"> Guardar Producto</button>
             <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">Cancelar</a>

@@ -102,9 +102,9 @@ QComboBox {
     background: #ffffff;
     border: 1.5px solid #cbd5e1;
     border-radius: 8px;
-    padding: 8px 36px 8px 12px;
+    padding: 6px 28px 6px 10px;
     color: #1e293b;
-    font-size: 14px;
+    font-size: 13px;
     min-height: 22px;
 }
 QComboBox:hover {
@@ -123,7 +123,7 @@ QComboBox:on {
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 32px;
+    width: 24px;
     border: none;
     border-left: 1.5px solid #cbd5e1;
     background: #f1f5f9;

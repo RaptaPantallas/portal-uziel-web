@@ -969,6 +969,10 @@ function actualizarSidebar(url) {
 // --- CARGAR CONTENIDO POR AJAX ---
 function cargarContenido(url, pushState = true) {
     showProgress();
+    // Cerrar cualquier modal que haya quedado abierto antes de navegar
+    document.querySelectorAll('.modal-overlay.open, .modal-notif.open').forEach(m => m.classList.remove('open'));
+    document.body.style.overflow = '';
+    
     const contentArea = document.getElementById('spa-content-area');
     if (contentArea) {
         contentArea.style.opacity = '0.6';

@@ -230,7 +230,21 @@
             </div>
             <div class="form-group">
                 <label>Teléfono</label>
-                <input type="text" name="telefono" class="form-control" value="{{ cliente[2] or '' }}" placeholder="(+58) 412-000-0000">
+                <div style="display: flex; gap: 8px;">
+                    {% set pfx = cliente[2][:5] if cliente[2] and cliente[2]|length >= 5 else '' %}
+                    <select id="edit-tel-prefix" class="form-control" style="width: 100px;" onchange="updateEditTel()">
+                        <option value="0414-" {% if pfx == '0414-' %}selected{% endif %}>0414</option>
+                        <option value="0424-" {% if pfx == '0424-' %}selected{% endif %}>0424</option>
+                        <option value="0416-" {% if pfx == '0416-' %}selected{% endif %}>0416</option>
+                        <option value="0426-" {% if pfx == '0426-' %}selected{% endif %}>0426</option>
+                        <option value="0412-" {% if pfx == '0412-' %}selected{% endif %}>0412</option>
+                        <option value="0212-" {% if pfx == '0212-' %}selected{% endif %}>0212</option>
+                        <option value="" {% if pfx not in ['0414-','0424-','0416-','0426-','0412-','0212-'] %}selected{% endif %}>Otro</option>
+                    </select>
+                    {% set num = cliente[2][5:] if pfx in ['0414-','0424-','0416-','0426-','0412-','0212-'] else cliente[2] %}
+                    <input type="text" id="edit-tel-number" class="form-control" value="{{ num or '' }}" placeholder="Ej: 1234567" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateEditTel()">
+                    <input type="hidden" name="telefono" id="edit-tel-hidden" value="{{ cliente[2] or '' }}">
+                </div>
             </div>
             <div class="form-group">
                 <label>Correo electrónico</label>
@@ -364,5 +378,11 @@ function actualizarPaisEdit(pais) {
 
 // Initial call
 actualizarPaisEdit(currentCountry === "Venezuela" ? "Venezuela" : "Otro");
+
+function updateEditTel() {
+    const prefix = document.getElementById("edit-tel-prefix").value;
+    const number = document.getElementById("edit-tel-number").value;
+    document.getElementById("edit-tel-hidden").value = number ? prefix + number : "";
+}
 </script>
 {% endblock %}

@@ -380,8 +380,18 @@
         </div>
         <form method="POST" action="{{ url_for('nuevo_cliente') }}">
             <div class="form-group">
-                <label>RIF del Cliente</label>
-                <input type="text" name="rif" class="form-control" placeholder="Ej: J-12345678-9" required>
+                <label>RIF / Cédula</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="modal-rif-prefix" class="form-control" style="width: 80px;" onchange="updateModalRif()">
+                        <option value="V-">V-</option>
+                        <option value="E-">E-</option>
+                        <option value="J-">J-</option>
+                        <option value="G-">G-</option>
+                        <option value="P-">P-</option>
+                    </select>
+                    <input type="text" id="modal-rif-number" class="form-control" placeholder="Ej: 123456789" required pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateModalRif()">
+                    <input type="hidden" name="rif" id="modal-rif-hidden">
+                </div>
             </div>
             <div class="form-group">
                 <label>Nombre de la Empresa</label>
@@ -389,7 +399,18 @@
             </div>
             <div class="form-group">
                 <label>Teléfono</label>
-                <input type="text" name="telefono" class="form-control" placeholder="Ej: 0414-1234567" required>
+                <div style="display: flex; gap: 8px;">
+                    <select id="modal-tel-prefix" class="form-control" style="width: 100px;" onchange="updateModalTel()">
+                        <option value="0414-">0414</option>
+                        <option value="0424-">0424</option>
+                        <option value="0416-">0416</option>
+                        <option value="0426-">0426</option>
+                        <option value="0412-">0412</option>
+                        <option value="0212-">0212</option>
+                    </select>
+                    <input type="text" id="modal-tel-number" class="form-control" placeholder="Ej: 1234567" required pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateModalTel()">
+                    <input type="hidden" name="telefono" id="modal-tel-hidden">
+                </div>
             </div>
             <div class="form-group">
                 <label>Correo Electrónico <span style="font-size:11px;color:var(--text-light);font-weight:400;">(opcional)</span></label>
@@ -507,27 +528,43 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         actualizarPaisModal("Venezuela");
+        updateModalRif();
+        updateModalTel();
     });
 
-    // Enlazar también a la función de abrir modal para reiniciar el estado
-    if (typeof originalAbrirModalNuevoCliente === 'undefined') {
-        var originalAbrirModalNuevoCliente = abrirModalNuevoCliente;
-        abrirModalNuevoCliente = function() {
-            originalAbrirModalNuevoCliente();
-            const pSel = document.getElementById("modal-pais-select");
-            if (pSel) {
-                pSel.value = "Venezuela";
-                actualizarPaisModal("Venezuela");
-            }
-        };
+    function updateModalRif() {
+        const prefix = document.getElementById("modal-rif-prefix").value;
+        const number = document.getElementById("modal-rif-number").value;
+        document.getElementById("modal-rif-hidden").value = number ? prefix + number : "";
     }
 
-    function abrirModalTarea() { document.getElementById('modalTarea').classList.add('open'); }
-    function cerrarModalTarea() { document.getElementById('modalTarea').classList.remove('open'); }
-    function abrirModalNuevoProducto() { document.getElementById('modalNuevoProducto').classList.add('open'); }
-    function cerrarModalNuevoProducto() { document.getElementById('modalNuevoProducto').classList.remove('open'); }
-    function abrirModalNuevoCliente() { document.getElementById('modalNuevoCliente').classList.add('open'); }
-    function cerrarModalNuevoCliente() { document.getElementById('modalNuevoCliente').classList.remove('open'); }
+    function updateModalTel() {
+        const prefix = document.getElementById("modal-tel-prefix").value;
+        const number = document.getElementById("modal-tel-number").value;
+        document.getElementById("modal-tel-hidden").value = number ? prefix + number : "";
+    }
+
+    function abrirModalTarea() { const m = document.getElementById('modalTarea'); if (m) m.classList.add('open'); }
+    function cerrarModalTarea() { const m = document.getElementById('modalTarea'); if (m) m.classList.remove('open'); }
+    function abrirModalNuevoProducto() { const m = document.getElementById('modalNuevoProducto'); if (m) m.classList.add('open'); }
+    function cerrarModalNuevoProducto() { const m = document.getElementById('modalNuevoProducto'); if (m) m.classList.remove('open'); }
+    function abrirModalNuevoCliente() {
+        const m = document.getElementById('modalNuevoCliente');
+        if (m) m.classList.add('open');
+        const pSel = document.getElementById("modal-pais-select");
+        if (pSel) {
+            pSel.value = "Venezuela";
+            actualizarPaisModal("Venezuela");
+        }
+    }
+    function cerrarModalNuevoCliente() { const m = document.getElementById('modalNuevoCliente'); if (m) m.classList.remove('open'); }
+    
+    window.abrirModalCliente = abrirModalNuevoCliente;
+    window.cerrarModalCliente = cerrarModalNuevoCliente;
+    window.abrirModalProducto = abrirModalNuevoProducto;
+    window.cerrarModalProducto = cerrarModalNuevoProducto;
+    window.abrirModalTarea = abrirModalTarea;
+    window.cerrarModalTarea = cerrarModalTarea;
     function actualizarNombreClienteT(select) {
         const opcion = select.options[select.selectedIndex];
         document.getElementById('t_cliente_nombre').value = opcion.getAttribute('data-nombre') || '';
