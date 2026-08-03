@@ -4215,11 +4215,11 @@ El equipo de Importadora Uziel C.A."""
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                SELECT DISTINCT EXTRACT(MONTH FROM fecha_creacion)::int AS mes, EXTRACT(YEAR FROM fecha_creacion)::int AS anio
+                SELECT DISTINCT EXTRACT(MONTH FROM CAST(fecha AS DATE))::int AS mes, EXTRACT(YEAR FROM CAST(fecha AS DATE))::int AS anio
                 FROM (
-                    SELECT fecha_creacion FROM gastos_publicidad
+                    SELECT fecha_inicio AS fecha FROM gastos_publicidad
                     UNION
-                    SELECT fecha_creacion FROM gastos_lonas
+                    SELECT fecha_creacion AS fecha FROM gastos_lonas
                 ) AS combinados
                 ORDER BY anio DESC, mes DESC
             """)
