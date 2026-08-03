@@ -805,10 +805,12 @@
             <i data-lucide="printer" class="nav-icon"></i> <span>Impresión 3D</span>
         </a>
         {% endif %}
+        {% if puede_ver('reportes') %}
         <hr class="nav-divider">
         <a href="{{ url_for('reportes') }}" class="nav-item {% if request.endpoint == 'reportes' %}active{% endif %}">
             <i data-lucide="pie-chart" class="nav-icon"></i> <span>Reportes</span>
         </a>
+        {% endif %}
         {% if puede('usuarios', 'gestionar') %}
         <a href="{{ url_for('admin_usuarios') }}" class="nav-item {% if request.endpoint == 'admin_usuarios' %}active{% endif %}">
             <i data-lucide="shield" class="nav-icon"></i> <span>Usuarios</span>

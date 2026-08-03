@@ -57,12 +57,16 @@
     <form action="{{ url_for('generar_pdf') }}" method="POST">
         <div class="card-header">
             <span class="card-title">Inventario completo</span>
+            {% if puede('reportes', 'ver') %}
             <button type="submit" class="btn btn-primary"> Generar PDF Seleccionados</button>
+            {% endif %}
         </div>
         <div class="table-responsive"><table id="tabla-productos">
             <thead>
                 <tr>
+                    {% if puede('reportes', 'ver') %}
                     <th style="width:40px;">PDF</th>
+                    {% endif %}
                     <th>SKU</th>
                     <th>Nombre</th>
                     <th>Marca</th>
@@ -83,7 +87,9 @@
                     data-compatibilidad="{{ producto[4] }}"
                     data-precio="{{ producto[5] }}"
                     data-existencia="{{ producto[7] }}">
+                    {% if puede('reportes', 'ver') %}
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ sku }}"></td>
+                    {% endif %}
                     <td><span class="sku-badge">{{ sku }}</span></td>
                     <td>
                         <a href="{{ url_for('detalle_producto', sku=sku) }}" class="link-detalle">{{ producto[1] }}</a>

@@ -119,13 +119,17 @@
                     <button type="button" class="btn btn-primary" onclick="abrirModalNuevoProducto()">+ Nuevo Producto</button>
                     <button type="button" class="btn btn-primary" onclick="abrirModalNuevoCliente()">+ Nuevo Cliente</button>
                 {% endif %}
+                {% if puede('reportes', 'ver') %}
                 <button type="submit" class="btn btn-primary"> Generar PDF</button>
+                {% endif %}
             </div>
         </div>
         <div class="table-responsive"><table>
             <thead>
                 <tr>
+                    {% if puede('reportes', 'ver') %}
                     <th style="width:40px;">PDF</th>
+                    {% endif %}
                     <th>SKU</th>
                     <th>Nombre</th>
                     <th>Marca</th>
@@ -136,7 +140,9 @@
             <tbody>
                 {% for producto in productos %}
                 <tr>
+                    {% if puede('reportes', 'ver') %}
                     <td><input type="checkbox" name="skus_seleccionados" value="{{ producto[0] }}"></td>
+                    {% endif %}
                     <td><span class="sku-badge">{{ producto[0] }}</span></td>
                     <td>{{ producto[1] }}</td>
                     <td>{{ producto[3] }}</td>

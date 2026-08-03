@@ -1427,6 +1427,10 @@ def eliminar_tarea(tarea_id):
 @app.route('/generar_pdf', methods=['POST'])
 @login_requerido
 def generar_pdf():
+    if not _puede("reportes", "ver"):
+        flash(' No tienes permisos para generar reportes en PDF.', 'error')
+        return redirect(url_for('inicio'))
+
     skus_seleccionados = request.form.getlist('skus_seleccionados')
 
     if not skus_seleccionados:
@@ -1471,6 +1475,10 @@ def generar_pdf():
 @login_requerido
 def reportes():
     """Página de reportes con selector de fechas personalizado."""
+    if not _puede("reportes", "ver"):
+        flash(' No tienes permisos para ver los reportes.', 'error')
+        return redirect(url_for('inicio'))
+
     from datetime import datetime, timedelta
 
     hoy = datetime.now()
