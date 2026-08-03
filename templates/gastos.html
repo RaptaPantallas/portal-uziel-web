@@ -363,6 +363,8 @@
                         <td><span style="font-size: 12px; color: var(--text-muted);">{{ g[7].capitalize() }}</span></td>
                         {% if puede('gastos', 'gestionar') %}
                         <td style="text-align: center;">
+                            
+                            <button type="button" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 11px; margin-bottom: 4px; background:#eab308; border-color:#eab308;" onclick="abrirModalEditarLona({{ g[0] }}, '{{ g[9] }}', '{{ g[10] }}', '{{ g[4]|escape }}', '{{ g[1]|escape }}', '{{ g[2]|escape }}', {{ g[11] }}, {{ g[3] }}, '{{ g[14]|escape }}', {{ g[5] }}, '{{ g[6]|escape }}')">✏️</button>
                             <button type="button" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 11px; margin-bottom: 4px;" onclick="abrirModalPagos({{ g[0] }}, '{{ g[1] }}', {{ g[5] }}, {{ g[13] }})">Pagos</button>
                             <form action="{{ url_for('eliminar_gasto_lona', gasto_id=g[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Seguro que deseas eliminar este gasto?');">
                                 <button type="submit" class="btn btn-danger btn-sm" style="padding: 4px 8px; font-size: 11px;">✕</button>
@@ -525,6 +527,78 @@
             <div class="form-actions">
                 <button type="button" class="btn btn-ghost" onclick="cerrarModalLona()">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="background:#10b981; border-color:#10b981;">Registrar Gasto</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- MODAL: EDITAR GASTO FÍSICO / DEPARTAMENTO -->
+<div class="modal-overlay" id="modalEditarLona">
+    <div class="modal wide">
+        <div class="modal-header">
+            <span>Editar Gasto de Insumo / Servicio</span>
+            <button class="modal-close" onclick="cerrarModalEditarLona()">✕</button>
+        </div>
+        <form action="" id="form-editar-lona" method="POST">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="edit-lon-categoria">Categoría del Gasto <span class="req">*</span></label>
+                    <select name="categoria" id="edit-lon-categoria" class="form-control" required onchange="toggleEditLonaCampos(this.value)">
+                        <option value="Material para Aliado" selected>Material para Aliado Comercial</option>
+                        <option value="Servicio del Departamento">Servicio del Departamento (Ej. Teléfono, Envío)</option>
+                        <option value="Implementos / Herramientas">Implementos / Herramientas del Departamento</option>
+                        <option value="Material POP / Promocional">Material POP / Promocional (Ej. Gorras, Llaveros)</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                
+                <!-- Campos dinámicos de destinatario -->
+                <div class="form-group" id="edit-form-group-aliado">
+                    <label for="edit-lon-aliado-id">Seleccionar Cliente/Aliado <span class="req">*</span></label>
+                    <select name="aliado_rif" id="edit-lon-aliado-id" class="form-control" required>
+                        <option value="">— Seleccionar Cliente —</option>
+                        {% for cliente in lista_clientes %}
+                        <option value="{{ cliente[0] }}">{{ cliente[1] }} ({{ cliente[0] }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group" id="edit-form-group-para-quien" style="display:none;">
+                    <label for="edit-lon-para-quien" id="lbl-edit-lon-para-quien">¿Para quién? (Destinatario) <span class="req">*</span></label>
+                    <input type="text" name="para_quien" id="edit-lon-para-quien" class="form-control" placeholder="Ej: Departamento de Marketing, Línea Oficina">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-lon-herramienta" id="lbl-edit-lon-herramienta">Concepto / Material / Insumo <span class="req">*</span></label>
+                    <input type="text" name="herramienta" id="edit-lon-herramienta" class="form-control" placeholder="Ej: Gorras bordadas, Lona publicitaria, Pago Plan Movil" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-lon-uso" id="lbl-edit-lon-uso">Uso / Propósito <span class="req">*</span></label>
+                    <input type="text" name="uso" id="edit-lon-uso" class="form-control" placeholder="Ej: Campaña marca, Letrero exterior, Línea de contacto" required>
+                </div>
+                <div class="form-group" id="edit-form-group-cantidad">
+                    <label for="edit-lon-cantidad" id="lbl-edit-lon-cantidad">Cantidad <span class="req">*</span></label>
+                    <input type="number" name="cantidad" id="edit-lon-cantidad" class="form-control" value="1" min="1" step="1" required oninput="calcularTotalEditLona()">
+                </div>
+                <div class="form-group">
+                    <label for="edit-lon-precio" id="lbl-edit-lon-precio">Precio / Costo Unitario ($) <span class="req">*</span></label>
+                    <input type="number" name="precio" id="edit-lon-precio" class="form-control" min="0" step="0.01" placeholder="Ej: 45.00" required oninput="calcularTotalEditLona()">
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="edit-lon-proveedor" id="lbl-edit-lon-proveedor">Proveedor / Empresa <span class="req">*</span></label>
+                    <input type="text" name="proveedor" id="edit-lon-proveedor" class="form-control" placeholder="Ej: Infinitua, Verartes, Independiente..." required>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="edit-lon-total">Monto Total ($)</label>
+                    <input type="number" name="total" id="edit-lon-total" class="form-control" min="0" step="0.01" placeholder="Se calcula automáticamente o ingresa valor fijo">
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label for="edit-lon-comentario">Comentario / Notas adicionales</label>
+                    <textarea name="comentario" id="edit-lon-comentario" class="form-control" placeholder="Detalla especificaciones técnicas, medidas, colores..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalEditarLona()">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="background:#10b981; border-color:#10b981;">Guardar Cambios</button>
             </div>
         </form>
     </div>
@@ -902,6 +976,101 @@
         
         // Recalcular total con el nuevo estado de los campos
         calcularTotalLona();
+    }
+
+    
+    function cerrarModalEditarLona() {
+        const modal = document.getElementById('modalEditarLona');
+        if (modal) modal.classList.remove('open');
+    }
+
+    function abrirModalEditarLona(id, categoria, aliado_id, para_quien, herramienta, uso, cantidad, precio, proveedor, total, comentario) {
+        document.getElementById('form-editar-lona').action = `/gastos/lona/${id}/editar`;
+        
+        document.getElementById('edit-lon-categoria').value = categoria;
+        toggleEditLonaCampos(categoria);
+
+        if (aliado_id && aliado_id !== 'None') {
+            document.getElementById('edit-lon-aliado-id').value = aliado_id;
+        } else {
+            document.getElementById('edit-lon-aliado-id').value = '';
+        }
+        
+        document.getElementById('edit-lon-para-quien').value = para_quien !== 'None' ? para_quien : '';
+        document.getElementById('edit-lon-herramienta').value = herramienta;
+        document.getElementById('edit-lon-uso').value = uso;
+        document.getElementById('edit-lon-cantidad').value = cantidad !== 'None' ? cantidad : 1;
+        document.getElementById('edit-lon-precio').value = precio;
+        document.getElementById('edit-lon-proveedor').value = proveedor !== 'None' ? proveedor : '';
+        document.getElementById('edit-lon-total').value = total;
+        document.getElementById('edit-lon-comentario').value = comentario !== 'None' ? comentario : '';
+
+        const modal = document.getElementById('modalEditarLona');
+        if (modal) modal.classList.add('open');
+    }
+
+    function calcularTotalEditLona() {
+        const cantidad = parseInt(document.getElementById('edit-lon-cantidad').value) || 1;
+        const precio = parseFloat(document.getElementById('edit-lon-precio').value) || 0;
+        const totalInput = document.getElementById('edit-lon-total');
+        
+        if (precio > 0) {
+            totalInput.value = (cantidad * precio).toFixed(2);
+        } else {
+            totalInput.value = '';
+        }
+    }
+
+    function toggleEditLonaCampos(categoria) {
+        const grpAliado = document.getElementById('edit-form-group-aliado');
+        const grpParaQuien = document.getElementById('edit-form-group-para-quien');
+        const grpCantidad = document.getElementById('edit-form-group-cantidad');
+        const selectAliado = document.getElementById('edit-lon-aliado-id');
+        const inputParaQuien = document.getElementById('edit-lon-para-quien');
+        const inputCantidad = document.getElementById('edit-lon-cantidad');
+        
+        const lblHerramienta = document.getElementById('lbl-edit-lon-herramienta');
+        const lblUso = document.getElementById('lbl-edit-lon-uso');
+        const lblParaQuien = document.getElementById('lbl-edit-lon-para-quien');
+        const lblPrecio = document.getElementById('lbl-edit-lon-precio');
+        
+        // Same logic as toggleLonaCampos but with 'edit-' prefix elements...
+        if (!grpAliado) return;
+        
+        grpCantidad.style.display = 'block';
+        if (inputCantidad) inputCantidad.setAttribute('required', 'true');
+        
+        if (categoria === 'Material para Aliado') {
+            grpAliado.style.display = 'block';
+            grpParaQuien.style.display = 'none';
+            selectAliado.setAttribute('required', 'true');
+            if (inputParaQuien) inputParaQuien.removeAttribute('required');
+        } else if (categoria === 'Servicio del Departamento') {
+            grpAliado.style.display = 'none';
+            grpParaQuien.style.display = 'block';
+            selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+            grpCantidad.style.display = 'none';
+            if (inputCantidad) {
+                inputCantidad.removeAttribute('required');
+                inputCantidad.value = '1';
+            }
+        } else if (categoria === 'Implementos / Herramientas') {
+            grpAliado.style.display = 'none';
+            grpParaQuien.style.display = 'block';
+            selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+        } else if (categoria === 'Material POP / Promocional') {
+            grpAliado.style.display = 'none';
+            grpParaQuien.style.display = 'block';
+            selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+        } else {
+            grpAliado.style.display = 'none';
+            grpParaQuien.style.display = 'block';
+            selectAliado.removeAttribute('required');
+            if (inputParaQuien) inputParaQuien.setAttribute('required', 'true');
+        }
     }
 
     function abrirModalLona() {

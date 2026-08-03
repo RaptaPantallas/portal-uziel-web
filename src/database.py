@@ -4242,6 +4242,28 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
         return resultado
 
+    def actualizar_gasto_lona(self, gasto_id: int, herramienta: str, uso: str, precio: float, para_quien: str, total: float, comentario: str, categoria: str, aliado_id: int = None, cantidad: int = 1, proveedor: str = '') -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE gastos_lonas 
+                SET herramienta = %s, uso = %s, precio = %s, para_quien = %s, total = %s, 
+                    comentario = %s, categoria = %s, aliado_id = %s, cantidad = %s, proveedor = %s
+                WHERE id = %s
+            """, (herramienta, uso, precio, para_quien, total, comentario, categoria, aliado_id, cantidad, proveedor, gasto_id))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al actualizar gasto de lona #{gasto_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def eliminar_gasto_lona(self, gasto_id):
         conexion = self.conectar()
         if not conexion: return False

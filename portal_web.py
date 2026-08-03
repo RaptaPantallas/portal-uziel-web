@@ -2405,6 +2405,75 @@ def eliminar_gasto_lona(gasto_id):
     return redirect(request.referrer or url_for('ver_gastos'))
 
 
+@app.route('/gastos/lona/<int:gasto_id>/editar', methods=['POST'])
+@login_requerido
+def editar_gasto_lona_route(gasto_id):
+    """Edita un registro de gasto de lona físico / insumos."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    herramienta = request.form.get('herramienta', '').strip()
+    uso = request.form.get('uso', '').strip()
+    precio = request.form.get('precio', 0, type=float)
+    para_quien = request.form.get('para_quien', '').strip()
+    total = request.form.get('total', 0, type=float)
+    comentario = request.form.get('comentario', '').strip()
+    
+    categoria = request.form.get('categoria', 'Otros').strip()
+    aliado_rif = request.form.get('aliado_rif', '').strip()
+    cantidad = request.form.get('cantidad', 1, type=int)
+    proveedor = request.form.get('proveedor', '').strip()
+
+    if not herramienta or not uso:
+        flash(' El concepto y el uso son campos obligatorios.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    aliado_id = None
+    if categoria == 'Material para Aliado':
+        if not aliado_rif:
+            flash(' Debes seleccionar un cliente/aliado para esta categoría.', 'error')
+            return redirect(url_for('ver_gastos'))
+        cliente_datos = bd.obtener_cliente(aliado_rif)
+        nombre_aliado = cliente_datos[1] if cliente_datos else aliado_rif
+        aliado_id_bd = bd.obtener_o_crear_aliado_por_rif(aliado_rif, nombre_aliado)
+        if aliado_id_bd:
+            aliado_id = aliado_id_bd
+            para_quien = nombre_aliado
+        else:
+            para_quien = f"Aliado {aliado_rif}"
+    else:
+        aliado_id = None
+        if not para_quien:
+            para_quien = 'Departamento'
+
+    if total == 0:
+        total = precio * cantidad
+
+    creado_por = session.get('usuario')
+    ok = bd.actualizar_gasto_lona(
+        gasto_id=gasto_id,
+        herramienta=herramienta,
+        uso=uso,
+        precio=precio,
+        para_quien=para_quien,
+        total=total,
+        comentario=comentario,
+        categoria=categoria,
+        aliado_id=aliado_id,
+        cantidad=cantidad,
+        proveedor=proveedor
+    )
+
+    if ok:
+        flash(' Gasto actualizado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Editar Gasto Lona', f'Editó gasto de lona #{gasto_id}')
+    else:
+        flash(' Error al actualizar el gasto.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+
 @app.route('/gastos/lona/<int:gasto_id>/pago/nuevo', methods=['POST'])
 @login_requerido
 def nuevo_pago_lona(gasto_id):
