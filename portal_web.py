@@ -2484,6 +2484,23 @@ def editar_pago_lona(pago_id):
         
     return redirect(request.referrer or url_for('ver_gastos'))
 
+@app.route('/gastos/lona/pago/<int:pago_id>/eliminar', methods=['POST'])
+@login_requerido
+def eliminar_pago_lona_route(pago_id):
+    """Elimina un pago registrado de lona."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar pagos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    ok = bd.eliminar_pago_lona(pago_id)
+    
+    if ok:
+        flash(' Pago eliminado correctamente.', 'exito')
+    else:
+        flash(' Error al eliminar el pago.', 'error')
+        
+    return redirect(request.referrer or url_for('ver_gastos'))
+
 
 @app.route('/gastos/exportar')
 @login_requerido

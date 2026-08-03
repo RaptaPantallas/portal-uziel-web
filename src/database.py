@@ -4202,6 +4202,23 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
+    def eliminar_pago_lona(self, pago_id: int) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM pagos_lonas WHERE id = %s", (pago_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al eliminar pago #{pago_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
     def obtener_pagos_por_lona(self, gasto_lona_id: int) -> list:
         conexion = self.conectar()
         resultado = []
