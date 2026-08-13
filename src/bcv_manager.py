@@ -66,8 +66,17 @@ class BCVManager:
 
         mostrar_bs = False
         if bd:
-            # Consultamos la configuración desde la BD
-            mostrar_bs = (bd.obtener_configuracion("mostrar_bcv", "0") == "1")
+            ahora_config = time.time()
+            if not hasattr(self, 'config_cache_time'):
+                self.config_cache_time = 0
+                self.mostrar_bs_cached = False
+                
+            # Caché de 15 segundos para no saturar la BD al renderizar 100 productos en web
+            if ahora_config - self.config_cache_time > 15:
+                self.mostrar_bs_cached = (bd.obtener_configuracion("mostrar_bcv", "0") == "1")
+                self.config_cache_time = ahora_config
+                
+            mostrar_bs = self.mostrar_bs_cached
 
         if mostrar_bs:
             tasa = self.obtener_tasa_bcv()
