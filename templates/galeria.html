@@ -155,7 +155,7 @@
 
 <div class="galeria-grid" id="galeria-grid">
     {% for p in productos %}
-    <a href="{{ url_for('detalle_producto', sku=p.sku) }}" class="galeria-card" data-sku="{{ p.sku }}" data-nombre="{{ p.nombre }}">
+    <a href="{{ url_for('detalle_producto', sku=p.sku, origen='galeria') }}" class="galeria-card" data-sku="{{ p.sku }}" data-nombre="{{ p.nombre }}">
         <div class="thumb-wrap">
             {% if p.id_activo %}
             <img src="{{ url_for('servir_preview', activo_id=p.id_activo) }}" alt="{{ p.sku }}" loading="lazy">

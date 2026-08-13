@@ -25,6 +25,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import cm
 from src.database import ConexionBD
+from src.bcv_manager import bcv
 
 
 def _extraer_ruta_relativa(ruta_archivo):
@@ -155,7 +156,8 @@ def _dibujar_pagina_producto(c, sku: str, datos: tuple, ancho: float, alto: floa
     # Precio en verde y grande
     c.setFont("Helvetica-Bold", FUENTE_PREC)
     c.setFillColorRGB(*COLOR_VERDE_PREC)
-    precio_str = f"$ {precio}" if precio is not None else "—"
+    bd = ConexionBD()
+    precio_str = bcv.formatear_precio(precio, bd) if precio is not None else "—"
     c.drawString(MARGEN_X + 130, alto - 204, precio_str)
 
     # ---- Fotografía del producto ----
@@ -298,7 +300,8 @@ def _dibujar_fila_producto(c, sku: str, nombre: str, marca: str,
 
     # ---- Información del producto ----
     x_texto = X_DETALLE
-    precio_str = f"$ {precio}" if precio is not None else "—"
+    bd = ConexionBD()
+    precio_str = bcv.formatear_precio(precio, bd) if precio is not None else "—"
     labels = ["SKU:", "Producto:", "Marca:", "Compatibilidad:", "Precio:"]
     valores = [sku, nombre, str(marca), str(compatibilidad), precio_str]
     ancho_label = 68
@@ -623,10 +626,11 @@ def generar_pdf_alianza(datos: dict) -> io.BytesIO:
 
         c.drawCentredString(MARGEN_X + 305, y + 3, str(cantidad))
 
+        bd = ConexionBD()
         c.setFont("Helvetica", 9)
-        c.drawRightString(MARGEN_X + 420, y + 3, f"$ {float(precio_unit):,.2f}")
+        c.drawRightString(MARGEN_X + 420, y + 3, bcv.formatear_precio(precio_unit, bd))
         c.setFont("Helvetica-Bold", 9)
-        c.drawRightString(MARGEN_X + 490, y + 3, f"$ {float(subtotal):,.2f}")
+        c.drawRightString(MARGEN_X + 490, y + 3, bcv.formatear_precio(subtotal, bd))
 
         # Línea divisoria entre filas
         c.setStrokeColorRGB(*COLOR_LINEA)
@@ -643,9 +647,10 @@ def generar_pdf_alianza(datos: dict) -> io.BytesIO:
     y -= 16
     c.setFont("Helvetica-Bold", 12)
     c.setFillColorRGB(*COLOR_NEGRO)
-    c.drawString(MARGEN_X + 300, y, "TOTAL USD:")
+    c.drawString(MARGEN_X + 300, y, "TOTAL:")
     c.setFillColorRGB(*COLOR_VERDE_PREC)
-    c.drawRightString(ancho - MARGEN_X, y, f"$ {float(total_usd):,.2f}")
+    bd = ConexionBD()
+    c.drawRightString(ancho - MARGEN_X, y, bcv.formatear_precio(total_usd, bd))
 
     # ---- Notas ----
     if notas:
@@ -941,9 +946,10 @@ def generar_reporte_pdf(datos: dict, tipo: str = "Semanal", productos_list: list
             if len(nombre) > 35:
                 nombre = nombre[:32] + "..."
             c.drawString(MARGEN + 110, y + 3, nombre)
-            c.drawString(MARGEN + 310, y + 3, str(prod[2]))
-            c.setFillColorRGB(*COLOR_VERDE_PREC)
-            precio = f"${float(prod[4]):,.2f}" if prod[4] else "—"
+            c.drawString(MARGEN + 195, y + 3, str(prod[2]))
+            c.drawString(MARGEN + 295, y + 3, str(prod[3]))
+            bd = ConexionBD()
+            precio = bcv.formatear_precio(prod[4], bd) if prod[4] else "—"
             c.drawRightString(ancho - MARGEN - 6, y + 3, precio)
             y -= 14
 

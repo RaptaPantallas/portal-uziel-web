@@ -129,6 +129,7 @@ class ConexionBD:
         self._crear_columna_superadmin()
         # self._sembrar_usuario_jefe() # Comentado a petición del usuario para evitar que reaparezca
         self._crear_tabla_config_correo()
+        self._crear_tabla_configuraciones()
         self._crear_indices_rendimiento()
         self.inicializar_alianzas()
         self.inicializar_categorias()
@@ -588,6 +589,65 @@ class ConexionBD:
         except Error as e:
             print(f" [Seguridad] Nota: tabla config_correo no creada: {e}")
             conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def _crear_tabla_configuraciones(self):
+        """Crea la tabla de configuraciones globales si no existe."""
+        conexion = self.conectar()
+        if not conexion: return
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS configuraciones (
+                    clave VARCHAR(100) PRIMARY KEY,
+                    valor TEXT NOT NULL
+                )
+            """)
+            conexion.commit()
+        except Error as e:
+            print(f" [BD] Nota: tabla configuraciones no creada: {e}")
+            conexion.rollback()
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def obtener_configuracion(self, clave: str, por_defecto: str = "") -> str:
+        conexion = self.conectar()
+        if not conexion: return por_defecto
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("SELECT valor FROM configuraciones WHERE clave = %s", (clave,))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+            return por_defecto
+        except Error as e:
+            print(f" [BD] Error al obtener configuracion {clave}: {e}")
+            return por_defecto
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def guardar_configuracion(self, clave: str, valor: str) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                INSERT INTO configuraciones (clave, valor) VALUES (%s, %s)
+                ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor
+            """, (clave, valor))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [BD] Error al guardar configuracion {clave}: {e}")
+            conexion.rollback()
+            return False
         finally:
             if cursor: cursor.close()
             conexion.close()
@@ -3988,6 +4048,7 @@ El equipo de Importadora Uziel C.A."""
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS categoria VARCHAR(100) DEFAULT 'Otros'")
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS aliado_id INTEGER REFERENCES aliados(id) ON DELETE SET NULL")
                 cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS cantidad INTEGER DEFAULT 1")
+                cursor.execute("ALTER TABLE gastos_lonas ADD COLUMN IF NOT EXISTS proveedor VARCHAR(255) DEFAULT ''")
                 conexion.commit()
             except Exception as e:
                 print(f" [Gastos] Error al agregar nuevas columnas a gastos_lonas: {e}")
@@ -4104,16 +4165,16 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
 
-    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id=None, cantidad=1):
+    def crear_gasto_lona(self, herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id=None, cantidad=1, proveedor=''):
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
             cursor.execute("""
-                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad))
+                INSERT INTO gastos_lonas (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad, proveedor)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (herramienta, uso, precio, para_quien, total, comentario, creado_por, categoria, aliado_id, cantidad, proveedor))
             conexion.commit()
             return True
         except Error as e:
@@ -4134,7 +4195,8 @@ El equipo de Importadora Uziel C.A."""
             cursor.execute("""
                 SELECT gl.id, gl.herramienta, gl.uso, gl.precio, gl.para_quien, gl.total, gl.comentario, gl.creado_por, gl.fecha_creacion,
                        gl.categoria, gl.aliado_id, gl.cantidad, a.nombre_aliado,
-                       COALESCE((SELECT SUM(monto) FROM pagos_lonas WHERE gasto_lona_id = gl.id), 0) AS total_pagado
+                       COALESCE((SELECT SUM(monto) FROM pagos_lonas WHERE gasto_lona_id = gl.id), 0) AS total_pagado,
+                       gl.proveedor
                 FROM gastos_lonas gl
                 LEFT JOIN aliados a ON gl.aliado_id = a.id
                 WHERE EXTRACT(MONTH FROM gl.fecha_creacion) = %s AND EXTRACT(YEAR FROM gl.fecha_creacion) = %s
@@ -4148,20 +4210,71 @@ El equipo de Importadora Uziel C.A."""
             conexion.close()
         return resultado
 
-    def registrar_pago_lona(self, gasto_lona_id: int, monto: float, metodo_pago: str, referencia: str, registrado_por: str) -> bool:
+    def registrar_pago_lona(self, gasto_lona_id: int, monto: float, metodo_pago: str, referencia: str, registrado_por: str, fecha_pago: str = None) -> bool:
         conexion = self.conectar()
         if not conexion: return False
         cursor = None
         try:
             cursor = conexion.cursor()
-            cursor.execute("""
-                INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por))
+            if fecha_pago:
+                cursor.execute("""
+                    INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por, fecha_pago)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por, fecha_pago))
+            else:
+                cursor.execute("""
+                    INSERT INTO pagos_lonas (gasto_lona_id, monto, metodo_pago, referencia, registrado_por)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (gasto_lona_id, monto, metodo_pago, referencia, registrado_por))
             conexion.commit()
             return True
         except Error as e:
             print(f" [Gastos] Error al registrar pago para lona #{gasto_lona_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def actualizar_pago_lona(self, pago_id: int, monto: float, metodo_pago: str, referencia: str, fecha_pago: str) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            if fecha_pago:
+                cursor.execute("""
+                    UPDATE pagos_lonas 
+                    SET monto = %s, metodo_pago = %s, referencia = %s, fecha_pago = %s
+                    WHERE id = %s
+                """, (monto, metodo_pago, referencia, fecha_pago, pago_id))
+            else:
+                cursor.execute("""
+                    UPDATE pagos_lonas 
+                    SET monto = %s, metodo_pago = %s, referencia = %s
+                    WHERE id = %s
+                """, (monto, metodo_pago, referencia, pago_id))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al actualizar pago #{pago_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
+
+    def eliminar_pago_lona(self, pago_id: int) -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("DELETE FROM pagos_lonas WHERE id = %s", (pago_id,))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al eliminar pago #{pago_id}: {e}")
             conexion.rollback()
             return False
         finally:
@@ -4188,6 +4301,28 @@ El equipo de Importadora Uziel C.A."""
             if cursor: cursor.close()
             conexion.close()
         return resultado
+
+    def actualizar_gasto_lona(self, gasto_id: int, herramienta: str, uso: str, precio: float, para_quien: str, total: float, comentario: str, categoria: str, aliado_id: int = None, cantidad: int = 1, proveedor: str = '') -> bool:
+        conexion = self.conectar()
+        if not conexion: return False
+        cursor = None
+        try:
+            cursor = conexion.cursor()
+            cursor.execute("""
+                UPDATE gastos_lonas 
+                SET herramienta = %s, uso = %s, precio = %s, para_quien = %s, total = %s, 
+                    comentario = %s, categoria = %s, aliado_id = %s, cantidad = %s, proveedor = %s
+                WHERE id = %s
+            """, (herramienta, uso, precio, para_quien, total, comentario, categoria, aliado_id, cantidad, proveedor, gasto_id))
+            conexion.commit()
+            return True
+        except Error as e:
+            print(f" [Gastos] Error al actualizar gasto de lona #{gasto_id}: {e}")
+            conexion.rollback()
+            return False
+        finally:
+            if cursor: cursor.close()
+            conexion.close()
 
     def eliminar_gasto_lona(self, gasto_id):
         conexion = self.conectar()

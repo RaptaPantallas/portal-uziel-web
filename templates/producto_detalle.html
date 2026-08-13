@@ -1,12 +1,16 @@
 {% extends base_template %}
 {% block title %}{{ producto[1] }} — Importadora Uziel{% endblock %}
 {% block content %}
-<div class="page-header">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
     <div>
-        <h1>{{ producto[1] }}</h1>
-        <p class="subtitulo"><span class="sku-badge">SKU: {{ producto[0] }}</span></p>
+        <h2 style="margin: 0; font-size: 24px;">{{ producto[1] }}</h2>
+        <div style="color: var(--primary); font-family: monospace; margin-top: 4px;">SKU: {{ producto[0] }}</div>
     </div>
-    <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Volver al catálogo</a>
+    {% if origen == 'galeria' %}
+        <a href="{{ url_for('galeria') }}" class="btn btn-ghost">← Volver a la galería</a>
+    {% else %}
+        <a href="{{ url_for('catalogo') }}" class="btn btn-ghost">← Volver al catálogo</a>
+    {% endif %}
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}

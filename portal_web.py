@@ -54,6 +54,7 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from src.database import ConexionBD
 from src.generador_pdf import generar_pdf_alianza, generar_ficha_tecnica, generar_pdf_catalogo, generar_reporte_pdf
 from src.backup import iniciar_hilo_respaldos, crear_respaldo
+from src.bcv_manager import bcv
 
 # Iniciar hilo de respaldos automáticos
 try:
@@ -311,6 +312,9 @@ def _puede(modulo: str, accion: str = "ver") -> bool:
     _refrescar_si_es_antigua()
     return session.get('permisos_dict', {}).get(modulo, {}).get(accion, False)
 
+@app.template_filter('formato_bcv')
+def formato_bcv_filter(precio):
+    return bcv.formatear_precio(precio, bd)
 
 def login_requerido(f):
     """
@@ -625,7 +629,7 @@ def api_galeria_buscar():
             'nombre': r[1],
             'total_fotos': r[3],
             'id_activo': r[4] if len(r) > 4 else None,
-            'url': url_for('detalle_producto', sku=r[0])
+            'url': url_for('detalle_producto', sku=r[0], origen='galeria')
         })
     return {'results': items, 'total': len(items), 'es_reciente': es_reciente}
 
@@ -666,12 +670,15 @@ def detalle_producto(sku):
         })
 
     total_fotos = sum(len(lista) for lista in galeria.values())
+    
+    origen = request.args.get('origen', 'catalogo')
 
     return render_template(
         'producto_detalle.html',
         producto=producto,
         galeria=galeria,
-        total_fotos=total_fotos
+        total_fotos=total_fotos,
+        origen=origen
     )
 
 
@@ -689,7 +696,32 @@ def servir_activo(nombre_archivo):
         return redirect(url_for('login'))
 
     carpeta_activos = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'almacen_activos')
-    return send_from_directory(carpeta_activos, nombre_archivo)
+    ruta_completa = os.path.join(carpeta_activos, nombre_archivo)
+    
+    if os.path.exists(ruta_completa):
+        return send_from_directory(carpeta_activos, nombre_archivo)
+    else:
+        # Fallback to database preview if disk file is missing (e.g. ephemeral Render storage)
+        from flask import Response
+        conexion = bd.conectar()
+        if conexion:
+            cursor = None
+            try:
+                cursor = conexion.cursor()
+                cursor.execute(
+                    "SELECT preview_webp FROM activos_digitales WHERE REPLACE(ruta_archivo, '\\', '/') = %s LIMIT 1",
+                    (nombre_normalizado,)
+                )
+                resultado = cursor.fetchone()
+                if resultado and resultado[0]:
+                    return Response(resultado[0], mimetype='image/webp')
+            except Exception as e:
+                print(f"Error serving fallback image: {e}")
+            finally:
+                if cursor: cursor.close()
+                conexion.close()
+                
+        return "Not found", 404
 
 
 @app.route('/subir_imagen/<sku>', methods=['POST'])
@@ -1543,7 +1575,7 @@ def api_reporte_productos():
 
     html = ""
     for p in datos["productos"]:
-        precio = f"${float(p[4]):,.2f}" if p[4] else "—"
+        precio = bcv.formatear_precio(p[4], bd) if p[4] else "—"
         html += f"""<tr>
             <td><span class="sku-badge">{p[0]}</span></td>
             <td>{p[1]}</td>
@@ -2328,6 +2360,7 @@ def nuevo_gasto_lona():
     categoria = request.form.get('categoria', 'Otros').strip()
     aliado_rif = request.form.get('aliado_rif', '').strip()
     cantidad = request.form.get('cantidad', 1, type=int)
+    proveedor = request.form.get('proveedor', '').strip()
 
     # Validaciones y asignaciones según categoría
     if not herramienta or not uso:
@@ -2371,7 +2404,8 @@ def nuevo_gasto_lona():
         creado_por=creado_por,
         categoria=categoria,
         aliado_id=aliado_id,
-        cantidad=cantidad
+        cantidad=cantidad,
+        proveedor=proveedor
     )
 
     if ok:
@@ -2403,6 +2437,75 @@ def eliminar_gasto_lona(gasto_id):
     return redirect(request.referrer or url_for('ver_gastos'))
 
 
+@app.route('/gastos/lona/<int:gasto_id>/editar', methods=['POST'])
+@login_requerido
+def editar_gasto_lona_route(gasto_id):
+    """Edita un registro de gasto de lona físico / insumos."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar gastos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    herramienta = request.form.get('herramienta', '').strip()
+    uso = request.form.get('uso', '').strip()
+    precio = request.form.get('precio', 0, type=float)
+    para_quien = request.form.get('para_quien', '').strip()
+    total = request.form.get('total', 0, type=float)
+    comentario = request.form.get('comentario', '').strip()
+    
+    categoria = request.form.get('categoria', 'Otros').strip()
+    aliado_rif = request.form.get('aliado_rif', '').strip()
+    cantidad = request.form.get('cantidad', 1, type=int)
+    proveedor = request.form.get('proveedor', '').strip()
+
+    if not herramienta or not uso:
+        flash(' El concepto y el uso son campos obligatorios.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    aliado_id = None
+    if categoria == 'Material para Aliado':
+        if not aliado_rif:
+            flash(' Debes seleccionar un cliente/aliado para esta categoría.', 'error')
+            return redirect(url_for('ver_gastos'))
+        cliente_datos = bd.obtener_cliente(aliado_rif)
+        nombre_aliado = cliente_datos[1] if cliente_datos else aliado_rif
+        aliado_id_bd = bd.obtener_o_crear_aliado_por_rif(aliado_rif, nombre_aliado)
+        if aliado_id_bd:
+            aliado_id = aliado_id_bd
+            para_quien = nombre_aliado
+        else:
+            para_quien = f"Aliado {aliado_rif}"
+    else:
+        aliado_id = None
+        if not para_quien:
+            para_quien = 'Departamento'
+
+    if total == 0:
+        total = precio * cantidad
+
+    creado_por = session.get('usuario')
+    ok = bd.actualizar_gasto_lona(
+        gasto_id=gasto_id,
+        herramienta=herramienta,
+        uso=uso,
+        precio=precio,
+        para_quien=para_quien,
+        total=total,
+        comentario=comentario,
+        categoria=categoria,
+        aliado_id=aliado_id,
+        cantidad=cantidad,
+        proveedor=proveedor
+    )
+
+    if ok:
+        flash(' Gasto actualizado correctamente.', 'exito')
+        bd.registrar_accion_auditoria(creado_por, 'Editar Gasto Lona', f'Editó gasto de lona #{gasto_id}')
+    else:
+        flash(' Error al actualizar el gasto.', 'error')
+
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+
 @app.route('/gastos/lona/<int:gasto_id>/pago/nuevo', methods=['POST'])
 @login_requerido
 def nuevo_pago_lona(gasto_id):
@@ -2414,13 +2517,16 @@ def nuevo_pago_lona(gasto_id):
     monto = request.form.get('monto', 0, type=float)
     metodo = request.form.get('metodo_pago', '').strip()
     referencia = request.form.get('referencia', '').strip()
+    fecha_pago = request.form.get('fecha_pago', '').strip()
+    if not fecha_pago:
+        fecha_pago = None
 
     if monto <= 0 or not metodo:
         flash(' Monto y método de pago son obligatorios.', 'error')
         return redirect(url_for('ver_gastos'))
 
     creado_por = session.get('usuario')
-    ok = bd.registrar_pago_lona(gasto_id, monto, metodo, referencia, creado_por)
+    ok = bd.registrar_pago_lona(gasto_id, monto, metodo, referencia, creado_por, fecha_pago)
 
     if ok:
         flash(f' Abono de ${monto:.2f} registrado correctamente.', 'exito')
@@ -2447,10 +2553,56 @@ def ver_pagos_lona(gasto_id):
             'monto': p[1],
             'metodo_pago': p[2],
             'referencia': p[3],
-            'fecha_pago': p[4].strftime('%Y-%m-%d %H:%M') if p[4] else '',
+            'fecha_pago': p[4].strftime('%Y-%m-%d %H:%M') if hasattr(p[4], 'strftime') else str(p[4]) if p[4] else '',
             'registrado_por': p[5]
         })
     return jsonify(lista)
+
+@app.route('/gastos/lona/pago/<int:pago_id>/editar', methods=['POST'])
+@login_requerido
+def editar_pago_lona(pago_id):
+    """Edita un pago registrado de lona."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar pagos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    monto = request.form.get('monto', 0, type=float)
+    metodo = request.form.get('metodo_pago', '').strip()
+    referencia = request.form.get('referencia', '').strip()
+    fecha_pago = request.form.get('fecha_pago', '').strip()
+    
+    if not fecha_pago:
+        fecha_pago = None
+
+    if monto <= 0 or not metodo:
+        flash(' Monto y método de pago son obligatorios.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    ok = bd.actualizar_pago_lona(pago_id, monto, metodo, referencia, fecha_pago)
+    
+    if ok:
+        flash(' Pago actualizado correctamente.', 'exito')
+    else:
+        flash(' Error al actualizar el pago.', 'error')
+        
+    return redirect(request.referrer or url_for('ver_gastos'))
+
+@app.route('/gastos/lona/pago/<int:pago_id>/eliminar', methods=['POST'])
+@login_requerido
+def eliminar_pago_lona_route(pago_id):
+    """Elimina un pago registrado de lona."""
+    if not _puede("gastos", "gestionar"):
+        flash(' No tienes permisos para gestionar pagos.', 'error')
+        return redirect(url_for('ver_gastos'))
+
+    ok = bd.eliminar_pago_lona(pago_id)
+    
+    if ok:
+        flash(' Pago eliminado correctamente.', 'exito')
+    else:
+        flash(' Error al eliminar el pago.', 'error')
+        
+    return redirect(request.referrer or url_for('ver_gastos'))
 
 
 @app.route('/gastos/exportar')
@@ -2743,7 +2895,7 @@ def exportar_gastos_excel():
     headers_lon = [
         "Categoría", "Concepto / Material", "Uso / Propósito", "Cantidad", 
         "Precio Unitario ($)", "Total ($)", "Destinatario", "Aliado Comercial", 
-        "Comentario / Notas", "Creado Por"
+        "Proveedor", "Comentario / Notas", "Creado Por"
     ]
 
     for c_num, header in enumerate(headers_lon, 1):
@@ -2766,11 +2918,12 @@ def exportar_gastos_excel():
         nom_aliado = g[12] if len(g) > 12 and g[12] else ""
         coment_val = g[6] if g[6] else ""
         por_val = g[7].capitalize() if g[7] else ""
+        proveedor_val = g[14] if len(g) > 14 and g[14] else ""
 
         row_data = [
             cat_val, herr_val, uso_val, cant_val, 
             prec_val, tot_val, dest_val, nom_aliado, 
-            coment_val, por_val
+            proveedor_val, coment_val, por_val
         ]
 
         for col_num, val in enumerate(row_data, 1):

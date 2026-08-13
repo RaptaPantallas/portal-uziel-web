@@ -103,7 +103,7 @@
                             <span style="color:#e74c3c;font-weight:bold;">Agotado</span>
                         {% endif %}
                     </td>
-                    <td class="precio">${{ producto[5] }}</td>
+                    <td class="precio">{{ producto[5] | formato_bcv }}</td>
                     <td>
                         <a href="{{ url_for('detalle_producto', sku=sku) }}" class="btn btn-ghost" style="padding:6px 10px;font-size:12px;">Galería</a>
                         {% if puede('productos', 'editar') %}
